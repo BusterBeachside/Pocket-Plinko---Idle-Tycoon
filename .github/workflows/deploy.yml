@@ -1,0 +1,37 @@
+name: Build for Itch.io
+
+on:
+  push:
+    branches: ["main", "master"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Build
+        run: npm run build
+        
+      - name: Zip Dist
+        run: cd dist && zip -r ../pocket-plinko.zip .
+        
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pocket-plinko-build
+          path: pocket-plinko.zip
+          retention-days: 5
