@@ -26,12 +26,11 @@ jobs:
       - name: Build
         run: npm run build
         
-      - name: Zip Dist
-        run: cd dist && zip -r ../pocket-plinko.zip .
-        
+      # GitHub Actions automatically zips the path provided in upload-artifact.
+      # Pointing to 'dist/' creates a zip with index.html at the root.
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: pocket-plinko-build
-          path: pocket-plinko.zip
+          path: dist/
           retention-days: 5
