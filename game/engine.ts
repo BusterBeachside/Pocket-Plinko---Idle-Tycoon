@@ -870,19 +870,10 @@ export class GameEngine {
                     // Set to cache immediately so we don't spam fetch
                     this.textureCache.set(tex, img);
                     
-                    // FIXED: Removed ./ prefix for consistency with assets
-                    fetch(`images/${tex}`)
-                        .then(response => {
-                            if(response.ok) return response.blob();
-                            throw new Error('Network response was not ok.');
-                        })
-                        .then(blob => {
-                            const objectURL = URL.createObjectURL(blob);
-                            img!.src = objectURL;
-                        })
-                        .catch(e => {
-                            console.error('Texture load failed:', tex, e);
-                        });
+                    // FIXED: Use standard image src
+                    img.src = `images/${tex}`;
+                    img.onload = () => { /* redraw handled by loop */ };
+                    img.onerror = (e) => { console.error('Texture load failed:', tex, e); };
                 }
                 
                 if (img.complete && img.naturalWidth) {

@@ -19,34 +19,28 @@ export class AssetLoader {
         const total = entries.length;
         let count = 0;
 
-        const loadAsset = async ([key, path]: [string, string]) => {
-            try {
-                const response = await fetch(path);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                const blob = await response.blob();
-                const objectURL = URL.createObjectURL(blob);
-                
+        const loadAsset = ([key, path]: [string, string]) => {
+            return new Promise<void>((resolve, reject) => {
                 const img = new Image();
-                img.src = objectURL;
+                img.src = path;
                 
-                await new Promise<void>((resolve, reject) => {
-                    img.onload = () => resolve();
-                    img.onerror = () => reject(new Error('Image load failed'));
-                });
+                img.onload = () => {
+                    this.images[key] = img;
+                    count++;
+                    if (onProgress) onProgress(count / total);
+                    resolve();
+                };
                 
-                this.images[key] = img;
-            } catch (e) {
-                console.error(`Failed to load asset [${key}] from [${path}]:`, e);
-                // Create a placeholder 1x1 transparent image to prevent rendering crashes
-                const placeholder = new Image();
-                placeholder.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-                this.images[key] = placeholder;
-            } finally {
-                count++;
-                if (onProgress) onProgress(count / total);
-            }
+                img.onerror = (e) => {
+                    console.error(`Failed to load asset [${key}] from [${path}]`, e);
+                    // Placeholder
+                    img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+                    this.images[key] = img;
+                    count++;
+                    if (onProgress) onProgress(count / total);
+                    resolve(); // Resolve anyway to allow game to start
+                };
+            });
         };
 
         await Promise.all(entries.map(loadAsset));
