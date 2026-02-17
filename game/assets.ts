@@ -1,12 +1,13 @@
+
 export const ASSET_PATHS = {
-    core: './images/core.png', 
-    bonus: './images/MarbleWings.png',
-    tut_play: './images/TUT_HowToPlay.png',
-    tut_micro: './images/TUT_MicroMarbles.png',
-    tut_bonus: './images/TUT_BonusMarble.png',
-    tut_kinetic: './images/TUT_KineticCore.png',
-    tut_shard: './images/TUT_ShardShop.png',
-    tut_skins: './images/TUT_MarbleSkins.png'
+    core: 'images/core.png', 
+    bonus: 'images/MarbleWings.png',
+    tut_play: 'images/TUT_HowToPlay.png',
+    tut_micro: 'images/TUT_MicroMarbles.png',
+    tut_bonus: 'images/TUT_BonusMarble.png',
+    tut_kinetic: 'images/TUT_KineticCore.png',
+    tut_shard: 'images/TUT_ShardShop.png',
+    tut_skins: 'images/TUT_MarbleSkins.png'
 };
 
 export class AssetLoader {

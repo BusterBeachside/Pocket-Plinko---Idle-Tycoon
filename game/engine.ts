@@ -870,7 +870,8 @@ export class GameEngine {
                     // Set to cache immediately so we don't spam fetch
                     this.textureCache.set(tex, img);
                     
-                    fetch(`./images/${tex}`)
+                    // FIXED: Removed ./ prefix for consistency with assets
+                    fetch(`images/${tex}`)
                         .then(response => {
                             if(response.ok) return response.blob();
                             throw new Error('Network response was not ok.');
