@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { engine } from '../../game/engine';
 import { GameState } from '../../game/types';
@@ -73,6 +74,30 @@ export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTu
                 }}>
                     {gameState.musicMuted ? 'Unmute Music' : 'Mute Music'}
                 </button>
+                
+                <div className="option-row" style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop: '10px'}}>
+                    <span style={{fontSize:'0.9rem', color:'#ccc'}}>Peg Sounds</span>
+                    <div style={{background:'rgba(255,255,255,0.1)', borderRadius:'12px', padding:'2px', display:'flex'}}>
+                        <button className={`toggle-switch ${gameState.pegMuted ? 'active' : ''}`} onClick={() => {
+                            engine.state.pegMuted = true; forceUpdate();
+                        }}>Off</button>
+                        <button className={`toggle-switch ${!gameState.pegMuted ? 'active' : ''}`} onClick={() => {
+                            engine.state.pegMuted = false; forceUpdate();
+                        }}>On</button>
+                    </div>
+                </div>
+
+                <div className="option-row" style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop: '5px'}}>
+                    <span style={{fontSize:'0.9rem', color:'#ccc'}}>Basket Sounds</span>
+                    <div style={{background:'rgba(255,255,255,0.1)', borderRadius:'12px', padding:'2px', display:'flex'}}>
+                        <button className={`toggle-switch ${gameState.basketMuted ? 'active' : ''}`} onClick={() => {
+                            engine.state.basketMuted = true; forceUpdate();
+                        }}>Off</button>
+                        <button className={`toggle-switch ${!gameState.basketMuted ? 'active' : ''}`} onClick={() => {
+                            engine.state.basketMuted = false; forceUpdate();
+                        }}>On</button>
+                    </div>
+                </div>
                 
                 <div className="option-row" style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'15px'}}>
                     <span style={{fontSize:'0.9rem', color:'#ccc'}}>Physics</span>

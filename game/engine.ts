@@ -1,3 +1,4 @@
+
 // ... (Keep existing imports)
 import { GameState, INITIAL_STATE } from './types';
 import { UPGRADES } from './config';
@@ -28,7 +29,7 @@ interface Popup {
 }
 
 interface VisualEffect {
-    x: number; y: number; t: number; duration: number; type: 'micro_spawn';
+    x: number; y: number; t: number; duration: number; type: 'micro_spawn' | 'critical_hit';
 }
 
 export class GameEngine {
@@ -126,6 +127,15 @@ export class GameEngine {
         const saved = localStorage.getItem('plinko_react_v1');
         if (saved) {
             const parsed = JSON.parse(saved);
+            
+            // Migration for v2: Shift extraBall level by +1 to match new "Level = Count" logic
+            if (!parsed.version || parsed.version < 2) {
+                if (parsed.upgrades) {
+                    parsed.upgrades.extraBall = (parsed.upgrades.extraBall || 0) + 1;
+                }
+                parsed.version = 2;
+            }
+
             const loaded = { 
                 ...INITIAL_STATE, 
                 ...parsed,
@@ -181,6 +191,9 @@ export class GameEngine {
         const keptPermMicro = this.state.permanentMicroBoostPercent;
         const keptTheme = this.state.activeTheme;
         const keptTotalPlayTime = this.state.totalPlayTime;
+        // Also keep mute settings
+        const keptPegMuted = this.state.pegMuted;
+        const keptBasketMuted = this.state.basketMuted;
         
         this.state = {
             ...INITIAL_STATE,
@@ -196,7 +209,9 @@ export class GameEngine {
             permanentIncomeBoostPercent: keptPermIncome,
             permanentMicroBoostPercent: keptPermMicro,
             activeTheme: keptTheme,
-            totalPlayTime: keptTotalPlayTime
+            totalPlayTime: keptTotalPlayTime,
+            pegMuted: keptPegMuted,
+            basketMuted: keptBasketMuted
         };
         
         this.calculateDerivedState();
@@ -298,8 +313,8 @@ export class GameEngine {
         const rows = 12; // Enough rows to cover the board
         
         for(let r=0; r<rows; r++) {
-            // Alternate columns for honeycomb: 9 then 8
-            const cols = (r % 2 === 0) ? 9 : 8;
+            // Alternate columns for honeycomb: 11 then 10 (was 9 then 8)
+            const cols = (r % 2 === 0) ? 11 : 10;
             
             const rowWidth = (cols - 1) * spacingX;
             // Center the row within the canvas width
@@ -331,7 +346,7 @@ export class GameEngine {
     // ... (Keep spawnBalls, spawnMicroMarble, rollRarity, spawnBall, buyUpgrade, getUpgradeCost, startLoop, spawnBonusMarble, unpauseBonusMarble)
 
     spawnBalls() {
-        const targetCount = 1 + this.state.upgrades.extraBall;
+        const targetCount = this.state.upgrades.extraBall; // Removed 1+
         this.balls = this.balls.filter(b => b.y < this.height + 50);
         const currentNormalBalls = this.balls.filter(b => !b.micro).length;
 
@@ -407,7 +422,7 @@ export class GameEngine {
         const level = this.state.upgrades[id];
         const cost = Math.floor(cfg.baseCost * Math.pow(cfg.costMultiplier, level));
 
-        if (cfg.unlocksAt && (this.state.upgrades.extraBall + 1) < cfg.unlocksAt) return;
+        if (cfg.unlocksAt && (this.state.upgrades.extraBall) < cfg.unlocksAt) return; // Removed 1+
         if (cfg.maxPercent) {
              const currentPercent = this.state[id + 'Percent' as keyof GameState] as number;
              if (currentPercent >= cfg.maxPercent) return;
@@ -519,7 +534,7 @@ export class GameEngine {
     calculateScore(ball: Ball, baseValue: number, rarityMultiplier: number) {
         const isCritical = Math.random() * 100 < this.state.criticalChancePercent;
         
-        const marbleCountMult = Math.max(1, (1 + this.state.upgrades.extraBall) * 0.75);
+        const marbleCountMult = Math.max(1, (this.state.upgrades.extraBall) * 0.75); // Removed 1+
         
         const totalIncomePercent = (this.state.permanentIncomeBoostPercent || 0) + (this.state.derivedIncomeBoostPercent || 0);
         const permIncomeMult = 1 + (totalIncomePercent / 100);
@@ -643,6 +658,12 @@ export class GameEngine {
                                     const rarityMult = b.type === 'legendary' ? 4 : (b.type === 'rare' ? 3 : (b.type === 'uncommon' ? 2 : 1));
                                     const { gain, isCritical } = this.calculateScore(b, pegBase, rarityMult);
                                     
+                                    if (isCritical) {
+                                        this.visualEffects.push({
+                                            x: p.x, y: p.y, t: performance.now(), duration: 400, type: 'critical_hit'
+                                        });
+                                    }
+
                                     this.addMoney(gain);
                                     if(!this.state.disableMoneyPopups) {
                                         this.popups.push({
@@ -650,8 +671,10 @@ export class GameEngine {
                                             critical: isCritical, master: b.master, micro: b.micro
                                         });
                                     }
-                                    if(b.micro) this.audio.play('microPeg', 2, 0.3);
-                                    else this.audio.play('peg', 2, 0.3);
+                                    if (!this.state.pegMuted) {
+                                        if(b.micro) this.audio.play('microPeg', 2, 0.3);
+                                        else this.audio.play('peg', 2, 0.3);
+                                    }
                                 }
                             }
                         }
@@ -668,6 +691,12 @@ export class GameEngine {
                     const rarityMult = b.type === 'legendary' ? 4 : (b.type === 'rare' ? 3 : (b.type === 'uncommon' ? 2 : 1));
                     
                     const { gain, isCritical } = this.calculateScore(b, base, rarityMult);
+                    
+                    if (isCritical) {
+                        this.visualEffects.push({
+                            x: b.x, y: this.height - 20, t: performance.now(), duration: 500, type: 'critical_hit'
+                        });
+                    }
 
                     this.addMoney(gain);
                     if(!this.state.disableMoneyPopups) {
@@ -676,8 +705,10 @@ export class GameEngine {
                             critical: isCritical, master: b.master, micro: b.micro
                         });
                     }
-                    if(b.micro) this.audio.play('microBasket', 1, 0.4);
-                    else this.audio.play('basket', 1, 0.4);
+                    if (!this.state.basketMuted) {
+                        if(b.micro) this.audio.play('microBasket', 1, 0.4);
+                        else this.audio.play('basket', 1, 0.4);
+                    }
 
                     if (b.micro) {
                         b._remove = true; 
@@ -795,15 +826,44 @@ export class GameEngine {
             }
             const pct = elapsed / e.duration;
             const alpha = 1 - pct;
-            const r = 2 + pct * 36;
-            
-            ctx.save();
-            ctx.beginPath();
-            ctx.lineWidth = Math.max(1, 4 * (1 - pct));
-            ctx.strokeStyle = `rgba(100,220,255,${0.9 * alpha})`;
-            ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.restore();
+
+            if (e.type === 'micro_spawn') {
+                const r = 2 + pct * 36;
+                ctx.save();
+                ctx.beginPath();
+                ctx.lineWidth = Math.max(1, 4 * (1 - pct));
+                ctx.strokeStyle = `rgba(100,220,255,${0.9 * alpha})`;
+                ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            } else if (e.type === 'critical_hit') {
+                const scale = 5 + (pct * 25);
+                
+                ctx.save();
+                ctx.translate(e.x, e.y);
+                ctx.rotate(pct * 2); // Rotate as it expands
+                
+                // Draw Star
+                ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                ctx.beginPath();
+                for (let j = 0; j < 5; j++) {
+                    ctx.lineTo(Math.cos((18 + j * 72) * Math.PI / 180) * scale, 
+                               Math.sin((18 + j * 72) * Math.PI / 180) * scale);
+                    ctx.lineTo(Math.cos((54 + j * 72) * Math.PI / 180) * (scale * 0.4), 
+                               Math.sin((54 + j * 72) * Math.PI / 180) * (scale * 0.4));
+                }
+                ctx.closePath();
+                ctx.fill();
+                
+                // Draw Shockwave
+                ctx.strokeStyle = `rgba(255, 215, 0, ${alpha})`;
+                ctx.lineWidth = 2 * (1-pct);
+                ctx.beginPath();
+                ctx.arc(0, 0, scale * 0.8, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                ctx.restore();
+            }
         }
 
         // Draw Master Aura Pass (Before other balls to be in background but over board)
@@ -870,10 +930,19 @@ export class GameEngine {
                     // Set to cache immediately so we don't spam fetch
                     this.textureCache.set(tex, img);
                     
-                    // FIXED: Use standard image src
-                    img.src = `images/${tex}`;
-                    img.onload = () => { /* redraw handled by loop */ };
-                    img.onerror = (e) => { console.error('Texture load failed:', tex, e); };
+                    // FIXED: Removed ./ prefix for consistency with assets
+                    fetch(`images/${tex}`)
+                        .then(response => {
+                            if(response.ok) return response.blob();
+                            throw new Error('Network response was not ok.');
+                        })
+                        .then(blob => {
+                            const objectURL = URL.createObjectURL(blob);
+                            img!.src = objectURL;
+                        })
+                        .catch(e => {
+                            console.error('Texture load failed:', tex, e);
+                        });
                 }
                 
                 if (img.complete && img.naturalWidth) {
@@ -920,7 +989,7 @@ export class GameEngine {
         const basketW = width / 5;
         const basketH = 35; // Visual height
         
-        const marbleCountMult = Math.max(1, (1 + this.state.upgrades.extraBall) * 0.75);
+        const marbleCountMult = Math.max(1, (this.state.upgrades.extraBall) * 0.75); // Removed 1+
         const totalIncomePercent = (this.state.permanentIncomeBoostPercent || 0) + (this.state.derivedIncomeBoostPercent || 0);
         const permIncomeMult = 1 + (totalIncomePercent / 100);
         const displayMult = marbleCountMult * permIncomeMult;
@@ -988,6 +1057,9 @@ export class GameEngine {
                 const hue = (now / 5) % 360;
                 ctx.fillStyle = `hsla(${hue}, 100%, 70%, ${alpha})`;
                 ctx.font = '900 20px Arial';
+            } else if (p.micro) {
+                ctx.fillStyle = `rgba(178, 0, 255, ${alpha})`;
+                ctx.font = 'bold 16px Arial';
             } else {
                 ctx.fillStyle = p.critical ? `rgba(255, 250, 122, ${alpha})` : `rgba(255, 215, 0, ${alpha})`;
                 ctx.font = p.critical ? 'bold 24px Arial' : 'bold 16px Arial';

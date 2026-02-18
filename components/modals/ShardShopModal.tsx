@@ -3,11 +3,27 @@ import { engine } from '../../game/engine';
 import { PERM_UPGRADES, MARBLE_SKINS } from '../../game/shardShopConfig';
 import { formatNumber } from '../../game/utils';
 
-// Helper component
+// Helper component to handle independent fetch logic for each skin card
 const SkinCard = ({ skin, isOwned, isEquipped, canAfford, onBuy, onEquip }: any) => {
-    // Use direct path, no fetch blobbing needed for simple images
+    const [bgUrl, setBgUrl] = useState<string>('');
+
+    useEffect(() => {
+        if (!skin.texture) return;
+        let active = true;
+        fetch(`./images/${skin.texture}`)
+            .then(res => {
+                if (!res.ok) throw new Error('Failed to load');
+                return res.blob();
+            })
+            .then(blob => {
+                if (active) setBgUrl(URL.createObjectURL(blob));
+            })
+            .catch(() => { /* ignore loading errors */ });
+        return () => { active = false; };
+    }, [skin.texture]);
+
     const displayStyle = skin.texture 
-        ? { backgroundImage: `url(images/${skin.texture})` } 
+        ? (bgUrl ? { backgroundImage: `url(${bgUrl})` } : { backgroundColor: '#333' })
         : { background: 'radial-gradient(circle at 30% 30%, #fff, #ffd700, #ff6b6b)' };
 
     return (

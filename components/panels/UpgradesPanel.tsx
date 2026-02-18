@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { engine } from '../../game/engine';
 import { UPGRADES } from '../../game/config';
@@ -17,7 +18,7 @@ export const UpgradesPanel = ({ isOpen, onClose, gameState, onBuy }: UpgradesPan
         const cfg = UPGRADES.find(u => u.id === id);
         if(!cfg) return { locked: false, message: '' };
         
-        const balls = 1 + gameState.upgrades.extraBall;
+        const balls = gameState.upgrades.extraBall; // Removed 1+
         if (cfg.unlocksAt && balls < cfg.unlocksAt) {
             return { locked: true, message: `Req: ${cfg.unlocksAt} Marbles` };
         }

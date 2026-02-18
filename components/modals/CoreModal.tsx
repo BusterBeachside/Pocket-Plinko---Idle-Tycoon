@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { engine } from '../../game/engine';
 import { assets } from '../../game/assets';
@@ -7,7 +8,7 @@ export const CoreModal = ({ onClose, onOpenShop, onActivate }: { onClose: () => 
     const [view, setView] = useState<'main' | 'activate'>('main');
     
     const s = engine.state;
-    const balls = 1 + s.upgrades.extraBall;
+    const balls = s.upgrades.extraBall; // Removed 1+
     const money = s.money;
     const prestiged = s.timesPrestiged > 0;
     
@@ -30,9 +31,8 @@ export const CoreModal = ({ onClose, onOpenShop, onActivate }: { onClose: () => 
     baseShards = Math.max(1, baseShards);
 
     // Apply Permanent Shard Multiplier (+10% per level)
-    // Check permUpgradesLevels directly or fall back to shardMultiplierPercent
-    const permLevel = s.permUpgradesLevels['perm_shard_multi'] || 0;
-    const shardMultiPercent = (s.shardMultiplierPercent || 0) + (permLevel * 10);
+    // Use state.shardMultiplierPercent directly, as it includes permanent upgrades applied in engine
+    const shardMultiPercent = s.shardMultiplierPercent || 0;
     
     let totalShards = baseShards;
     if (shardMultiPercent > 0) {

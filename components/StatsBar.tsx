@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { engine } from '../game/engine';
 import { formatNumber } from '../game/utils';
@@ -13,12 +14,12 @@ export const StatsBar = () => {
         const loop = () => {
             setMoney(engine.state.money);
             setMps(engine.state.currentMps || 0);
-            setBalls(1 + engine.state.upgrades.extraBall);
+            setBalls(engine.state.upgrades.extraBall); // Removed 1+
             
             // Calculate effective Peg Value for display
             // Base * MarbleMult * IncomeMult
             const base = engine.state.pegValue;
-            const marbleMult = Math.max(1, (1 + engine.state.upgrades.extraBall) * 0.75);
+            const marbleMult = Math.max(1, (engine.state.upgrades.extraBall) * 0.75); // Removed 1+
             const totalIncomePercent = (engine.state.permanentIncomeBoostPercent || 0) + (engine.state.derivedIncomeBoostPercent || 0);
             const incomeMult = 1 + (totalIncomePercent / 100);
             

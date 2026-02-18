@@ -13,6 +13,7 @@ export interface BonusMarbleState {
 }
 
 export interface GameState {
+    version: number; // For save migration
     money: number;
     lifetimeEarnings: number;
     ballsCount: number;
@@ -60,6 +61,8 @@ export interface GameState {
     musicVolume: number;
     sfxMuted: boolean;
     musicMuted: boolean;
+    pegMuted: boolean;
+    basketMuted: boolean;
     disableMoneyPopups: boolean;
     activeTheme: 'dark' | 'purple'; // New theme setting
 
@@ -85,6 +88,7 @@ export interface GameState {
 }
 
 export const INITIAL_STATE: GameState = {
+    version: 2,
     money: 0,
     lifetimeEarnings: 0,
     ballsCount: 1,
@@ -110,7 +114,7 @@ export const INITIAL_STATE: GameState = {
     shardMultiplierPercent: 0,
 
     upgrades: {
-        extraBall: 0,
+        extraBall: 1, // Start at Level 1 (which equals 1 ball)
         pegValue: 0,
         ballSpeed: 0,
         basketValue: 0,
@@ -126,6 +130,8 @@ export const INITIAL_STATE: GameState = {
     musicVolume: 0.3,
     sfxMuted: false,
     musicMuted: false,
+    pegMuted: false,
+    basketMuted: false,
     disableMoneyPopups: false,
     activeTheme: 'dark', // Default to dark
 

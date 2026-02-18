@@ -1,10 +1,11 @@
+
 import { UpgradeConfig } from './types';
 
 export const UPGRADES: UpgradeConfig[] = [
     { 
         id: 'extraBall', 
         name: 'Extra Marble', 
-        baseCost: 25, 
+        baseCost: 18, // Adjusted from 25 so Level 2 (18 * 1.4^1 = 25.2) matches previous first upgrade cost
         costMultiplier: 1.4, 
         description: 'Adds another marble to the board.',
         unlocksAt: 1 

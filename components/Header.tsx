@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { engine } from '../game/engine';
 import { assets } from '../game/assets';
@@ -6,7 +7,7 @@ export const Header = ({ onCoreClick }: { onCoreClick: () => void }) => {
     const [glow, setGlow] = useState(false);
     useEffect(() => {
         const i = setInterval(() => {
-            const balls = 1 + engine.state.upgrades.extraBall;
+            const balls = engine.state.upgrades.extraBall; // Removed 1+
             setGlow(balls >= 50);
         }, 1000);
         return () => clearInterval(i);
