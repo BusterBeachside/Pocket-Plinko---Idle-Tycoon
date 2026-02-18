@@ -161,3 +161,27 @@ export interface UpgradeConfig {
     unlocksAt?: number; // Requires N balls
     maxPercent?: number; // Max level cap based on percentage
 }
+
+// Entity Interfaces extracted from Engine
+export interface Ball {
+    x: number; y: number; vx: number; vy: number; radius: number;
+    id: number;
+    master: boolean;
+    micro: boolean;
+    type: 'normal' | 'uncommon' | 'rare' | 'legendary';
+    trail: {x:number, y:number}[];
+    _pegCooldown: number;
+    _remove?: boolean;
+}
+
+export interface Peg {
+    x: number; y: number; glow: number; cooldown: number;
+}
+
+export interface Popup {
+    x: number; y: number; text: string; t: number; critical: boolean; master: boolean; micro: boolean;
+}
+
+export interface VisualEffect {
+    x: number; y: number; t: number; duration: number; type: 'micro_spawn' | 'critical_hit';
+}

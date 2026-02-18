@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { assets, ASSET_PATHS } from '../game/assets';
 
@@ -35,9 +36,10 @@ export const TutorialOverlay = ({ onClose, imageKey }: { onClose: () => void, im
     const currentSrc = assets.getSrc(activeKey);
 
     return (
-        <div className="tutorial-overlay" onClick={handleNext}>
+        <div className="tutorial-overlay">
             <div className={`tutorial-card pop-in ${isClosing ? 'pop-out' : 'show'}`}>
-                <img src={currentSrc} alt="Tutorial" />
+                <img src={currentSrc} alt="Tutorial" onClick={handleNext} />
+                <button className="tutorial-btn" onClick={handleNext}>Got it!</button>
             </div>
         </div>
     );

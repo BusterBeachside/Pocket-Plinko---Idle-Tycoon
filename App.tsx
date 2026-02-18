@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { engine } from './game/engine';
 import { assets } from './game/assets';
@@ -107,7 +108,7 @@ const App = () => {
 
     // Check for Kinetic Core Tutorial (>= 50 Marbles)
     useEffect(() => {
-        const balls = 1 + gameState.upgrades.extraBall;
+        const balls = gameState.upgrades.extraBall; // Fixed: Do not add +1, level is the count
         if (balls >= 50 && !localStorage.getItem('plinko_seen_kinetic_tutorial_v1')) {
              setSpecificTutorial('tut_kinetic');
         }
