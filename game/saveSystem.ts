@@ -22,7 +22,9 @@ export class SaveSystem {
                 permUpgradesLevels: { ...INITIAL_STATE.permUpgradesLevels, ...parsed.permUpgradesLevels },
                 permUpgradeCosts: { ...INITIAL_STATE.permUpgradeCosts, ...parsed.permUpgradeCosts },
                 ownedMarbles: parsed.ownedMarbles || INITIAL_STATE.ownedMarbles,
-                activeTheme: parsed.activeTheme || INITIAL_STATE.activeTheme // Load theme
+                activeTheme: parsed.activeTheme || INITIAL_STATE.activeTheme, // Load theme
+                // Initialize currentRunPeakMps if missing (migration)
+                currentRunPeakMps: parsed.currentRunPeakMps ?? (parsed.currentMps || 0)
             };
             // Ensure upgrades object structure is complete even if loaded from partial save
             loaded.upgrades = { ...INITIAL_STATE.upgrades, ...(parsed.upgrades || {}) };
@@ -72,9 +74,35 @@ export class SaveSystem {
         const keptTotalPlayTime = currentState.totalPlayTime;
         const keptPegMuted = currentState.pegMuted;
         const keptBasketMuted = currentState.basketMuted;
+        const keptPeakMps = currentState.peakMps; // All-time peak persists
         
+        // Deep copy INITIAL_STATE to avoid reference issues, then override mutable fields explicitly
+        const baseState = JSON.parse(JSON.stringify(INITIAL_STATE));
+
         const newState = {
-            ...INITIAL_STATE,
+            ...baseState,
+            
+            // Explicitly reset mutable progression fields to ensure clean slate
+            money: 0,
+            lifetimeEarnings: 0,
+            ballsCount: 1,
+            currentRunPeakMps: 0, // Reset current run peak
+            currentMps: 0,
+            
+            upgrades: {
+                extraBall: 1,
+                pegValue: 0,
+                ballSpeed: 0,
+                basketValue: 0,
+                uncommonChance: 0,
+                rareChance: 0,
+                legendaryChance: 0,
+                criticalChance: 0,
+                microValue: 0,
+                bonusValue: 0
+            },
+
+            // Restore kept values
             kineticShards: keptShards,
             timesPrestiged: keptPrestiged,
             masterMultiplier: keptMasterMult,
@@ -89,7 +117,8 @@ export class SaveSystem {
             activeTheme: keptTheme,
             totalPlayTime: keptTotalPlayTime,
             pegMuted: keptPegMuted,
-            basketMuted: keptBasketMuted
+            basketMuted: keptBasketMuted,
+            peakMps: keptPeakMps
         };
         
         this.calculateDerivedState(newState);

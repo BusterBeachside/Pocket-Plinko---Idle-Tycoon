@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { engine } from '../../game/engine';
 import { formatNumber } from '../../game/utils';
@@ -35,7 +36,8 @@ export const StatsModal = ({ onClose }: { onClose: () => void }) => {
                 </div>
                 <div className="stats-grid">
                     <div className="stat-tile"><div className="stat-label">Lifetime $</div><div className="stat-value" style={{color:'#ffd700'}}>${format(s.lifetimeEarnings + s.money)}</div></div>
-                    <div className="stat-tile"><div className="stat-label">Peak $/s</div><div className="stat-value">${format(s.peakMps)}/s</div></div>
+                    <div className="stat-tile"><div className="stat-label">Peak $/s (Run)</div><div className="stat-value">${format(s.currentRunPeakMps || 0)}/s</div></div>
+                    <div className="stat-tile"><div className="stat-label">Peak $/s (All-Time)</div><div className="stat-value">${format(s.peakMps)}/s</div></div>
                     <div className="stat-tile"><div className="stat-label">Times Prestiged</div><div className="stat-value">{s.timesPrestiged}</div></div>
                     <div className="stat-tile"><div className="stat-label">Kinetic Shards</div><div className="stat-value" style={{color:'#00ffff'}}>{format(s.kineticShards)}</div></div>
                     <div className="stat-tile"><div className="stat-label">Master Multiplier</div><div className="stat-value">x{format(totalMasterMultiplier)}</div></div>

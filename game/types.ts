@@ -68,6 +68,7 @@ export interface GameState {
 
     // Stats
     peakMps: number;
+    currentRunPeakMps: number; // New: Peak MPS for current run
     currentMps: number;
     lastSaveTime: number;
     totalPlayTime: number; // New: seconds
@@ -136,6 +137,7 @@ export const INITIAL_STATE: GameState = {
     activeTheme: 'dark', // Default to dark
 
     peakMps: 0,
+    currentRunPeakMps: 0,
     currentMps: 0,
     lastSaveTime: Date.now(),
     totalPlayTime: 0,

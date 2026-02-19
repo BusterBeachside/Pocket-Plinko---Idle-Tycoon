@@ -133,9 +133,15 @@ export class GameEngine {
     private checkOfflineIncome() {
         if (this.state.lastSaveTime) {
             const now = Date.now();
-            const diffSeconds = (now - this.state.lastSaveTime) / 1000;
-            if (diffSeconds > 60 && this.state.peakMps > 0) {
-                const earnings = Math.floor(this.state.peakMps * 0.25 * diffSeconds);
+            let diffSeconds = (now - this.state.lastSaveTime) / 1000;
+            
+            // Cap to 24 hours (86400 seconds)
+            if (diffSeconds > 86400) diffSeconds = 86400;
+
+            // Only award if > 30 seconds away
+            // Use currentRunPeakMps for calculation
+            if (diffSeconds > 30 && this.state.currentRunPeakMps > 0) {
+                const earnings = Math.floor(this.state.currentRunPeakMps * 0.25 * diffSeconds);
                 if (earnings > 0) {
                     this.state.money += earnings;
                     this.state.lifetimeEarnings += earnings;
@@ -289,7 +295,15 @@ export class GameEngine {
             
             const mps = Math.round(this.incomeBuffer);
             this.state.currentMps = mps;
+            
+            // Update All-time Peak
             if (mps > this.state.peakMps) this.state.peakMps = mps;
+            
+            // Update Current Run Peak
+            if (mps > (this.state.currentRunPeakMps || 0)) {
+                this.state.currentRunPeakMps = mps;
+            }
+            
             this.incomeBuffer = 0;
             this.saveState();
             
@@ -336,7 +350,9 @@ export class GameEngine {
             const dist = Math.sqrt((x-bx)*(x-bx) + (y-by)*(y-by));
             if (dist < 40) {
                 const bonusRate = 0.10 + (this.state.upgrades.bonusValue * 0.05); 
-                const amount = Math.max(100, Math.round(this.state.peakMps * bonusRate));
+                // Use currentRunPeakMps instead of all-time peak
+                const peakToUse = this.state.currentRunPeakMps || this.state.currentMps || 0;
+                const amount = Math.max(100, Math.round(peakToUse * bonusRate));
                 this.addMoney(amount);
                 // NOTE: We do NOT push to popups here anymore to let UI handle it externally
                 this.audio.play('bonus');

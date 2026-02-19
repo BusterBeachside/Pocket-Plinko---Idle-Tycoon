@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { engine } from '../game/engine';
 
@@ -35,19 +36,38 @@ export const PrestigeOverlay = ({ onComplete }: { onComplete: () => void }) => {
         engine.audio.setMusicVolume(0); // Mute music for prestige SFX
 
         // Re-center balls for the start of animation relative to screen center
-        // We want them to start roughly where they are relative to game canvas, 
-        // but since game canvas scales, we project them to screen coordinates.
         const centerX = cvs.width / 2;
         const centerY = cvs.height / 2;
         
-        // Prepare animation objects
+        // --- CHAOTIC SETUP ---
+        const total = marblesSnapshot.length;
+        // Create an array of indices [0, 1, 2, ... N]
+        const indices = Array.from({length: total}, (_, i) => i);
+        // Fisher-Yates shuffle to randomize the "suck order"
+        for (let i = indices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [indices[i], indices[j]] = [indices[j], indices[i]];
+        }
+
         const animBalls = marblesSnapshot.map((b, i) => {
-            // Distribute them in a chaotic cloud near center if they aren't already
+            const orderPos = indices[i];
             return {
                 ...b,
                 x: centerX + (Math.random() - 0.5) * 300,
                 y: centerY + (Math.random() - 0.5) * 400,
-                radius: b.radius || 6
+                radius: b.radius || 6,
+                
+                // Chaos factors
+                // Random spin direction and speed multiplier
+                speedVar: (Math.random() < 0.5 ? 1 : -1) * (1.5 + Math.random() * 2), 
+                phaseOffset: Math.random() * Math.PI * 2,
+                
+                // Suction Timing:
+                // Spread the start times over the first 1.5s of the 2.5s vortex phase
+                suctionDelay: (orderPos / Math.max(1, total)) * 1.5,
+                
+                // How fast it zips to center once started (0.3s - 0.5s)
+                suctionDuration: 0.3 + Math.random() * 0.2
             };
         });
         
@@ -61,6 +81,7 @@ export const PrestigeOverlay = ({ onComplete }: { onComplete: () => void }) => {
         const loop = () => {
             const now = performance.now();
             const dt = (now - start) / 1000;
+            const globalTime = now * 0.002;
             
             // Clear
             ctx.clearRect(0, 0, cvs.width, cvs.height);
@@ -73,13 +94,15 @@ export const PrestigeOverlay = ({ onComplete }: { onComplete: () => void }) => {
                 const progress = Math.min(1, dt / 1.5);
                 animBalls.forEach((b, i) => {
                     const angle = (i / animBalls.length) * Math.PI * 2;
-                    // Spiraling out target
-                    const targetR = 250;
+                    // Spiraling out target with Wave Motion
+                    const waveOffset = Math.sin(globalTime * 3 + i * 0.5) * 20;
+                    const targetR = 250 + waveOffset;
+                    
                     const r = targetR * (1 - Math.pow(1 - progress, 2)); // Ease out
                     
                     // Orbit
-                    b.x = centerX + Math.cos(angle + now * 0.001) * r;
-                    b.y = centerY + Math.sin(angle + now * 0.001) * r;
+                    b.x = centerX + Math.cos(angle + globalTime) * r;
+                    b.y = centerY + Math.sin(angle + globalTime) * r;
                 });
                 
                 if (progress >= 1) {
@@ -87,21 +110,24 @@ export const PrestigeOverlay = ({ onComplete }: { onComplete: () => void }) => {
                     start = now;
                 }
             } else if (phase === 'hold') {
-                // Gentle float
+                // Continuous Wave Float
                 animBalls.forEach((b, i) => {
-                    const angle = (i / animBalls.length) * Math.PI * 2 + (now * 0.0005);
-                    const r = 250 + Math.sin(now * 0.005 + i) * 20;
+                    const angle = (i / animBalls.length) * Math.PI * 2 + globalTime;
+                    const waveOffset = Math.sin(globalTime * 3 + i * 0.5) * 20;
+                    const r = 250 + waveOffset;
+                    
                     b.x = centerX + Math.cos(angle) * r;
                     b.y = centerY + Math.sin(angle) * r;
                 });
 
-                if (dt > 0.5) {
+                if (dt > 1.0) { // Slightly longer hold to appreciate the wave
                     phase = 'vortex';
                     start = now;
                     engine.audio.play('prestige2'); // Vortex sound
                 }
             } else if (phase === 'vortex') {
-                const progress = Math.min(1, dt / 3);
+                const duration = 2.5; // Longer phase to allow staggered intake
+                const progress = Math.min(1, dt / duration);
                 
                 // Draw vortex bg
                 const hue = (now / 20) % 360;
@@ -115,8 +141,28 @@ export const PrestigeOverlay = ({ onComplete }: { onComplete: () => void }) => {
                 ctx.globalCompositeOperation = 'source-over';
 
                 animBalls.forEach((b, i) => {
-                    const angle = (i / animBalls.length) * Math.PI * 2 + (dt * 8); // Spin faster
-                    const r = 250 * (1 - Math.pow(progress, 3)); // Suck in cubic
+                    // 1. Extreme Spin
+                    // Base rotation + Time-based acceleration + Random SpeedVar
+                    const spinSpeed = 2 + (dt * 8 * Math.abs(b.speedVar));
+                    const angle = (i / animBalls.length) * Math.PI * 2 + (now * 0.001 * spinSpeed * Math.sign(b.speedVar));
+
+                    // 2. Staggered Suction Logic
+                    let r = 250;
+                    
+                    if (dt > b.suctionDelay) {
+                        // Suction has started for this ball
+                        const suckT = (dt - b.suctionDelay) / b.suctionDuration;
+                        const suckProgress = Math.min(1, Math.max(0, suckT));
+                        
+                        // Cubic In easing for "SHOOP" effect
+                        const suction = Math.pow(suckProgress, 3);
+                        r = 250 * (1 - suction);
+                    } else {
+                        // Waiting to be sucked in, keep waving
+                        const waveOffset = Math.sin(globalTime * 10 + i * 0.5) * 10;
+                        r = 250 + waveOffset;
+                    }
+
                     b.x = centerX + Math.cos(angle) * r;
                     b.y = centerY + Math.sin(angle) * r;
                 });
