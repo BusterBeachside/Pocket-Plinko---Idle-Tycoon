@@ -5,6 +5,9 @@ import { formatNumber } from './utils';
 import { SaveSystem } from './saveSystem';
 import { GameRenderer } from './renderer';
 import { ShopSystem } from './shop';
+import { ProgressionManager } from './progression';
+import { PhysicsManager } from './physics';
+import { Spawner } from './spawner';
 
 export class GameEngine {
     state: GameState;
@@ -47,6 +50,13 @@ export class GameEngine {
     // UI Throttle
     lastNotify: number = 0;
 
+    microAutoclickerTimer: number = 0;
+
+    notifications: { id: string, message: string, type: 'achievement' | 'mission', fading?: boolean }[] = [];
+    
+    isGameStarted: boolean = false;
+    isResetting: boolean = false;
+
     constructor() {
         this.state = SaveSystem.loadState();
         SaveSystem.calculateDerivedState(this.state); // Ensure stats are correct on load
@@ -73,16 +83,58 @@ export class GameEngine {
                     }
                 }
             });
+            
+            // Visibility Change Listener
+            document.addEventListener('visibilitychange', () => {
+                this.handleVisibilityChange();
+            });
         }
 
         this.startLoop();
     }
 
+    handleVisibilityChange() {
+        if (document.hidden) {
+            this.state.lastTabOutTime = Date.now();
+            this.audio.suspend();
+            if (this.state.bonusMarble) {
+                this.state.bonusMarble.paused = true;
+            }
+            this.saveState();
+        } else {
+            this.audio.resume();
+            if (this.state.bonusMarble) {
+                this.state.bonusMarble.paused = false;
+            }
+            
+            // Calculate offline income from tab-out
+            if (this.state.lastTabOutTime) {
+                const now = Date.now();
+                const diffSeconds = (now - this.state.lastTabOutTime) / 1000;
+                
+                // Only award if > 5 seconds (to avoid quick switching spam)
+                if (diffSeconds > 5 && this.state.currentRunPeakMps > 0) {
+                    // Cap at 24 hours
+                    const cappedSeconds = Math.min(diffSeconds, 86400);
+                    const earnings = Math.floor(this.state.currentRunPeakMps * 0.25 * cappedSeconds);
+                    
+                    if (earnings > 0) {
+                        this.addMoney(earnings, false); // Don't count towards income buffer to avoid spiking MPS
+                        this.offlineEarnings = earnings;
+                        this.pushNotification(`Welcome back! You earned $${formatNumber(earnings)} while away.`, 'mission');
+                    }
+                }
+                this.state.lastTabOutTime = undefined;
+            }
+        }
+    }
+
     start() {
         this.running = true;
+        this.isGameStarted = true;
         this.lastTime = performance.now();
         this.lastBonusSpawn = Date.now(); 
-        this.checkOfflineIncome();
+        this.checkOfflineIncome(); // Check for long-term offline (closed browser)
         this.spawnBalls();
     }
 
@@ -96,13 +148,26 @@ export class GameEngine {
     }
 
     saveState() {
+        if (this.isResetting) return;
         SaveSystem.saveState(this.state);
+    }
+
+    hardReset() {
+        this.isResetting = true;
+        this.running = false;
+        if (typeof window !== 'undefined') {
+            localStorage.clear();
+            location.reload();
+        }
     }
     
     resetForPrestige(shardsEarned: number, masterMultiGain: number) {
         // Create new state via SaveSystem
         this.state = SaveSystem.createPrestigeState(this.state, shardsEarned, masterMultiGain);
         
+        // Track mission
+        ProgressionManager.updateMissionProgress(this.state, 'prestige', 1);
+
         this.saveState();
         this.balls = [];
         this.spawnBalls();
@@ -161,115 +226,36 @@ export class GameEngine {
     }
 
     initPegs() {
-        this.pegs = [];
-        const spacingX = 40; 
-        const spacingY = 40; 
-        const rows = 12; // Enough rows to cover the board
-        
-        for(let r=0; r<rows; r++) {
-            // Alternate columns for honeycomb: 11 then 10 (was 9 then 8)
-            const cols = (r % 2 === 0) ? 11 : 10;
-            
-            const rowWidth = (cols - 1) * spacingX;
-            // Center the row within the canvas width
-            const startX = (this.width - rowWidth) / 2;
-            
-            for(let c=0; c<cols; c++) {
-                this.pegs.push({
-                    x: startX + (c * spacingX),
-                    y: 80 + (r * spacingY),
-                    glow: 0,
-                    cooldown: 0
-                });
-            }
-        }
-
-        this.gridCols = Math.ceil(this.width / this.gridSize);
-        this.gridRows = Math.ceil(this.height / this.gridSize);
-        this.grid = Array.from({ length: this.gridRows }, () => Array.from({ length: this.gridCols }, () => []));
-
-        this.pegs.forEach(p => {
-            const gx = Math.floor(p.x / this.gridSize);
-            const gy = Math.floor(p.y / this.gridSize);
-            if(gx >= 0 && gx < this.gridCols && gy >= 0 && gy < this.gridRows) {
-                this.grid[gy][gx].push(p);
-            }
-        });
+        const { pegs, grid, gridCols, gridRows } = Spawner.initPegs(this.width, this.height, this.gridSize);
+        this.pegs = pegs;
+        this.grid = grid;
+        this.gridCols = gridCols;
+        this.gridRows = gridRows;
     }
 
     spawnBalls() {
-        const targetCount = this.state.upgrades.extraBall; // Removed 1+
-        this.balls = this.balls.filter(b => b.y < this.height + 50);
-        const currentNormalBalls = this.balls.filter(b => !b.micro).length;
-
-        if (currentNormalBalls < targetCount) {
-            const hasMasterUnlock = this.state.masterMultiplier > 0 || this.state.timesPrestiged > 0;
-            const masterExists = this.balls.some(b => b.master);
-            
-            if (hasMasterUnlock && !masterExists) {
-                this.spawnBall({ master: true });
-            } else {
-                this.spawnBall();
-            }
-        }
+        Spawner.spawnBalls(this.state, this.balls, this.width, this.height, (o) => this.spawnBall(o));
     }
 
     spawnMicroMarble(ignoredX: number, ignoredY: number) {
-        const spawnX = Math.random() * this.width;
-        const spawnY = 20;
-        
-        this.spawnBall({ micro: true, x: spawnX, y: spawnY });
-        
-        this.visualEffects.push({
-            x: spawnX, y: spawnY, t: performance.now(), duration: 420, type: 'micro_spawn'
-        });
+        Spawner.spawnMicroMarble(this.width, (o) => this.spawnBall(o), (e) => this.visualEffects.push(e));
+        ProgressionManager.updateMissionProgress(this.state, 'micro_marbles', 1);
     }
 
     rollRarity(): 'normal' | 'uncommon' | 'rare' | 'legendary' {
-        const legChance = (this.state.legendaryChancePercent || 0) / 100;
-        const rareChance = (this.state.rareChancePercent || 0) / 100;
-        const uncChance = (this.state.uncommonChancePercent || 0) / 100;
-
-        if (Math.random() < legChance) return 'legendary';
-        if (Math.random() < rareChance) return 'rare';
-        if (Math.random() < uncChance) return 'uncommon';
-        return 'normal';
+        return PhysicsManager.rollRarity(this.state);
     }
 
     spawnBall(overrides: Partial<Ball> = {}) {
-        let isMaster = overrides.master || false;
-        let isMicro = overrides.micro || false;
-        let type: 'normal' | 'uncommon' | 'rare' | 'legendary' = 'normal';
-
-        if (!isMaster && !isMicro) {
-            type = this.rollRarity();
-        }
-
-        // Master ball radius reduced to 6 (was 8) to match normal balls and avoid getting stuck
-        const radius = isMaster ? 6 : (isMicro ? 3 : 6);
-
-        const x = overrides.x !== undefined ? overrides.x : (this.width / 2 + (Math.random() - 0.5) * 50);
-        const y = overrides.y !== undefined ? overrides.y : 20;
-
-        this.balls.push({
-            x: x,
-            y: y,
-            vx: (Math.random() - 0.5) * 4,
-            vy: 0,
-            radius,
-            id: Math.random(),
-            master: isMaster,
-            micro: isMicro,
-            type,
-            trail: [],
-            _pegCooldown: 0,
-            _remove: false,
-            ...overrides
-        });
+        const ball = Spawner.createBall(this.state, this.width, overrides);
+        this.balls.push(ball);
     }
 
     buyUpgrade(id: keyof GameState['upgrades']) {
         if (ShopSystem.buyUpgrade(this.state, id, this.audio, () => this.saveState())) {
+            this.state.lifetimeUpgradesBought = (this.state.lifetimeUpgradesBought || 0) + 1;
+            // Track mission
+            ProgressionManager.updateMissionProgress(this.state, 'upgrades_bought', 1);
             this.notify();
         }
     }
@@ -307,10 +293,13 @@ export class GameEngine {
             this.incomeBuffer = 0;
             this.saveState();
             
-            if (Date.now() - this.lastBonusSpawn > 60000) {
+            if (Date.now() - this.lastBonusSpawn > 60000 && this.isGameStarted) {
                 if (!this.state.bonusMarble?.active) {
                     const roll = Math.random();
-                    if (roll < this.state.bonusChance) {
+                    const tutorialSeen = typeof window !== 'undefined' && localStorage.getItem('plinko_seen_bonus_tutorial_v1');
+                    
+                    // Force first spawn if tutorial not seen
+                    if (roll < this.state.bonusChance || !tutorialSeen) {
                         this.spawnBonusMarble();
                     } else {
                         this.lastBonusSpawn = Date.now(); 
@@ -321,19 +310,9 @@ export class GameEngine {
     }
     
     spawnBonusMarble() {
-        if (!this.state.bonusMarble) this.state.bonusMarble = { active: false, x: 0, y: 0, baseY: 0, t: 0, paused: false };
-        
-        // Trigger Tutorial Check if not seen
-        if (typeof window !== 'undefined' && !localStorage.getItem('plinko_seen_bonus_tutorial_v1')) {
-            this.state.bonusMarble.paused = true;
-            window.dispatchEvent(new CustomEvent('request-tutorial', { detail: { key: 'tut_bonus' } }));
-        }
-
-        this.state.bonusMarble.active = true;
-        this.state.bonusMarble.x = this.width + 50;
-        this.state.bonusMarble.y = 100 + Math.random() * 200;
-        this.state.bonusMarble.baseY = this.state.bonusMarble.y;
-        this.state.bonusMarble.t = 0;
+        Spawner.spawnBonusMarble(this.state, this.width, (key) => {
+            window.dispatchEvent(new CustomEvent('request-tutorial', { detail: { key } }));
+        });
         this.lastBonusSpawn = Date.now();
     }
     
@@ -353,10 +332,15 @@ export class GameEngine {
                 // Use currentRunPeakMps instead of all-time peak
                 const peakToUse = this.state.currentRunPeakMps || this.state.currentMps || 0;
                 const amount = Math.max(100, Math.round(peakToUse * bonusRate));
-                this.addMoney(amount);
+                this.addMoney(amount, false);
                 // NOTE: We do NOT push to popups here anymore to let UI handle it externally
                 this.audio.play('bonus');
                 this.state.bonusMarble.active = false;
+                this.state.lifetimeBonusMarbles = (this.state.lifetimeBonusMarbles || 0) + 1;
+
+                // Track mission
+                ProgressionManager.updateMissionProgress(this.state, 'bonus_marbles', 1);
+
                 this.notify();
                 return amount;
             }
@@ -364,68 +348,47 @@ export class GameEngine {
         return 0;
     }
 
-    addMoney(amount: number) {
+    addMoney(amount: number, countTowardsIncome: boolean = true) {
         this.state.money += amount;
         this.state.lifetimeEarnings += amount;
-        this.incomeBuffer += amount;
+        if (countTowardsIncome) {
+            this.incomeBuffer += amount;
+        }
     }
 
     calculateScore(ball: Ball, baseValue: number, rarityMultiplier: number) {
-        const isCritical = Math.random() * 100 < this.state.criticalChancePercent;
-        
-        const marbleCountMult = Math.max(1, (this.state.upgrades.extraBall) * 0.75); // Removed 1+
-        
-        const totalIncomePercent = (this.state.permanentIncomeBoostPercent || 0) + (this.state.derivedIncomeBoostPercent || 0);
-        const permIncomeMult = 1 + (totalIncomePercent / 100);
-        
-        let multiplier = rarityMultiplier;
-
-        if (ball.micro) {
-            const transientPercent = this.state.microValuePercent || 0;
-            const permanentPercent = this.state.permanentMicroBoostPercent || 0;
-            const microValuePercentage = 1 + transientPercent + permanentPercent;
-            multiplier *= (microValuePercentage / 100);
-        }
-
-        if (ball.master) {
-            const ownedBonus = Math.floor(this.state.ownedMarbles.length); 
-            const milestoneBonus = Math.floor(this.state.ownedMarbles.length / 10) * 5;
-            const totalMasterMult = (1 + (this.state.masterMultiplier || 0) + ownedBonus + milestoneBonus);
-            
-            multiplier = totalMasterMult;
-        }
-
-        let gain = baseValue * multiplier * marbleCountMult * permIncomeMult;
-        if (ball.micro && gain < 1 && gain > 0.01) gain = 1;
-        
-        // Round to nearest whole number first
-        gain = Math.round(gain);
-        
-        // Apply critical hit doubling after rounding to ensure precise 2x
-        if (isCritical) {
-            gain *= 2;
-        }
-        
-        return { gain, isCritical };
+        return PhysicsManager.calculateScore(this.state, ball, baseValue, rarityMultiplier);
     }
 
     update(dt: number) {
         if (!this.running) return; 
         
+        this.checkAchievements();
+        this.checkMissions();
+
         // Track play time
         this.state.totalPlayTime = (this.state.totalPlayTime || 0) + dt;
 
-        // Force UI update periodically to keep buttons enabled/disabled correctly
+        // Micro Autoclicker Logic
+        const autoLevel = this.state.permUpgradesLevels['perm_micro_autoclicker'] || 0;
+        if (autoLevel > 0) {
+            const marblesPerSecond = autoLevel * 0.1;
+            const interval = 1 / marblesPerSecond;
+            this.microAutoclickerTimer += dt;
+            if (this.microAutoclickerTimer >= interval) {
+                this.microAutoclickerTimer -= interval;
+                this.spawnMicroMarble(0, 0); // Coordinates are ignored by Spawner.spawnMicroMarble
+            }
+        }
+
+        // Force UI update periodically
         const now = performance.now();
-        if (now - this.lastNotify > 150) { // 6-7 FPS UI state updates
+        if (now - this.lastNotify > 150) {
             this.lastNotify = now;
             this.notify();
         }
 
         const timeScale = this.state.ballSpeed;
-        const gravity = 500 * timeScale;
-        const bounce = 0.6;
-        const pegRadius = this.pegRadius; 
 
         if (this.state.bonusMarble && this.state.bonusMarble.active) {
             const bm = this.state.bonusMarble;
@@ -439,143 +402,26 @@ export class GameEngine {
 
         this.balls = this.balls.filter(b => b.y < this.height + 100 && !b._remove);
 
-        this.balls.forEach(b => {
-            if (b._remove) return;
-
-            b.vy += gravity * dt;
-            b.x += b.vx * dt * timeScale;
-            b.y += b.vy * dt * timeScale;
-            
-            // Wall Collision (Simple Bounce)
-            if (b.x < b.radius) {
-                b.x = b.radius;
-                b.vx = Math.abs(b.vx) * 0.6;
-            }
-            if (b.x > this.width - b.radius) {
-                b.x = this.width - b.radius;
-                b.vx = -Math.abs(b.vx) * 0.6;
-            }
-            
-            if (b.trail.length > 20) b.trail.shift();
-            b.trail.push({x: b.x, y: b.y});
-
-            // Standard peg collision
-            if(b._pegCooldown > 0) b._pegCooldown -= dt * 60;
-
-            const gx = Math.floor(b.x / this.gridSize);
-            const gy = Math.floor(b.y / this.gridSize);
-
-            for(let dy = -1; dy <= 1; dy++) {
-                for(let dx = -1; dx <= 1; dx++) {
-                    const cx = gx + dx;
-                    const cy = gy + dy;
-                    if(cx >= 0 && cx < this.gridCols && cy >= 0 && cy < this.gridRows) {
-                        const cell = this.grid[cy][cx];
-                        for(let i=0; i<cell.length; i++) {
-                            const p = cell[i];
-                            const distX = b.x - p.x;
-                            const distY = b.y - p.y;
-                            const distSq = distX*distX + distY*distY;
-                            const minDist = b.radius + pegRadius;
-                            
-                            if (distSq < minDist*minDist) {
-                                const angle = Math.atan2(distY, distX);
-                                const speed = Math.sqrt(b.vx*b.vx + b.vy*b.vy);
-                                b.vx = Math.cos(angle) * speed * bounce + (Math.random() - 0.5) * 50;
-                                b.vy = Math.sin(angle) * speed * bounce;
-                                const overlap = minDist - Math.sqrt(distSq);
-                                b.x += Math.cos(angle) * overlap;
-                                b.y += Math.sin(angle) * overlap;
-
-                                p.glow = 1.0;
-                                p.cooldown = 10;
-                                
-                                if (b._pegCooldown <= 0) {
-                                    b._pegCooldown = 10;
-                                    
-                                    const pegBase = Math.max(1, this.state.pegValue);
-                                    const rarityMult = b.type === 'legendary' ? 4 : (b.type === 'rare' ? 3 : (b.type === 'uncommon' ? 2 : 1));
-                                    const { gain, isCritical } = this.calculateScore(b, pegBase, rarityMult);
-                                    
-                                    if (isCritical) {
-                                        this.visualEffects.push({
-                                            x: p.x, y: p.y, t: performance.now(), duration: 400, type: 'critical_hit'
-                                        });
-                                    }
-
-                                    this.addMoney(gain);
-                                    if(!this.state.disableMoneyPopups) {
-                                        this.popups.push({
-                                            x: p.x, y: p.y, text: `+$${formatNumber(gain)}`, t: performance.now(),
-                                            critical: isCritical, master: b.master, micro: b.micro
-                                        });
-                                    }
-                                    if (!this.state.pegMuted) {
-                                        if(b.micro) this.audio.play('microPeg', 2, 0.3);
-                                        else this.audio.play('peg', 2, 0.3);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            if (b.y > this.height - 40 && b.y < this.height - 10) {
-                if (b.vy > 0) {
-                    const basketWidth = this.width / 5;
-                    const idx = Math.floor(b.x / basketWidth);
-                    const baseValues = [10, 5, 20, 5, 10];
-                    const base = (baseValues[idx] || 5) + this.state.basketValueBonus;
-                    const rarityMult = b.type === 'legendary' ? 4 : (b.type === 'rare' ? 3 : (b.type === 'uncommon' ? 2 : 1));
-                    
-                    const { gain, isCritical } = this.calculateScore(b, base, rarityMult);
-                    
-                    if (isCritical) {
-                        this.visualEffects.push({
-                            x: b.x, y: this.height - 20, t: performance.now(), duration: 500, type: 'critical_hit'
-                        });
-                    }
-
-                    this.addMoney(gain);
-                    if(!this.state.disableMoneyPopups) {
-                        this.popups.push({
-                            x: b.x, y: b.y, text: `+$${formatNumber(gain)}`, t: performance.now(),
-                            critical: isCritical, master: b.master, micro: b.micro
-                        });
-                    }
-                    if (!this.state.basketMuted) {
-                        if(b.micro) this.audio.play('microBasket', 1, 0.4);
-                        else this.audio.play('basket', 1, 0.4);
-                    }
-
-                    if (b.micro) {
-                        b._remove = true; 
-                    } else if (b.master) {
-                        // Respawn master centeredish
-                        b.y = 20;
-                        b.x = this.width / 2 + (Math.random() - 0.5) * 50;
-                        b.vx = 0; b.vy = 0;
-                        b.trail = [];
-                    } else {
-                        // Respawn normal balls away from edges, re-rolling rarity
-                        b.type = this.rollRarity();
-                        b.y = 20;
-                        b.x = 20 + Math.random() * (this.width - 40);
-                        b.vx = 0; b.vy = 0;
-                        b.trail = [];
-                    }
-                }
-            }
-        });
+        PhysicsManager.updateBalls(
+            dt,
+            this.state,
+            this.balls,
+            this.grid,
+            this.width,
+            this.height,
+            this.gridSize,
+            this.gridCols,
+            this.gridRows,
+            this.pegRadius,
+            (amount) => this.addMoney(amount),
+            (p) => this.popups.push(p),
+            (e) => this.visualEffects.push(e),
+            this.audio
+        );
         
         this.spawnBalls();
         this.pegs.forEach(p => { if (p.glow > 0) p.glow -= dt * 3; });
         
-        // Clean up popups and visual effects
-        // Note: Popups array is shared with Renderer, so we filter it here for logic, 
-        // Renderer filters it for drawing time.
-        // We will remove really old popups to prevent memory leak
         if (this.popups.length > 50) {
              const now = performance.now();
              this.popups = this.popups.filter(p => now - p.t < 1500);
@@ -599,6 +445,65 @@ export class GameEngine {
             this.visualEffects, 
             this.popups
         );
+    }
+
+    pushNotification(message: string, type: 'achievement' | 'mission') {
+        const id = Math.random().toString(36).substr(2, 9);
+        this.notifications.push({ id, message, type, fading: false });
+        this.notify();
+        
+        // Start fade out after 3.5 seconds
+        setTimeout(() => {
+            const n = this.notifications.find(x => x.id === id);
+            if (n) {
+                n.fading = true;
+                this.notify();
+            }
+        }, 3500);
+
+        // Remove after 4 seconds
+        setTimeout(() => {
+            this.notifications = this.notifications.filter(n => n.id !== id);
+            this.notify();
+        }, 4000);
+    }
+
+    checkAchievements() {
+        ProgressionManager.checkAchievements(this.state, (a, c) => this.addMoney(a, c), (m, t) => this.pushNotification(m, t));
+    }
+
+    checkMissions() {
+        ProgressionManager.checkMissions(this.state, (m, t) => this.pushNotification(m, t));
+    }
+
+    claimMission(instanceId: string) {
+        if (ProgressionManager.claimMission(this.state, instanceId, (a, c) => this.addMoney(a, c), (m, t) => this.pushNotification(m, t))) {
+            this.audio.play('upgrade');
+            this.notify();
+            this.saveState();
+            return true;
+        }
+        return false;
+    }
+
+    rerollMission(instanceId: string) {
+        if (ProgressionManager.rerollMission(this.state, instanceId, (m, t) => this.pushNotification(m, t))) {
+            this.audio.play('upgrade');
+            this.notify();
+            this.saveState();
+            return true;
+        }
+        return false;
+    }
+
+    claimAchievement(achievementId: string) {
+        if (ProgressionManager.claimAchievement(this.state, achievementId, (a, c) => this.addMoney(a, c), (m, t) => this.pushNotification(m, t))) {
+            this.audio.play('upgrade');
+            this.notify();
+            this.saveState();
+            return true;
+        }
+        return false;
     }
 }
 

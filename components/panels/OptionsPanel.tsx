@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { engine } from '../../game/engine';
 import { GameState } from '../../game/types';
 
@@ -11,11 +11,36 @@ interface OptionsPanelProps {
     onOpenTutorials: () => void;
     onReset: () => void;
     forceUpdate: () => void;
+    uiState: any;
+    setUiState: (state: any) => void;
+    hasClaimableMissions: boolean;
+    hasClaimableAchievements: boolean;
 }
 
-export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTutorials, onReset, forceUpdate }: OptionsPanelProps) => {
+export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTutorials, onReset, forceUpdate, uiState, setUiState, hasClaimableMissions, hasClaimableAchievements }: OptionsPanelProps) => {
+    const touchStart = useRef<number | null>(null);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStart.current = e.touches[0].clientX;
+    };
+
+    const handleTouchEnd = (e: React.TouchEvent) => {
+        if (touchStart.current === null) return;
+        const touchEnd = e.changedTouches[0].clientX;
+        const diff = touchEnd - touchStart.current;
+        // Swipe right to close (diff > 50)
+        if (diff > 50 && isOpen) {
+            onClose();
+        }
+        touchStart.current = null;
+    };
+
     return (
-        <div className={`sidebar-right ${isOpen ? 'open' : ''}`}>
+        <div 
+            className={`sidebar-right ${isOpen ? 'open' : ''}`}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+        >
             <div className="panel-header">
                 <h2>Options</h2>
                 <button className="close-btn" onClick={onClose}>×</button>
@@ -28,6 +53,14 @@ export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTu
                 
                 <button className="btn-toggle" onClick={onOpenTutorials}>
                     Tutorials
+                </button>
+
+                <button className={`btn-toggle ${hasClaimableAchievements ? 'glow-breathing' : ''}`} onClick={() => setUiState((s: any) => ({...s, achievementsOpen: true}))}>
+                    Achievements
+                </button>
+
+                <button className={`btn-toggle ${hasClaimableMissions ? 'glow-breathing' : ''}`} onClick={() => setUiState((s: any) => ({...s, missionsOpen: true}))}>
+                    Missions
                 </button>
                 
                 <div className="option-row" style={{marginTop:'20px'}}>

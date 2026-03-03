@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { engine } from '../../game/engine';
 import { UPGRADES } from '../../game/config';
 import { UpgradeCard } from '../UpgradeCard';
@@ -13,6 +13,22 @@ interface UpgradesPanelProps {
 }
 
 export const UpgradesPanel = ({ isOpen, onClose, gameState, onBuy }: UpgradesPanelProps) => {
+    const touchStart = useRef<number | null>(null);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStart.current = e.touches[0].clientX;
+    };
+
+    const handleTouchEnd = (e: React.TouchEvent) => {
+        if (touchStart.current === null) return;
+        const touchEnd = e.changedTouches[0].clientX;
+        const diff = touchStart.current - touchEnd;
+        // Swipe left to close (diff > 50)
+        if (diff > 50 && isOpen) {
+            onClose();
+        }
+        touchStart.current = null;
+    };
     
     const getLockStatus = (id: string) => {
         const cfg = UPGRADES.find(u => u.id === id);
@@ -32,7 +48,11 @@ export const UpgradesPanel = ({ isOpen, onClose, gameState, onBuy }: UpgradesPan
     };
 
     return (
-        <div className={`sidebar ${isOpen ? 'open' : ''}`}>
+        <div 
+            className={`sidebar ${isOpen ? 'open' : ''}`}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+        >
             <div className="panel-header">
                 <h2>Upgrades</h2>
                 <button className="close-btn" onClick={onClose}>×</button>

@@ -71,7 +71,15 @@ export interface GameState {
     currentRunPeakMps: number; // New: Peak MPS for current run
     currentMps: number;
     lastSaveTime: number;
+    lastTabOutTime?: number; // New: track when user tabbed out
     totalPlayTime: number; // New: seconds
+    
+    // Lifetime Stats for Achievements
+    lifetimePegHits: number;
+    lifetimeBaskets: number;
+    lifetimeBonusMarbles: number;
+    lifetimeUpgradesBought: number;
+    lifetimeCriticalHits: number;
     
     // Prestige / Core
     kineticShards: number;
@@ -86,6 +94,25 @@ export interface GameState {
 
     // Runtime (not always persisted fully, but good to have in type)
     bonusMarble?: BonusMarbleState;
+    achievements: { [key: string]: any };
+    missions: {
+        date: string;
+        activeDailies: ActiveMission[];
+        activeRepeatables: ActiveMission[];
+    };
+    dailyCompleted: number;
+    repeatableCompleted: number;
+    lifetimeMissionsCompleted: number;
+    achievementsUnlocked: number;
+}
+
+export interface ActiveMission {
+    id: string;
+    instanceId: string;
+    type: 'daily' | 'repeatable';
+    progress: number;
+    completed: boolean;
+    claimed: boolean;
 }
 
 export const INITIAL_STATE: GameState = {
@@ -142,6 +169,12 @@ export const INITIAL_STATE: GameState = {
     lastSaveTime: Date.now(),
     totalPlayTime: 0,
     
+    lifetimePegHits: 0,
+    lifetimeBaskets: 0,
+    lifetimeBonusMarbles: 0,
+    lifetimeUpgradesBought: 0,
+    lifetimeCriticalHits: 0,
+    
     kineticShards: 0,
     masterMultiplier: 0,
     timesPrestiged: 0,
@@ -151,7 +184,17 @@ export const INITIAL_STATE: GameState = {
     activeMarbleTexture: null,
     bonusChance: 0.5,
     
-    bonusMarble: { active: false, x: 0, y: 0, baseY: 0, t: 0 }
+    bonusMarble: { active: false, x: 0, y: 0, baseY: 0, t: 0 },
+    achievements: {},
+    missions: {
+        date: '',
+        activeDailies: [],
+        activeRepeatables: []
+    },
+    dailyCompleted: 0,
+    repeatableCompleted: 0,
+    lifetimeMissionsCompleted: 0,
+    achievementsUnlocked: 0,
 };
 
 export interface UpgradeConfig {

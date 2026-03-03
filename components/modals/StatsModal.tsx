@@ -36,7 +36,7 @@ export const StatsModal = ({ onClose }: { onClose: () => void }) => {
                 </div>
                 <div className="stats-grid">
                     <div className="stat-tile"><div className="stat-label">Lifetime $</div><div className="stat-value" style={{color:'#ffd700'}}>${format(s.lifetimeEarnings + s.money)}</div></div>
-                    <div className="stat-tile"><div className="stat-label">Peak $/s (Run)</div><div className="stat-value">${format(s.currentRunPeakMps || 0)}/s</div></div>
+                    <div className="stat-tile"><div className="stat-label">Peak $/s (This Run)</div><div className="stat-value">${format(s.currentRunPeakMps || 0)}/s</div></div>
                     <div className="stat-tile"><div className="stat-label">Peak $/s (All-Time)</div><div className="stat-value">${format(s.peakMps)}/s</div></div>
                     <div className="stat-tile"><div className="stat-label">Times Prestiged</div><div className="stat-value">{s.timesPrestiged}</div></div>
                     <div className="stat-tile"><div className="stat-label">Kinetic Shards</div><div className="stat-value" style={{color:'#00ffff'}}>{format(s.kineticShards)}</div></div>
@@ -45,11 +45,12 @@ export const StatsModal = ({ onClose }: { onClose: () => void }) => {
                     <div className="stat-tile"><div className="stat-label">Micro Value</div><div className="stat-value">{1 + (s.microValuePercent || 0) + (s.permanentMicroBoostPercent || 0)}%</div></div>
                     <div className="stat-tile"><div className="stat-label">Bonus Chance</div><div className="stat-value">{Math.round((s.bonusChance || 0.5) * 100)}%</div></div>
                     <div className="stat-tile"><div className="stat-label">Skins Owned</div><div className="stat-value">{ownedCount}</div></div>
+                    <div className="stat-tile"><div className="stat-label">Daily Missions</div><div className="stat-value">{s.dailyCompleted || 0}</div></div>
+                    <div className="stat-tile"><div className="stat-label">Repeatable Missions</div><div className="stat-value">{s.repeatableCompleted || 0}</div></div>
+                    <div className="stat-tile"><div className="stat-label">Achievements Unlocked</div><div className="stat-value">{s.achievementsUnlocked || 0}</div></div>
                     <div className="stat-tile"><div className="stat-label">Total Play Time</div><div className="stat-value">{timeStr}</div></div>
                 </div>
-                <div className="footer-center" style={{marginTop:'20px'}}>
-                    <button className="no" onClick={onClose}>Close</button>
-                </div>
+                {/* Removed redundant Close button for mobile */}
             </div>
         </div>
     );

@@ -24,7 +24,9 @@ export class SaveSystem {
                 ownedMarbles: parsed.ownedMarbles || INITIAL_STATE.ownedMarbles,
                 activeTheme: parsed.activeTheme || INITIAL_STATE.activeTheme, // Load theme
                 // Initialize currentRunPeakMps if missing (migration)
-                currentRunPeakMps: parsed.currentRunPeakMps ?? (parsed.currentMps || 0)
+                currentRunPeakMps: parsed.currentRunPeakMps ?? (parsed.currentMps || 0),
+                // Mission migration
+                missions: (parsed.missions && parsed.missions.activeDailies && parsed.missions.activeRepeatables) ? parsed.missions : INITIAL_STATE.missions
             };
             // Ensure upgrades object structure is complete even if loaded from partial save
             loaded.upgrades = { ...INITIAL_STATE.upgrades, ...(parsed.upgrades || {}) };
@@ -75,6 +77,12 @@ export class SaveSystem {
         const keptPegMuted = currentState.pegMuted;
         const keptBasketMuted = currentState.basketMuted;
         const keptPeakMps = currentState.peakMps; // All-time peak persists
+        const keptMissions = JSON.parse(JSON.stringify(currentState.missions));
+        const keptAchievements = { ...currentState.achievements };
+        const keptDailyCompleted = currentState.dailyCompleted;
+        const keptRepeatableCompleted = currentState.repeatableCompleted;
+        const keptLifetimeMissions = currentState.lifetimeMissionsCompleted;
+        const keptAchievementsUnlocked = currentState.achievementsUnlocked;
         
         // Deep copy INITIAL_STATE to avoid reference issues, then override mutable fields explicitly
         const baseState = JSON.parse(JSON.stringify(INITIAL_STATE));
@@ -118,7 +126,13 @@ export class SaveSystem {
             totalPlayTime: keptTotalPlayTime,
             pegMuted: keptPegMuted,
             basketMuted: keptBasketMuted,
-            peakMps: keptPeakMps
+            peakMps: keptPeakMps,
+            missions: keptMissions,
+            achievements: keptAchievements,
+            dailyCompleted: keptDailyCompleted,
+            repeatableCompleted: keptRepeatableCompleted,
+            lifetimeMissionsCompleted: keptLifetimeMissions,
+            achievementsUnlocked: keptAchievementsUnlocked
         };
         
         this.calculateDerivedState(newState);

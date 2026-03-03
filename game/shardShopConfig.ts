@@ -11,7 +11,8 @@ export const PERM_UPGRADES: PermUpgradeConfig[] = [
     { id: 'perm_income_a', name: 'Permanent Income Boost', description: 'Increases all base income by 5%', baseCost: 3, maxLevel: 0 },
     { id: 'perm_shard_multi', name: 'Shard Multiplier', description: 'Increases Shard gain from Prestiging by 10%', baseCost: 5, maxLevel: 0 },
     { id: 'perm_micro_boost', name: 'Micro Marble Boost', description: 'Increases the base value of Micro Marbles by 2%', baseCost: 7, maxLevel: 0 },
-    { id: 'perm_bonus_chance', name: 'Bonus Chance Boost', description: 'Increases chance for a Bonus Marble to appear by 1%', baseCost: 10, maxLevel: 50 }
+    { id: 'perm_bonus_chance', name: 'Bonus Chance Boost', description: 'Increases chance for a Bonus Marble to appear by 1%', baseCost: 10, maxLevel: 50 },
+    { id: 'perm_micro_autoclicker', name: 'Micro Autoclicker', description: 'Automatically drops 0.1 Micro Marbles per second per level', baseCost: 5, maxLevel: 100 }
 ];
 
 export interface MarbleSkinConfig {

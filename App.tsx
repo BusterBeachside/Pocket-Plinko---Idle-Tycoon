@@ -15,6 +15,8 @@ import { ShardShopModal } from './components/modals/ShardShopModal';
 import { CoreModal } from './components/modals/CoreModal';
 import { StatsModal } from './components/modals/StatsModal';
 import { ResetModal } from './components/modals/ResetModal';
+import { AchievementsModal } from './components/modals/AchievementsModal';
+import { MissionsModal } from './components/modals/MissionsModal';
 import { UpgradesPanel } from './components/panels/UpgradesPanel';
 import { OptionsPanel } from './components/panels/OptionsPanel';
 
@@ -46,7 +48,7 @@ const FloatingTextLayer = () => {
 
 const App = () => {
     const [gameState, setGameState] = useState(engine.state);
-    const [uiState, setUiState] = useState({ upgradesOpen: false, optionsOpen: false, statsOpen: false, shardShopOpen: false, coreModalOpen: false, prestigeAnim: false });
+    const [uiState, setUiState] = useState({ upgradesOpen: false, optionsOpen: false, statsOpen: false, shardShopOpen: false, coreModalOpen: false, prestigeAnim: false, achievementsOpen: false, missionsOpen: false });
     const [started, setStarted] = useState(false);
     const [assetsLoaded, setAssetsLoaded] = useState(false);
     const [loadProgress, setLoadProgress] = useState(0);
@@ -58,6 +60,7 @@ const App = () => {
     const [tutorialMenuOpen, setTutorialMenuOpen] = useState(false);
     const [specificTutorial, setSpecificTutorial] = useState<any>(null); // keyof ASSET_PATHS
     const [resetStep, setResetStep] = useState<0 | 1 | 2>(0);
+    const [notifications, setNotifications] = useState(engine.notifications);
 
     useEffect(() => {
         // Combined loading for images and audio
@@ -80,6 +83,7 @@ const App = () => {
         // Use Subscription for updates
         const unsub = engine.subscribe(() => {
             setGameState({ ...engine.state });
+            setNotifications([...engine.notifications]);
         });
         
         // Listen for tutorial requests from engine or components
@@ -177,6 +181,9 @@ const App = () => {
 
     const isPurple = gameState.activeTheme === 'purple';
 
+    const hasClaimableMissions = [...gameState.missions.activeDailies, ...gameState.missions.activeRepeatables].some(m => m.completed && !m.claimed);
+    const hasClaimableAchievements = Object.values(gameState.achievements).some(a => (a === true || (a && a.completed)) && !(a && a.claimed));
+
     return (
         <div className={`app-container ${isPurple ? 'theme-purple' : 'theme-dark'}`}>
             {!started && <TitleScreen onStart={handleStart} loading={!assetsLoaded} progress={loadProgress} />}
@@ -193,16 +200,32 @@ const App = () => {
             {uiState.statsOpen && <StatsModal onClose={() => setUiState(s => ({...s, statsOpen: false}))} />}
             {uiState.shardShopOpen && <ShardShopModal onClose={() => setUiState(s => ({...s, shardShopOpen: false}))} />}
             {uiState.coreModalOpen && <CoreModal onClose={() => setUiState(s => ({...s, coreModalOpen: false}))} onOpenShop={() => setUiState(s => ({...s, coreModalOpen: false, shardShopOpen: true}))} onActivate={handleActivatePrestige} />}
+            {uiState.achievementsOpen && <AchievementsModal gameState={gameState} onClose={() => setUiState(s => ({...s, achievementsOpen: false}))} />}
+            {uiState.missionsOpen && <MissionsModal onClose={() => setUiState(s => ({...s, missionsOpen: false}))} />}
             
             {tutorialMenuOpen && <TutorialMenu onClose={() => setTutorialMenuOpen(false)} onSelect={(key) => { setTutorialMenuOpen(false); setSpecificTutorial(key); }} />}
             
             {resetStep > 0 && <ResetModal step={resetStep as 1|2} onCancel={() => setResetStep(0)} onConfirm={() => {
                 if (resetStep === 1) setResetStep(2);
                 else {
-                    localStorage.clear();
-                    location.reload();
+                    engine.hardReset();
                 }
             }} />}
+
+            <div className="notification-layer">
+                {notifications.map(n => (
+                    <div 
+                        key={n.id} 
+                        className={`notification-item ${n.type} ${n.fading ? 'fading' : ''}`}
+                        onClick={() => {
+                            if (n.type === 'mission') setUiState(s => ({ ...s, missionsOpen: true }));
+                            if (n.type === 'achievement') setUiState(s => ({ ...s, achievementsOpen: true }));
+                        }}
+                    >
+                        {n.message}
+                    </div>
+                ))}
+            </div>
 
             <Header onCoreClick={handleCoreClick} />
             
@@ -220,8 +243,7 @@ const App = () => {
                     <GameCanvas />
                     <div className="mobile-controls">
                         <button className="mobile-btn" onClick={() => togglePanel('upgrades')}>⚡ Upgrades</button>
-                        <button className="mobile-btn" onClick={() => setUiState(s => ({...s, statsOpen: true}))}>📊 Stats</button>
-                        <button className="mobile-btn" onClick={() => togglePanel('options')}>⚙ Options</button>
+                        <button className={`mobile-btn ${(hasClaimableMissions || hasClaimableAchievements) ? 'glow-breathing' : ''}`} onClick={() => togglePanel('options')}>⚙ Options</button>
                     </div>
                 </div>
 
@@ -233,6 +255,10 @@ const App = () => {
                     onOpenStats={() => setUiState(s => ({...s, statsOpen: true, optionsOpen: false}))}
                     onOpenTutorials={() => { setTutorialMenuOpen(true); setUiState(s => ({...s, optionsOpen: false})); }}
                     onReset={() => { setResetStep(1); setUiState(s => ({...s, optionsOpen: false})); }}
+                    uiState={uiState}
+                    setUiState={setUiState}
+                    hasClaimableMissions={hasClaimableMissions}
+                    hasClaimableAchievements={hasClaimableAchievements}
                 />
             </div>
         </div>
