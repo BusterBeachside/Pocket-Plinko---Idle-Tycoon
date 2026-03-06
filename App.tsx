@@ -8,7 +8,9 @@ import { GameCanvas } from './components/GameCanvas';
 import { Header } from './components/Header';
 import { StatsBar } from './components/StatsBar';
 import { TitleScreen } from './components/TitleScreen';
+import { UnderdogAuth } from './components/UnderdogAuth';
 import { Toast } from './components/Toast';
+import { SupabaseService } from './services/supabaseService';
 import { TutorialOverlay, TutorialMenu } from './components/Tutorials';
 import { PrestigeOverlay } from './components/PrestigeOverlay';
 import { ShardShopModal } from './components/modals/ShardShopModal';
@@ -17,6 +19,7 @@ import { StatsModal } from './components/modals/StatsModal';
 import { ResetModal } from './components/modals/ResetModal';
 import { AchievementsModal } from './components/modals/AchievementsModal';
 import { MissionsModal } from './components/modals/MissionsModal';
+import { LeaderboardModal } from './components/modals/LeaderboardModal';
 import { UpgradesPanel } from './components/panels/UpgradesPanel';
 import { OptionsPanel } from './components/panels/OptionsPanel';
 
@@ -48,8 +51,12 @@ const FloatingTextLayer = () => {
 
 const App = () => {
     const [gameState, setGameState] = useState(engine.state);
-    const [uiState, setUiState] = useState({ upgradesOpen: false, optionsOpen: false, statsOpen: false, shardShopOpen: false, coreModalOpen: false, prestigeAnim: false, achievementsOpen: false, missionsOpen: false });
+    const [uiState, setUiState] = useState({ upgradesOpen: false, optionsOpen: false, statsOpen: false, shardShopOpen: false, coreModalOpen: false, prestigeAnim: false, achievementsOpen: false, missionsOpen: false, leaderboardOpen: false });
     const [started, setStarted] = useState(false);
+    const [authModalOpen, setAuthModalOpen] = useState(true);
+    const [user, setUser] = useState<any>(null);
+    const [profile, setProfile] = useState<any>(null);
+    const [isOffline, setIsOffline] = useState(false);
     const [assetsLoaded, setAssetsLoaded] = useState(false);
     const [loadProgress, setLoadProgress] = useState(0);
     const [toast, setToast] = useState<{msg: string, visible: boolean} | null>(null);
@@ -63,6 +70,23 @@ const App = () => {
     const [notifications, setNotifications] = useState(engine.notifications);
 
     useEffect(() => {
+        // Check for existing session
+        SupabaseService.getCurrentUser().then(async u => {
+            if (u) {
+                setUser(u);
+                const p = await SupabaseService.getProfile(u.id);
+                setProfile(p);
+                engine.isOffline = false;
+                setAuthModalOpen(false);
+                // Sync progress with Supabase
+                const syncedState = await SupabaseService.syncData(engine.state);
+                if (syncedState) {
+                    engine.state = { ...syncedState };
+                    engine.notify();
+                }
+            }
+        });
+
         // Combined loading for images and audio
         let imgProgress = 0;
         let audioProgress = 0;
@@ -142,6 +166,24 @@ const App = () => {
         }, 50);
     };
 
+    const handleAuthComplete = async (u: any, offline: boolean) => {
+        setUser(u);
+        setIsOffline(offline);
+        engine.isOffline = offline;
+        setAuthModalOpen(false);
+        
+        if (u) {
+            const p = await SupabaseService.getProfile(u.id);
+            setProfile(p);
+            // Sync current local progress to cloud (as requested)
+            const syncedState = await SupabaseService.syncData(engine.state);
+            if (syncedState) {
+                engine.state = { ...syncedState };
+                engine.notify();
+            }
+        }
+    };
+
     const handleBuy = (id: any) => { engine.buyUpgrade(id); };
     const handleCoreClick = () => { setUiState(s => ({ ...s, coreModalOpen: true })); };
     const handleActivatePrestige = (shards: number, mult: number) => {
@@ -187,6 +229,15 @@ const App = () => {
     return (
         <div className={`app-container ${isPurple ? 'theme-purple' : 'theme-dark'}`}>
             {!started && <TitleScreen onStart={handleStart} loading={!assetsLoaded} progress={loadProgress} />}
+            
+            {authModalOpen && (
+                <UnderdogAuth 
+                    onAuthComplete={handleAuthComplete} 
+                    onClose={user ? () => setAuthModalOpen(false) : undefined}
+                    initialMode={user ? 'profile' : 'login'}
+                />
+            )}
+
             {uiState.prestigeAnim && <PrestigeOverlay onComplete={completePrestige} />}
             
             {/* Standard First-run Tutorial */}
@@ -202,6 +253,7 @@ const App = () => {
             {uiState.coreModalOpen && <CoreModal onClose={() => setUiState(s => ({...s, coreModalOpen: false}))} onOpenShop={() => setUiState(s => ({...s, coreModalOpen: false, shardShopOpen: true}))} onActivate={handleActivatePrestige} />}
             {uiState.achievementsOpen && <AchievementsModal gameState={gameState} onClose={() => setUiState(s => ({...s, achievementsOpen: false}))} />}
             {uiState.missionsOpen && <MissionsModal onClose={() => setUiState(s => ({...s, missionsOpen: false}))} />}
+            {uiState.leaderboardOpen && <LeaderboardModal onClose={() => setUiState(s => ({...s, leaderboardOpen: false}))} />}
             
             {tutorialMenuOpen && <TutorialMenu onClose={() => setTutorialMenuOpen(false)} onSelect={(key) => { setTutorialMenuOpen(false); setSpecificTutorial(key); }} />}
             
@@ -227,7 +279,11 @@ const App = () => {
                 ))}
             </div>
 
-            <Header onCoreClick={handleCoreClick} />
+            <Header 
+                onCoreClick={handleCoreClick} 
+                onAuthClick={() => setAuthModalOpen(true)} 
+                profile={profile}
+            />
             
             <div className="main-content">
                 <UpgradesPanel 

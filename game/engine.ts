@@ -8,6 +8,7 @@ import { ShopSystem } from './shop';
 import { ProgressionManager } from './progression';
 import { PhysicsManager } from './physics';
 import { Spawner } from './spawner';
+import { SupabaseService } from '../services/supabaseService';
 
 export class GameEngine {
     state: GameState;
@@ -56,6 +57,7 @@ export class GameEngine {
     
     isGameStarted: boolean = false;
     isResetting: boolean = false;
+    isOffline: boolean = false;
 
     constructor() {
         this.state = SaveSystem.loadState();
@@ -108,7 +110,7 @@ export class GameEngine {
             }
             
             // Calculate offline income from tab-out
-            if (this.state.lastTabOutTime) {
+            if (this.state.lastTabOutTime && this.isGameStarted) {
                 const now = Date.now();
                 const diffSeconds = (now - this.state.lastTabOutTime) / 1000;
                 
@@ -147,9 +149,25 @@ export class GameEngine {
         this.listeners.forEach(cb => cb());
     }
 
-    saveState() {
+    async saveState() {
         if (this.isResetting) return;
+        
+        // Always save to local storage as backup/offline mode
         SaveSystem.saveState(this.state);
+
+        // If online, sync to Supabase
+        if (!this.isOffline) {
+            try {
+                const user = await SupabaseService.getCurrentUser();
+                if (user) {
+                    const { money, ...stats } = this.state;
+                    // We separate currency from stats in the DB schema
+                    await SupabaseService.saveProgress(stats, money, {});
+                }
+            } catch (err) {
+                console.error("Failed to sync to Supabase:", err);
+            }
+        }
     }
 
     hardReset() {
@@ -283,7 +301,13 @@ export class GameEngine {
             this.state.currentMps = mps;
             
             // Update All-time Peak
-            if (mps > this.state.peakMps) this.state.peakMps = mps;
+            if (mps > this.state.peakMps) {
+                this.state.peakMps = mps;
+                // Submit to leaderboard if online
+                if (!this.isOffline) {
+                    SupabaseService.submitScore(mps, 'mps').catch(console.error);
+                }
+            }
             
             // Update Current Run Peak
             if (mps > (this.state.currentRunPeakMps || 0)) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getMissionById } from '../../game/missions';
 import { engine } from '../../game/engine';
 import { formatNumber } from '../../game/utils';
@@ -6,6 +6,21 @@ import { ActiveMission } from '../../game/types';
 
 export const MissionsModal = ({ onClose }: { onClose: () => void }) => {
     const [timeToReset, setTimeToReset] = useState('');
+    const touchStart = useRef<number | null>(null);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStart.current = e.touches[0].clientX;
+    };
+
+    const handleTouchEnd = (e: React.TouchEvent) => {
+        if (touchStart.current === null) return;
+        const touchEnd = e.changedTouches[0].clientX;
+        const diff = touchEnd - touchStart.current;
+        if (diff > 50) {
+            onClose();
+        }
+        touchStart.current = null;
+    };
 
     useEffect(() => {
         const updateTimer = () => {
@@ -69,7 +84,12 @@ export const MissionsModal = ({ onClose }: { onClose: () => void }) => {
     };
 
     return (
-        <div className="confirm-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+        <div 
+            className="confirm-overlay" 
+            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+        >
             <div className="confirm-modal missions-modal">
                 <div className="modal-header-row">
                     <h3>Missions</h3>

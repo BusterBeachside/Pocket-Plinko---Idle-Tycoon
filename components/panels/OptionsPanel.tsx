@@ -55,6 +55,10 @@ export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTu
                     Tutorials
                 </button>
 
+                <button className="btn-toggle" style={{ background: '#f39c12', boxShadow: '0 4px 0 #d35400' }} onClick={() => setUiState((s: any) => ({...s, leaderboardOpen: true, optionsOpen: false}))}>
+                    Leaderboard
+                </button>
+
                 <button className={`btn-toggle ${hasClaimableAchievements ? 'glow-breathing' : ''}`} onClick={() => setUiState((s: any) => ({...s, achievementsOpen: true}))}>
                     Achievements
                 </button>

@@ -1,3 +1,4 @@
+import React, { useRef } from 'react';
 import { ACHIEVEMENT_GROUPS, romanize, getAchievementTier } from '../../game/achievements';
 import { engine } from '../../game/engine';
 import { formatNumber } from '../../game/utils';
@@ -6,9 +7,29 @@ export const AchievementsModal = ({ gameState, onClose }: { gameState: any, onCl
     const groups = ACHIEVEMENT_GROUPS;
     const completedAchievements = gameState.achievements;
     const peakMps = gameState.currentRunPeakMps || gameState.currentMps || 10;
+    const touchStart = useRef<number | null>(null);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStart.current = e.touches[0].clientX;
+    };
+
+    const handleTouchEnd = (e: React.TouchEvent) => {
+        if (touchStart.current === null) return;
+        const touchEnd = e.changedTouches[0].clientX;
+        const diff = touchEnd - touchStart.current;
+        if (diff > 50) {
+            onClose();
+        }
+        touchStart.current = null;
+    };
 
     return (
-        <div className="confirm-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+        <div 
+            className="confirm-overlay" 
+            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+        >
             <div className="confirm-modal achievements-modal">
                 <div style={{display:'flex', alignItems:'center', gap:'12px', justifyContent:'space-between', marginBottom:'15px'}}>
                     <h3>Achievements</h3>

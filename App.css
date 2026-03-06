@@ -1,4 +1,6 @@
 
+@import "tailwindcss";
+
 /* Reset & Base */
 * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
 body { 
@@ -794,6 +796,166 @@ canvas {
     font-weight: 800;
     color: #fff;
     font-size: 0.9rem;
+}
+
+/* Leaderboard Styles */
+.leaderboard-modal {
+    max-width: 600px;
+    width: 95%;
+    height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.leaderboard-container {
+    flex: 1;
+    overflow-y: auto;
+    margin-top: 15px;
+    padding-right: 5px;
+}
+
+.leaderboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.leaderboard-header {
+    display: grid;
+    grid-template-columns: 40px 1fr 100px 100px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-weight: 900;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    color: #aaa;
+}
+
+.leaderboard-row {
+    display: grid;
+    grid-template-columns: 40px 1fr 100px 100px;
+    padding: 12px 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    align-items: center;
+    transition: background 0.2s;
+    cursor: help;
+}
+
+.leaderboard-row:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.leaderboard-row .rank {
+    font-weight: 900;
+    color: #ffd700;
+}
+
+.player-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.player-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #333;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.username {
+    font-weight: 700;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mps {
+    font-weight: 800;
+    color: #4cb8f5;
+    text-align: right;
+}
+
+.earnings {
+    font-weight: 600;
+    color: #81c784;
+    text-align: right;
+    font-size: 0.9rem;
+}
+
+.leaderboard-tooltip {
+    background: rgba(15, 15, 20, 0.95);
+    border: 1px solid #ffd700;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    backdrop-filter: blur(10px);
+    min-width: 220px;
+    pointer-events: none;
+}
+
+.tooltip-header {
+    font-weight: 900;
+    color: #ffd700;
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+    padding-bottom: 8px;
+}
+
+.tooltip-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tooltip-stat {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+}
+
+.tooltip-stat span {
+    color: #aaa;
+}
+
+.tooltip-stat strong {
+    color: #fff;
+}
+
+.loading-spinner, .empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #888;
+    font-style: italic;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.avatar-display {
+    transition: transform 0.2s;
+}
+
+.avatar-display:hover {
+    transform: scale(1.05);
 }
 
 .mission-description {
