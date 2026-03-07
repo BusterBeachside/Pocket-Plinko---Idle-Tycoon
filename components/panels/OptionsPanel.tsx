@@ -1,5 +1,6 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { engine } from '../../game/engine';
 import { GameState } from '../../game/types';
 
@@ -18,22 +19,49 @@ interface OptionsPanelProps {
 }
 
 export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTutorials, onReset, forceUpdate, uiState, setUiState, hasClaimableMissions, hasClaimableAchievements }: OptionsPanelProps) => {
-    const touchStart = useRef<number | null>(null);
+    const touchStart = useRef<{x: number, y: number} | null>(null);
+    const isSwiping = useRef(false);
 
     const handleTouchStart = (e: React.TouchEvent) => {
-        touchStart.current = e.touches[0].clientX;
+        touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        isSwiping.current = true;
     };
 
     const handleTouchEnd = (e: React.TouchEvent) => {
-        if (touchStart.current === null) return;
-        const touchEnd = e.changedTouches[0].clientX;
-        const diff = touchEnd - touchStart.current;
-        // Swipe right to close (diff > 50)
-        if (diff > 50 && isOpen) {
-            onClose();
+        if (!touchStart.current || !isSwiping.current) return;
+        
+        const touchEnd = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+        const dx = touchEnd.x - touchStart.current.x;
+        const dy = touchEnd.y - touchStart.current.y;
+        
+        // Horizontal swipe must be significantly larger than vertical to count
+        // and must exceed a higher threshold (100px)
+        if (Math.abs(dx) > 100 && Math.abs(dx) > Math.abs(dy) * 2) {
+            if (dx > 0 && isOpen) { // Swipe right to close
+                onClose();
+            }
         }
+        
         touchStart.current = null;
+        isSwiping.current = false;
     };
+
+    const [syncing, setSyncing] = useState(false);
+
+    const handleForceSync = async () => {
+        if (gameState.isOffline || syncing) return;
+        setSyncing(true);
+        try {
+            await engine.saveState();
+            forceUpdate();
+        } finally {
+            setTimeout(() => setSyncing(false), 1000);
+        }
+    };
+
+    const lastSyncStr = gameState.lastCloudSyncTime && gameState.lastCloudSyncTime > 0 
+        ? new Date(gameState.lastCloudSyncTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        : 'Never';
 
     return (
         <div 
@@ -168,6 +196,26 @@ export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTu
                             engine.state.activeTheme = 'purple'; forceUpdate(); engine.saveState();
                         }}>Purple</button>
                     </div>
+                </div>
+
+                <div className="sync-section" style={{marginTop:'25px', padding:'12px', background:'rgba(255,255,255,0.05)', borderRadius:'12px'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px'}}>
+                        <span style={{fontSize:'0.8rem', color:'#888'}}>Cloud Sync</span>
+                        <span style={{fontSize:'0.8rem', color: gameState.isOffline ? '#e74c3c' : '#2ecc71'}}>
+                            {gameState.isOffline ? 'Offline' : lastSyncStr}
+                        </span>
+                    </div>
+                    {!gameState.isOffline && (
+                        <button 
+                            className={`btn-pill small ${syncing ? 'loading' : ''}`} 
+                            style={{width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', margin:0}}
+                            onClick={handleForceSync}
+                            disabled={syncing}
+                        >
+                            <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+                            {syncing ? 'Syncing...' : 'Sync Now'}
+                        </button>
+                    )}
                 </div>
 
                 <div style={{marginTop:'auto', paddingTop:'20px'}}>

@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { SupabaseService } from '../../services/supabaseService';
 import { formatNumber } from '../../game/utils';
 import { assets } from '../../game/assets';
@@ -17,17 +18,32 @@ interface LeaderboardEntry {
 export const LeaderboardModal = ({ onClose }: { onClose: () => void }) => {
     const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [hoveredEntry, setHoveredEntry] = useState<number | null>(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+    const fetchData = async (isRefresh = false) => {
+        if (isRefresh) setRefreshing(true);
+        else setLoading(true);
+
+        try {
+            const [data, user] = await Promise.all([
+                SupabaseService.getGlobalLeaderboard(),
+                SupabaseService.getCurrentUser()
+            ]);
+            setEntries(data);
+            if (user) setCurrentUserId(user.id);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
 
     useEffect(() => {
-        SupabaseService.getGlobalLeaderboard().then(data => {
-            setEntries(data);
-            setLoading(false);
-        }).catch(err => {
-            console.error(err);
-            setLoading(false);
-        });
+        fetchData();
     }, []);
 
     const handleMouseMove = (e: React.MouseEvent) => {
@@ -38,7 +54,17 @@ export const LeaderboardModal = ({ onClose }: { onClose: () => void }) => {
         <div className="confirm-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
             <div className="confirm-modal leaderboard-modal" onMouseMove={handleMouseMove}>
                 <div className="modal-header-row">
-                    <h2 className="column-title daily" style={{ fontSize: '1.5rem' }}>Global Leaderboard</h2>
+                    <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                        <h2 className="column-title daily" style={{ fontSize: '1.5rem', margin: 0 }}>Global Leaderboard</h2>
+                        <button 
+                            className={`refresh-btn ${refreshing ? 'spinning' : ''}`} 
+                            onClick={() => fetchData(true)}
+                            disabled={loading || refreshing}
+                            title="Refresh rankings"
+                        >
+                            <RefreshCw size={18} />
+                        </button>
+                    </div>
                     <button className="close-core" onClick={onClose}>Close</button>
                 </div>
 
@@ -55,26 +81,33 @@ export const LeaderboardModal = ({ onClose }: { onClose: () => void }) => {
                                 <span className="mps">Peak $/s</span>
                                 <span className="earnings">Lifetime</span>
                             </div>
-                            {entries.map((entry, index) => (
-                                <div 
-                                    key={index} 
-                                    className="leaderboard-row"
-                                    onMouseEnter={() => setHoveredEntry(index)}
-                                    onMouseLeave={() => setHoveredEntry(null)}
-                                >
-                                    <span className="rank">{index + 1}</span>
-                                    <div className="player-info">
-                                        <AvatarDisplay 
-                                            avatarId={entry.profiles?.avatar_url || 'marble_white'} 
-                                            size={32} 
-                                            ownedSkins={entry.stats?.ownedMarbles || []}
-                                        />
-                                        <span className="username">{entry.profiles?.username || 'Anonymous'}</span>
+                             {entries.map((entry, index) => {
+                                const isMe = (entry as any).user_id === currentUserId;
+                                
+                                return (
+                                    <div 
+                                        key={index} 
+                                        className={`leaderboard-row ${isMe ? 'is-me' : ''}`}
+                                        onMouseEnter={() => setHoveredEntry(index)}
+                                        onMouseLeave={() => setHoveredEntry(null)}
+                                    >
+                                        <span className="rank">{index + 1}</span>
+                                        <div className="player-info">
+                                            <AvatarDisplay 
+                                                avatarId={entry.profiles?.avatar_url || 'marble_white'} 
+                                                size={32} 
+                                                ownedSkins={entry.stats?.ownedMarbles || []}
+                                            />
+                                            <span className="username">
+                                                {entry.profiles?.username || 'Anonymous'}
+                                                {isMe && <span className="me-tag"> (You)</span>}
+                                            </span>
+                                        </div>
+                                        <span className="mps">${formatNumber(entry.stats?.peakMps || 0)}</span>
+                                        <span className="earnings">${formatNumber(entry.stats?.lifetimeEarnings || 0)}</span>
                                     </div>
-                                    <span className="mps">${formatNumber(entry.stats?.peakMps || 0)}</span>
-                                    <span className="earnings">${formatNumber(entry.stats?.lifetimeEarnings || 0)}</span>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>

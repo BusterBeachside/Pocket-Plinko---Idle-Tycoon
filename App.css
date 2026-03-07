@@ -822,25 +822,39 @@ canvas {
 
 .leaderboard-header {
     display: grid;
-    grid-template-columns: 40px 1fr 100px 100px;
+    grid-template-columns: 30px 1fr 80px 80px;
     padding: 10px;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     font-weight: 900;
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     text-transform: uppercase;
     color: #aaa;
 }
 
 .leaderboard-row {
     display: grid;
-    grid-template-columns: 40px 1fr 100px 100px;
+    grid-template-columns: 30px 1fr 80px 80px;
     padding: 12px 10px;
     background: rgba(255, 255, 255, 0.03);
     border-radius: 8px;
     align-items: center;
     transition: background 0.2s;
     cursor: help;
+}
+
+@media (max-width: 500px) {
+    .leaderboard-header, .leaderboard-row {
+        grid-template-columns: 25px 1fr 65px 65px;
+        font-size: 0.65rem;
+        padding: 8px 6px;
+    }
+    .leaderboard-row .username {
+        font-size: 0.75rem;
+    }
+    .leaderboard-row .mps, .leaderboard-row .earnings {
+        font-size: 0.75rem;
+    }
 }
 
 .leaderboard-row:hover {
@@ -1154,3 +1168,59 @@ canvas {
         max-width: 90%;
     }
 }
+
+/* New Leaderboard & Sync Styles */
+.leaderboard-row.is-me {
+    background: rgba(46, 204, 113, 0.15);
+    border-left: 3px solid #2ecc71;
+}
+
+.me-tag {
+    color: #2ecc71;
+    font-size: 0.8rem;
+    font-weight: bold;
+    margin-left: 4px;
+}
+
+.refresh-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #ccc;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.refresh-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.refresh-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.refresh-btn.spinning svg {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.sync-section .btn-pill.loading {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.sync-section .sync-time.offline {
+    color: #e74c3c;
+}
+

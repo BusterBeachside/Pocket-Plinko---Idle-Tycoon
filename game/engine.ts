@@ -57,7 +57,7 @@ export class GameEngine {
     
     isGameStarted: boolean = false;
     isResetting: boolean = false;
-    isOffline: boolean = false;
+    isSyncing: boolean = false;
 
     constructor() {
         this.state = SaveSystem.loadState();
@@ -150,19 +150,20 @@ export class GameEngine {
     }
 
     async saveState() {
-        if (this.isResetting) return;
+        if (this.isResetting || this.isSyncing) return;
         
         // Always save to local storage as backup/offline mode
         SaveSystem.saveState(this.state);
 
         // If online, sync to Supabase
-        if (!this.isOffline) {
+        if (!this.state.isOffline && !this.isSyncing) {
             try {
                 const user = await SupabaseService.getCurrentUser();
                 if (user) {
                     const { money, ...stats } = this.state;
                     // We separate currency from stats in the DB schema
                     await SupabaseService.saveProgress(stats, money, {});
+                    this.state.lastCloudSyncTime = Date.now();
                 }
             } catch (err) {
                 console.error("Failed to sync to Supabase:", err);
@@ -304,7 +305,7 @@ export class GameEngine {
             if (mps > this.state.peakMps) {
                 this.state.peakMps = mps;
                 // Submit to leaderboard if online
-                if (!this.isOffline) {
+                if (!this.state.isOffline) {
                     SupabaseService.submitScore(mps, 'mps').catch(console.error);
                 }
             }

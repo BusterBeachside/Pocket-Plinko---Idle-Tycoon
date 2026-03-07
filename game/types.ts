@@ -71,8 +71,10 @@ export interface GameState {
     currentRunPeakMps: number; // New: Peak MPS for current run
     currentMps: number;
     lastSaveTime: number;
+    lastCloudSyncTime?: number; // New: track when last synced to cloud
     lastTabOutTime?: number; // New: track when user tabbed out
     totalPlayTime: number; // New: seconds
+    isOffline: boolean; // New: track online status in state
     
     // Lifetime Stats for Achievements
     lifetimePegHits: number;
@@ -167,7 +169,9 @@ export const INITIAL_STATE: GameState = {
     currentRunPeakMps: 0,
     currentMps: 0,
     lastSaveTime: Date.now(),
+    lastCloudSyncTime: 0,
     totalPlayTime: 0,
+    isOffline: true,
     
     lifetimePegHits: 0,
     lifetimeBaskets: 0,

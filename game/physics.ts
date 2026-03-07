@@ -52,24 +52,29 @@ export class PhysicsManager {
         audio: AudioController
     ) {
         const timeScale = state.ballSpeed;
-        const gravity = 500 * timeScale;
-        const bounce = 0.6;
+        const gravity = 600 * timeScale; // Slightly higher gravity for better feel
+        const bounce = 0.55; // Restitution
+        const friction = 0.995; // Air resistance/friction
 
         balls.forEach(b => {
             if (b._remove) return;
 
+            // Apply gravity and friction
             b.vy += gravity * dt;
+            b.vx *= friction;
+            b.vy *= friction;
+
             b.x += b.vx * dt * timeScale;
             b.y += b.vy * dt * timeScale;
             
             // Wall Collision
             if (b.x < b.radius) {
                 b.x = b.radius;
-                b.vx = Math.abs(b.vx) * 0.6;
+                b.vx = Math.abs(b.vx) * 0.5;
             }
             if (b.x > width - b.radius) {
                 b.x = width - b.radius;
-                b.vx = -Math.abs(b.vx) * 0.6;
+                b.vx = -Math.abs(b.vx) * 0.5;
             }
             
             if (b.trail.length > 20) b.trail.shift();
@@ -95,13 +100,26 @@ export class PhysicsManager {
                             const minDist = b.radius + pegRadius;
                             
                             if (distSq < minDist*minDist) {
-                                const angle = Math.atan2(distY, distX);
-                                const speed = Math.sqrt(b.vx*b.vx + b.vy*b.vy);
-                                b.vx = Math.cos(angle) * speed * bounce + (Math.random() - 0.5) * 50;
-                                b.vy = Math.sin(angle) * speed * bounce;
-                                const overlap = minDist - Math.sqrt(distSq);
-                                b.x += Math.cos(angle) * overlap;
-                                b.y += Math.sin(angle) * overlap;
+                                // Proper Reflection Physics
+                                const dist = Math.sqrt(distSq);
+                                const nx = distX / dist; // Normal X
+                                const ny = distY / dist; // Normal Y
+                                
+                                // Dot product of velocity and normal
+                                const dot = b.vx * nx + b.vy * ny;
+                                
+                                // Reflect velocity: v = v - 2 * (v . n) * n
+                                // Apply restitution (bounce)
+                                b.vx = (b.vx - 2 * dot * nx) * bounce;
+                                b.vy = (b.vy - 2 * dot * ny) * bounce;
+                                
+                                // Add a tiny bit of random nudge to prevent perfect vertical stacks
+                                b.vx += (Math.random() - 0.5) * 15;
+
+                                // Resolve overlap
+                                const overlap = minDist - dist;
+                                b.x += nx * overlap;
+                                b.y += ny * overlap;
 
                                 p.glow = 1.0;
                                 p.cooldown = 10;
@@ -144,13 +162,33 @@ export class PhysicsManager {
             }
             
             // Basket collision
-            if (b.y > height - 40 && b.y < height - 10) {
+            const basketTop = height - 40;
+            const basketBottom = height - 10;
+            const basketW = width / 5;
+
+            // Check for basket dividers (solid vertical lines)
+            let hitDivider = false;
+            for (let i = 1; i < 5; i++) {
+                const dividerX = i * basketW;
+                if (b.y > basketTop && b.x > dividerX - 4 && b.x < dividerX + 4) {
+                    // Hit a divider
+                    hitDivider = true;
+                    if (b.x < dividerX) {
+                        b.x = dividerX - 4;
+                        b.vx = -Math.abs(b.vx) * 0.5;
+                    } else {
+                        b.x = dividerX + 4;
+                        b.vx = Math.abs(b.vx) * 0.5;
+                    }
+                }
+            }
+
+            if (!hitDivider && b.y > basketTop && b.y < basketBottom) {
                 if (b.vy > 0) {
                     state.lifetimeBaskets = (state.lifetimeBaskets || 0) + 1;
                     ProgressionManager.updateMissionProgress(state, 'baskets', 1);
 
-                    const basketWidth = width / 5;
-                    const idx = Math.floor(b.x / basketWidth);
+                    const idx = Math.floor(b.x / basketW);
                     const baseValues = [10, 5, 20, 5, 10];
                     const base = (baseValues[idx] || 5) + state.basketValueBonus;
                     const rarityMult = b.type === 'legendary' ? 4 : (b.type === 'rare' ? 3 : (b.type === 'uncommon' ? 2 : 1));

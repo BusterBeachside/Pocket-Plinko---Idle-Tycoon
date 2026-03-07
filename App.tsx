@@ -56,7 +56,6 @@ const App = () => {
     const [authModalOpen, setAuthModalOpen] = useState(true);
     const [user, setUser] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
-    const [isOffline, setIsOffline] = useState(false);
     const [assetsLoaded, setAssetsLoaded] = useState(false);
     const [loadProgress, setLoadProgress] = useState(0);
     const [toast, setToast] = useState<{msg: string, visible: boolean} | null>(null);
@@ -76,14 +75,18 @@ const App = () => {
                 setUser(u);
                 const p = await SupabaseService.getProfile(u.id);
                 setProfile(p);
-                engine.isOffline = false;
                 setAuthModalOpen(false);
+                
                 // Sync progress with Supabase
+                engine.isSyncing = true;
                 const syncedState = await SupabaseService.syncData(engine.state);
                 if (syncedState) {
                     engine.state = { ...syncedState };
                     engine.notify();
                 }
+                engine.isSyncing = false;
+                engine.state.isOffline = false;
+                engine.notify();
             }
         });
 
@@ -168,19 +171,24 @@ const App = () => {
 
     const handleAuthComplete = async (u: any, offline: boolean) => {
         setUser(u);
-        setIsOffline(offline);
-        engine.isOffline = offline;
         setAuthModalOpen(false);
         
         if (u) {
             const p = await SupabaseService.getProfile(u.id);
             setProfile(p);
             // Sync current local progress to cloud (as requested)
+            engine.isSyncing = true;
             const syncedState = await SupabaseService.syncData(engine.state);
             if (syncedState) {
                 engine.state = { ...syncedState };
                 engine.notify();
             }
+            engine.isSyncing = false;
+            engine.state.isOffline = false;
+            engine.notify();
+        } else {
+            engine.state.isOffline = true;
+            engine.notify();
         }
     };
 

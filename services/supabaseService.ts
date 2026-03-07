@@ -228,6 +228,7 @@ export class SupabaseService {
         const { data, error } = await supabase
             .from('user_game_data')
             .select(`
+                user_id,
                 currency,
                 stats,
                 profiles (

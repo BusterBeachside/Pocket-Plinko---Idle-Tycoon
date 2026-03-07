@@ -7,20 +7,31 @@ export const AchievementsModal = ({ gameState, onClose }: { gameState: any, onCl
     const groups = ACHIEVEMENT_GROUPS;
     const completedAchievements = gameState.achievements;
     const peakMps = gameState.currentRunPeakMps || gameState.currentMps || 10;
-    const touchStart = useRef<number | null>(null);
+    const touchStart = useRef<{x: number, y: number} | null>(null);
+    const isSwiping = useRef(false);
 
     const handleTouchStart = (e: React.TouchEvent) => {
-        touchStart.current = e.touches[0].clientX;
+        touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        isSwiping.current = true;
     };
 
     const handleTouchEnd = (e: React.TouchEvent) => {
-        if (touchStart.current === null) return;
-        const touchEnd = e.changedTouches[0].clientX;
-        const diff = touchEnd - touchStart.current;
-        if (diff > 50) {
-            onClose();
+        if (!touchStart.current || !isSwiping.current) return;
+        
+        const touchEnd = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+        const dx = touchEnd.x - touchStart.current.x;
+        const dy = touchEnd.y - touchStart.current.y;
+        
+        // Horizontal swipe must be significantly larger than vertical to count
+        // and must exceed a higher threshold (100px)
+        if (Math.abs(dx) > 100 && Math.abs(dx) > Math.abs(dy) * 2) {
+            if (dx > 0) { // Swipe right to close
+                onClose();
+            }
         }
+        
         touchStart.current = null;
+        isSwiping.current = false;
     };
 
     return (
