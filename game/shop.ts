@@ -54,15 +54,7 @@ export class ShopSystem {
             state.permUpgradesLevels[id] = currentLevel + 1;
             state.permUpgradeCosts[id] = Math.floor(currentCost * 1.4);
             
-            if (id === 'perm_income_a') {
-                state.permanentIncomeBoostPercent = (state.permanentIncomeBoostPercent || 0) + 5;
-            } else if (id === 'perm_shard_multi') {
-                state.shardMultiplierPercent = (state.shardMultiplierPercent || 0) + 10;
-            } else if (id === 'perm_micro_boost') {
-                state.permanentMicroBoostPercent = (state.permanentMicroBoostPercent || 0) + 2;
-            } else if (id === 'perm_bonus_chance') {
-                state.bonusChance = Math.min(1, 0.5 + ((currentLevel + 1) * 0.01));
-            }
+            SaveSystem.calculateDerivedState(state);
             
             audio.play('upgrade');
             saveCallback();

@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { engine } from './game/engine';
 import { assets } from './game/assets';
+import { SaveSystem } from './game/saveSystem';
 import './App.css';
 
 import { GameCanvas } from './components/GameCanvas';
@@ -83,6 +84,7 @@ const App = () => {
                 const syncedState = await SupabaseService.syncData(engine.state);
                 if (syncedState) {
                     engine.state = { ...syncedState };
+                    SaveSystem.calculateDerivedState(engine.state);
                     engine.notify();
                 }
                 engine.isSyncing = false;
@@ -183,6 +185,7 @@ const App = () => {
             const syncedState = await SupabaseService.syncData(engine.state);
             if (syncedState) {
                 engine.state = { ...syncedState };
+                SaveSystem.calculateDerivedState(engine.state);
                 engine.notify();
             }
             engine.isSyncing = false;

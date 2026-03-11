@@ -69,6 +69,13 @@ export class SaveSystem {
         // Derived bonuses: +1% income and +1 master mult per skin
         state.derivedIncomeBoostPercent = ownedCount + Math.floor(ownedCount / 10) * 5;
         state.derivedMasterBonus = ownedCount + Math.floor(ownedCount / 10) * 5;
+
+        // Calculate permanent upgrades
+        const p = state.permUpgradesLevels || {};
+        state.permanentIncomeBoostPercent = (p['perm_income_a'] || 0) * 5;
+        state.shardMultiplierPercent = (p['perm_shard_multi'] || 0) * 10;
+        state.permanentMicroBoostPercent = (p['perm_micro_boost'] || 0) * 2;
+        state.bonusChance = Math.min(1, 0.5 + ((p['perm_bonus_chance'] || 0) * 0.01));
     }
 
     static createPrestigeState(currentState: GameState, shardsEarned: number, masterMultiGain: number): GameState {
@@ -83,6 +90,7 @@ export class SaveSystem {
         const keptBonusChance = currentState.bonusChance;
         const keptPermIncome = currentState.permanentIncomeBoostPercent;
         const keptPermMicro = currentState.permanentMicroBoostPercent;
+        const keptShardMulti = currentState.shardMultiplierPercent;
         const keptTheme = currentState.activeTheme;
         const keptTotalPlayTime = currentState.totalPlayTime;
         const keptIsOffline = currentState.isOffline;
@@ -136,6 +144,7 @@ export class SaveSystem {
             bonusChance: keptBonusChance,
             permanentIncomeBoostPercent: keptPermIncome,
             permanentMicroBoostPercent: keptPermMicro,
+            shardMultiplierPercent: keptShardMulti,
             activeTheme: keptTheme,
             totalPlayTime: keptTotalPlayTime,
             isOffline: keptIsOffline,

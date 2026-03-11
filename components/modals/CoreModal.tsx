@@ -23,12 +23,17 @@ export const CoreModal = ({ onClose, onOpenShop, onActivate }: { onClose: () => 
     const lifetime = s.lifetimeEarnings;
     const peak = s.peakMps;
     
-    let baseShards = Math.floor(
-        (balls / 10) + 
-        (lifetime / 2000000000) + 
-        (peak / 1000000)
-    );
+    const rawShards = (balls / 10) + (lifetime / 2000000000) + (peak / 1000000);
+    let baseShards = Math.floor(rawShards);
     baseShards = Math.max(1, baseShards);
+
+    // Progress to next shard
+    let progressPercent = 0;
+    if (rawShards < 2) {
+        progressPercent = (rawShards / 2) * 100;
+    } else {
+        progressPercent = (rawShards % 1) * 100;
+    }
 
     // Apply Permanent Shard Multiplier (+10% per level)
     // Use state.shardMultiplierPercent directly, as it includes permanent upgrades applied in engine
@@ -138,6 +143,22 @@ export const CoreModal = ({ onClose, onOpenShop, onActivate }: { onClose: () => 
                         <div className="prestige-stat">
                             <div className="label">Master Multiplier</div>
                             <div className="value" style={{color:'#ffd700'}}>x{formatNumber(totalMasterMultGain)}</div>
+                        </div>
+                    </div>
+
+                    <div style={{ marginTop: '12px', padding: '0 4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#aaa', marginBottom: '4px', fontWeight: 700 }}>
+                            <span>Progress to Next Shard</span>
+                            <span>{Math.floor(progressPercent)}%</span>
+                        </div>
+                        <div style={{ width: '100%', height: '8px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div style={{
+                                width: `${progressPercent}%`,
+                                height: '100%',
+                                backgroundColor: '#00ffff',
+                                transition: 'width 0.3s ease',
+                                boxShadow: '0 0 8px rgba(0, 255, 255, 0.5)'
+                            }} />
                         </div>
                     </div>
                 </div>
