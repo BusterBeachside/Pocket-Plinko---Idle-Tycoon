@@ -54,6 +54,7 @@ const App = () => {
     const [uiState, setUiState] = useState({ upgradesOpen: false, optionsOpen: false, statsOpen: false, shardShopOpen: false, coreModalOpen: false, prestigeAnim: false, achievementsOpen: false, missionsOpen: false, leaderboardOpen: false });
     const [started, setStarted] = useState(false);
     const [authModalOpen, setAuthModalOpen] = useState(true);
+    const [isAuthChecking, setIsAuthChecking] = useState(true);
     const [user, setUser] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
     const [assetsLoaded, setAssetsLoaded] = useState(false);
@@ -88,6 +89,7 @@ const App = () => {
                 engine.state.isOffline = false;
                 engine.notify();
             }
+            setIsAuthChecking(false);
         });
 
         // Combined loading for images and audio
@@ -238,7 +240,7 @@ const App = () => {
         <div className={`app-container ${isPurple ? 'theme-purple' : 'theme-dark'}`}>
             {!started && <TitleScreen onStart={handleStart} loading={!assetsLoaded} progress={loadProgress} />}
             
-            {authModalOpen && (
+            {!isAuthChecking && authModalOpen && (
                 <UnderdogAuth 
                     onAuthComplete={handleAuthComplete} 
                     onClose={user ? () => setAuthModalOpen(false) : undefined}

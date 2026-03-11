@@ -104,7 +104,11 @@ export const UnderdogAuth: React.FC<UnderdogAuthProps> = ({ onAuthComplete, onCl
     setLoading(true);
     try {
       await SupabaseService.signOut();
+      // Clear local data to prevent persistence across identities
+      const { SaveSystem } = await import('../game/saveSystem');
+      SaveSystem.clearSave();
       onAuthComplete(null, false);
+      window.location.reload();
     } catch (err) {
       console.error(err);
     } finally {

@@ -26,10 +26,14 @@ export class SaveSystem {
                 // Initialize currentRunPeakMps if missing (migration)
                 currentRunPeakMps: parsed.currentRunPeakMps ?? (parsed.currentMps || 0),
                 // Mission migration
-                missions: (parsed.missions && parsed.missions.activeDailies && parsed.missions.activeRepeatables) ? parsed.missions : INITIAL_STATE.missions
+                missions: (parsed.missions && parsed.missions.activeDailies && parsed.missions.activeRepeatables) ? parsed.missions : INITIAL_STATE.missions,
+                // All-time earnings migration
+                allTimeEarnings: parsed.allTimeEarnings ?? (parsed.lifetimeEarnings || 0)
             };
             // Ensure upgrades object structure is complete even if loaded from partial save
             loaded.upgrades = { ...INITIAL_STATE.upgrades, ...(parsed.upgrades || {}) };
+            // Reset bonus marble to prevent frozen state on load
+            loaded.bonusMarble = JSON.parse(JSON.stringify(INITIAL_STATE.bonusMarble));
             return loaded;
         }
         return JSON.parse(JSON.stringify(INITIAL_STATE));
@@ -37,7 +41,14 @@ export class SaveSystem {
 
     static saveState(state: GameState) {
         state.lastSaveTime = Date.now();
-        localStorage.setItem('plinko_react_v1', JSON.stringify(state));
+        const stateToSave = { ...state };
+        // Don't save bonus marble position/state
+        stateToSave.bonusMarble = JSON.parse(JSON.stringify(INITIAL_STATE.bonusMarble));
+        localStorage.setItem('plinko_react_v1', JSON.stringify(stateToSave));
+    }
+
+    static clearSave() {
+        localStorage.removeItem('plinko_react_v1');
     }
 
     static calculateDerivedState(state: GameState) {
@@ -76,6 +87,7 @@ export class SaveSystem {
         const keptTotalPlayTime = currentState.totalPlayTime;
         const keptIsOffline = currentState.isOffline;
         const keptLastCloudSync = currentState.lastCloudSyncTime;
+        const keptAllTimeEarnings = currentState.allTimeEarnings;
         const keptPegMuted = currentState.pegMuted;
         const keptBasketMuted = currentState.basketMuted;
         const keptPeakMps = currentState.peakMps; // All-time peak persists
@@ -128,6 +140,7 @@ export class SaveSystem {
             totalPlayTime: keptTotalPlayTime,
             isOffline: keptIsOffline,
             lastCloudSyncTime: keptLastCloudSync,
+            allTimeEarnings: keptAllTimeEarnings,
             pegMuted: keptPegMuted,
             basketMuted: keptBasketMuted,
             peakMps: keptPeakMps,

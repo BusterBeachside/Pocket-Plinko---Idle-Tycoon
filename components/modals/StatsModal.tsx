@@ -17,9 +17,9 @@ export const StatsModal = ({ onClose }: { onClose: () => void }) => {
     const milestoneLevels = Math.floor(ownedCount / 10);
     const ownedSkinsMasterBonus = ownedCount; 
     const milestoneMasterBonus = milestoneLevels * 5;
-    const derivedMasterBonus = (ownedSkinsMasterBonus || 0) + (milestoneMasterBonus || 0);
-    const totalMasterMultiplier = (s.masterMultiplier || 0) + derivedMasterBonus;
-    const derivedIncomeBoost = ownedCount + (milestoneLevels * 5); 
+    const derivedMasterBonus = s.derivedMasterBonus || 0;
+    const totalMasterMultiplier = 1 + (s.masterMultiplier || 0) + derivedMasterBonus;
+    const derivedIncomeBoost = s.derivedIncomeBoostPercent || 0; 
     const totalIncomeBoost = (s.permanentIncomeBoostPercent || 0) + derivedIncomeBoost;
     const timeSecs = Math.floor(s.totalPlayTime || 0);
     const hh = Math.floor(timeSecs / 3600);
@@ -35,7 +35,7 @@ export const StatsModal = ({ onClose }: { onClose: () => void }) => {
                     <button className="close-core" onClick={onClose}>Close</button>
                 </div>
                 <div className="stats-grid">
-                    <div className="stat-tile"><div className="stat-label">Lifetime $</div><div className="stat-value" style={{color:'#ffd700'}}>${format(s.lifetimeEarnings + s.money)}</div></div>
+                    <div className="stat-tile"><div className="stat-label">All-Time $</div><div className="stat-value" style={{color:'#ffd700'}}>${format((s.allTimeEarnings || 0) + s.money)}</div></div>
                     <div className="stat-tile"><div className="stat-label">Peak $/s (This Run)</div><div className="stat-value">${format(s.currentRunPeakMps || 0)}/s</div></div>
                     <div className="stat-tile"><div className="stat-label">Peak $/s (All-Time)</div><div className="stat-value">${format(s.peakMps)}/s</div></div>
                     <div className="stat-tile"><div className="stat-label">Times Prestiged</div><div className="stat-value">{s.timesPrestiged}</div></div>

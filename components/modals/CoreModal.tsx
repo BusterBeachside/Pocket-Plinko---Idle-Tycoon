@@ -95,7 +95,8 @@ export const CoreModal = ({ onClose, onOpenShop, onActivate }: { onClose: () => 
                     <p style={{marginBottom:'10px'}}>The energy required to activate the Core is immense.</p>
                     <ul style={{textAlign:'left', marginBottom:'15px', color:'#ccc'}}>
                         <li>Marbles: <span style={{color:'#ff6b6b'}}>{balls} / {reqBalls}</span></li>
-                        <li>Your money: <span style={{color: hasMoney ? '#4caf50' : '#ff6b6b'}}>${formatNumber(money)} / $100M</span></li>
+                        <li>Money: <span style={{color: hasMoney ? '#4caf50' : '#ff6b6b'}}>${formatNumber(money)} / $100M</span></li>
+                        <li>Lifetime (This Run): <span style={{color:'#ffd700'}}>${formatNumber(lifetime)}</span></li>
                     </ul>
                     <p>Keep expanding your operation to unlock the ultimate power.</p>
                     <div className="footer-center">
@@ -126,6 +127,10 @@ export const CoreModal = ({ onClose, onOpenShop, onActivate }: { onClose: () => 
                     <p>Powering the Kinetic Core requires <strong>$100M</strong> and will <strong>reset all of your stats and upgrades to ZERO!</strong></p>
                     
                     <div className="prestige-stats">
+                        <div className="prestige-stat">
+                            <div className="label">Lifetime (This Run)</div>
+                            <div className="value" style={{color:'#ffd700'}}>${formatNumber(lifetime)}</div>
+                        </div>
                         <div className="prestige-stat">
                             <div className="label">Kinetic Shards</div>
                             <div className="value" style={{color:'#00ffff'}}>{formatNumber(totalShards)}</div>

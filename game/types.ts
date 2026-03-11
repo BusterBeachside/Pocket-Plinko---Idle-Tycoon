@@ -16,6 +16,7 @@ export interface GameState {
     version: number; // For save migration
     money: number;
     lifetimeEarnings: number;
+    allTimeEarnings: number;
     ballsCount: number;
     pegValue: number;
     ballSpeed: number;
@@ -121,6 +122,7 @@ export const INITIAL_STATE: GameState = {
     version: 2,
     money: 0,
     lifetimeEarnings: 0,
+    allTimeEarnings: 0,
     ballsCount: 1,
     pegValue: 1,
     ballSpeed: 1,

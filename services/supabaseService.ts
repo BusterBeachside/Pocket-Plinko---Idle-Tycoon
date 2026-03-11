@@ -137,7 +137,7 @@ export class SupabaseService {
             .upsert({
                 user_id: user.id,
                 game_id: gameId,
-                currency,
+                currency: Math.floor(currency), 
                 stats: statsToSave,
                 settings,
                 updated_at: new Date().toISOString()
@@ -167,11 +167,11 @@ export class SupabaseService {
                 return localState;
             }
 
-            // Compare lifetime earnings to see which is "better"
-            const cloudLifetime = cloudData.stats?.lifetimeEarnings || 0;
-            const localLifetime = localState.lifetimeEarnings || 0;
+            // Compare earnings to see which is "better"
+            const cloudAllTime = cloudData.stats?.allTimeEarnings || cloudData.stats?.lifetimeEarnings || 0;
+            const localAllTime = localState.allTimeEarnings || localState.lifetimeEarnings || 0;
 
-            if (localLifetime > cloudLifetime) {
+            if (localAllTime > cloudAllTime) {
                 // Local is better, sync to cloud
                 const { money, ...stats } = localState;
                 await this.saveProgress(stats, money, {});
@@ -222,23 +222,16 @@ export class SupabaseService {
         const gameId = await this.getGameId();
         if (!gameId) return [];
 
-        // Fetch user game data and join with profiles
-        // We sort by peakMps (primary) and lifetimeEarnings (secondary)
-        // Note: stats is a JSONB column, so we use ->> to extract values and cast them
         const { data, error } = await supabase
-            .from('user_game_data')
+            .from('leaderboards')
             .select(`
                 user_id,
-                currency,
-                stats,
-                profiles (
-                    username,
-                    avatar_url
-                )
+                score,
+                metadata
             `)
             .eq('game_id', gameId)
-            .order('stats->peakMps', { ascending: false })
-            .order('stats->lifetimeEarnings', { ascending: false })
+            .eq('metadata->>mode', 'mps')
+            .order('score', { ascending: false })
             .limit(50);
 
         if (error) {
@@ -246,7 +239,43 @@ export class SupabaseService {
             throw error;
         }
 
-        return data || [];
+        const entries = data || [];
+        if (entries.length === 0) return [];
+
+        // Fetch profiles for these users
+        const userIds = entries.map(e => e.user_id);
+        const { data: profiles, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url')
+            .in('id', userIds);
+
+        if (profileError) {
+            console.error("Error fetching profiles for leaderboard:", profileError);
+        }
+
+        const profileMap = (profiles || []).reduce((acc: any, p: any) => {
+            acc[p.id] = p;
+            return acc;
+        }, {});
+
+        // Map metadata to stats and attach profiles
+        const results = entries.map(item => ({
+            ...item,
+            stats: item.metadata,
+            currency: item.metadata?.money || 0,
+            profiles: profileMap[item.user_id] || { 
+                username: item.metadata?.username || 'Anonymous', 
+                avatar_url: item.metadata?.avatar_url || 'marble_white' 
+            }
+        }));
+
+        // Sort by score first, then by allTimeEarnings (handling JSON numbers)
+        return results.sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            const aEarnings = a.stats?.allTimeEarnings || a.stats?.lifetimeEarnings || 0;
+            const bEarnings = b.stats?.allTimeEarnings || b.stats?.lifetimeEarnings || 0;
+            return bEarnings - aEarnings;
+        });
     }
 
     static async submitScore(score: number, mode: string = 'default', metadata: any = {}): Promise<void> {
@@ -256,10 +285,13 @@ export class SupabaseService {
         const gameId = await this.getGameId();
         if (!gameId) return;
 
+        // Fetch profile to include in metadata for easier display
+        const profile = await this.getProfile(user.id);
+
         // Check if this is a personal best
         const { data: existingEntry, error: fetchError } = await supabase
             .from('leaderboards')
-            .select('id, score')
+            .select('id, score, metadata')
             .eq('user_id', user.id)
             .eq('game_id', gameId)
             .eq('metadata->>mode', mode)
@@ -270,14 +302,23 @@ export class SupabaseService {
             return;
         }
 
-        // Only update if no existing entry or new score is higher
-        if (!existingEntry || score > existingEntry.score) {
+        // Update if no existing entry, new score is higher, OR score is the same (to sync metadata)
+        // We also update if the new allTimeEarnings is higher than what's in metadata
+        const existingAllTime = existingEntry?.metadata?.allTimeEarnings || 0;
+        const newAllTime = metadata?.allTimeEarnings || 0;
+
+        if (!existingEntry || score > existingEntry.score || (score === existingEntry.score && newAllTime >= existingAllTime)) {
             // Upsert the new high score
             const payload: any = {
                 user_id: user.id,
                 game_id: gameId,
-                score,
-                metadata: { ...metadata, mode }
+                score: Math.floor(score),
+                metadata: { 
+                    ...metadata, 
+                    mode,
+                    username: profile?.username || 'Anonymous',
+                    avatar_url: profile?.avatar_url || 'marble_white'
+                }
             };
 
             if (existingEntry) {

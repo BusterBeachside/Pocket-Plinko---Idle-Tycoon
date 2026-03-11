@@ -2,11 +2,13 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { SupabaseService } from '../../services/supabaseService';
+import { engine } from '../../game/engine';
 import { formatNumber } from '../../game/utils';
 import { assets } from '../../game/assets';
 import { AvatarDisplay } from '../AvatarDisplay';
 
 interface LeaderboardEntry {
+    score: number;
     currency: number;
     stats: any;
     profiles: {
@@ -69,7 +71,11 @@ export const LeaderboardModal = ({ onClose }: { onClose: () => void }) => {
                 </div>
 
                 <div className="leaderboard-container">
-                    {loading ? (
+                    {engine.state.isOffline ? (
+                        <div className="empty-state" style={{ color: '#ffd700', fontSize: '1.1rem', padding: '60px 20px' }}>
+                            Login or Create Account to view the leaderboard!
+                        </div>
+                    ) : loading ? (
                         <div className="loading-spinner">Loading rankings...</div>
                     ) : entries.length === 0 ? (
                         <div className="empty-state">No rankings found yet. Be the first!</div>
@@ -79,7 +85,6 @@ export const LeaderboardModal = ({ onClose }: { onClose: () => void }) => {
                                 <span className="rank">#</span>
                                 <span className="player">Player</span>
                                 <span className="mps">Peak $/s</span>
-                                <span className="earnings">Lifetime</span>
                             </div>
                              {entries.map((entry, index) => {
                                 const isMe = (entry as any).user_id === currentUserId;
@@ -103,8 +108,7 @@ export const LeaderboardModal = ({ onClose }: { onClose: () => void }) => {
                                                 {isMe && <span className="me-tag"> (You)</span>}
                                             </span>
                                         </div>
-                                        <span className="mps">${formatNumber(entry.stats?.peakMps || 0)}</span>
-                                        <span className="earnings">${formatNumber(entry.stats?.lifetimeEarnings || 0)}</span>
+                                        <span className="mps">${formatNumber(entry.score || 0)}</span>
                                     </div>
                                 );
                             })}
@@ -127,12 +131,28 @@ export const LeaderboardModal = ({ onClose }: { onClose: () => void }) => {
                         </div>
                         <div className="tooltip-stats">
                             <div className="tooltip-stat">
+                                <span>All-Time Earnings:</span>
+                                <strong>${formatNumber(entries[hoveredEntry].stats?.allTimeEarnings || entries[hoveredEntry].stats?.lifetimeEarnings || 0)}</strong>
+                            </div>
+                            <div className="tooltip-stat">
                                 <span>Times Prestiged:</span>
                                 <strong>{entries[hoveredEntry].stats?.timesPrestiged || 0}</strong>
                             </div>
                             <div className="tooltip-stat">
+                                <span>Income Boost:</span>
+                                <strong>+{formatNumber((entries[hoveredEntry].stats?.derivedIncomeBoostPercent || 0) + (entries[hoveredEntry].stats?.permanentIncomeBoostPercent || 0))}%</strong>
+                            </div>
+                            <div className="tooltip-stat">
                                 <span>Master Multiplier:</span>
-                                <strong>x{formatNumber(entries[hoveredEntry].stats?.masterMultiplier || 1)}</strong>
+                                <strong>x{formatNumber(1 + (entries[hoveredEntry].stats?.masterMultiplier || 0) + (entries[hoveredEntry].stats?.derivedMasterBonus || 0))}</strong>
+                            </div>
+                            <div className="tooltip-stat">
+                                <span>Micro Value:</span>
+                                <strong>{1 + (entries[hoveredEntry].stats?.microValuePercent || 0) + (entries[hoveredEntry].stats?.permanentMicroBoostPercent || 0)}%</strong>
+                            </div>
+                            <div className="tooltip-stat">
+                                <span>Missions (D/R):</span>
+                                <strong>{entries[hoveredEntry].stats?.dailyCompleted || 0} / {entries[hoveredEntry].stats?.repeatableCompleted || 0}</strong>
                             </div>
                             <div className="tooltip-stat">
                                 <span>Achievements:</span>
@@ -148,7 +168,10 @@ export const LeaderboardModal = ({ onClose }: { onClose: () => void }) => {
                             </div>
                             <div className="tooltip-stat">
                                 <span>Total Play Time:</span>
-                                <strong>{Math.floor((entries[hoveredEntry].stats?.totalPlayTime || 0) / 3600)}h</strong>
+                                <strong>
+                                    {Math.floor((entries[hoveredEntry].stats?.totalPlayTime || 0) / 3600)}h{' '}
+                                    {Math.floor(((entries[hoveredEntry].stats?.totalPlayTime || 0) % 3600) / 60)}m
+                                </strong>
                             </div>
                         </div>
                     </div>

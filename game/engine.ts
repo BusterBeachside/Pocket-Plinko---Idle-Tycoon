@@ -58,6 +58,8 @@ export class GameEngine {
     isGameStarted: boolean = false;
     isResetting: boolean = false;
     isSyncing: boolean = false;
+    lastCloudSave: number = 0;
+    lastLeaderboardSync: number = 0;
 
     constructor() {
         this.state = SaveSystem.loadState();
@@ -68,8 +70,11 @@ export class GameEngine {
         
         // Debug Keys
         if (typeof window !== 'undefined') {
-            window.addEventListener('keydown', (e) => {
+            window.addEventListener('keydown', async (e) => {
                 if (e.shiftKey) {
+                    const user = await SupabaseService.getCurrentUser();
+                    if (user?.id !== 'a7155004-5e2c-4949-89ea-505daa903a31') return;
+
                     switch(e.key.toLowerCase()) {
                         case 'm': 
                             this.addMoney(10000000); 
@@ -149,21 +154,28 @@ export class GameEngine {
         this.listeners.forEach(cb => cb());
     }
 
-    async saveState() {
+    async saveState(force: boolean = false) {
         if (this.isResetting || this.isSyncing) return;
         
         // Always save to local storage as backup/offline mode
         SaveSystem.saveState(this.state);
 
-        // If online, sync to Supabase
-        if (!this.state.isOffline && !this.isSyncing) {
+        // If online, sync to Supabase (Throttled to every 30 seconds)
+        const now = Date.now();
+        if (!this.state.isOffline && !this.isSyncing && (force || (now - this.lastCloudSave > 30000))) {
+            this.lastCloudSave = now;
             try {
                 const user = await SupabaseService.getCurrentUser();
                 if (user) {
                     const { money, ...stats } = this.state;
-                    // We separate currency from stats in the DB schema
-                    await SupabaseService.saveProgress(stats, money, {});
+                    console.log("Syncing stats:", stats);
+                    // Sync both progress and leaderboard on the same cycle
+                    await Promise.all([
+                        SupabaseService.saveProgress(stats, money, {}),
+                        SupabaseService.submitScore(this.state.peakMps, 'mps', stats)
+                    ]);
                     this.state.lastCloudSyncTime = Date.now();
+                    this.lastLeaderboardSync = Date.now();
                 }
             } catch (err) {
                 console.error("Failed to sync to Supabase:", err);
@@ -304,9 +316,9 @@ export class GameEngine {
             // Update All-time Peak
             if (mps > this.state.peakMps) {
                 this.state.peakMps = mps;
-                // Submit to leaderboard if online
+                // Force immediate sync to cloud and leaderboard
                 if (!this.state.isOffline) {
-                    SupabaseService.submitScore(mps, 'mps').catch(console.error);
+                    this.saveState(true);
                 }
             }
             
@@ -376,6 +388,7 @@ export class GameEngine {
     addMoney(amount: number, countTowardsIncome: boolean = true) {
         this.state.money += amount;
         this.state.lifetimeEarnings += amount;
+        this.state.allTimeEarnings = (this.state.allTimeEarnings || 0) + amount;
         if (countTowardsIncome) {
             this.incomeBuffer += amount;
         }

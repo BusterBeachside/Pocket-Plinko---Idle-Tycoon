@@ -822,7 +822,7 @@ canvas {
 
 .leaderboard-header {
     display: grid;
-    grid-template-columns: 30px 1fr 80px 80px;
+    grid-template-columns: 30px 1fr 120px;
     padding: 10px;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 8px;
@@ -834,7 +834,7 @@ canvas {
 
 .leaderboard-row {
     display: grid;
-    grid-template-columns: 30px 1fr 80px 80px;
+    grid-template-columns: 30px 1fr 120px;
     padding: 12px 10px;
     background: rgba(255, 255, 255, 0.03);
     border-radius: 8px;
@@ -845,7 +845,7 @@ canvas {
 
 @media (max-width: 500px) {
     .leaderboard-header, .leaderboard-row {
-        grid-template-columns: 25px 1fr 65px 65px;
+        grid-template-columns: 25px 1fr 90px;
         font-size: 0.65rem;
         padding: 8px 6px;
     }
