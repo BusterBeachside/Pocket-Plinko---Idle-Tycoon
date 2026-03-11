@@ -74,6 +74,8 @@ export class SaveSystem {
         const keptPermMicro = currentState.permanentMicroBoostPercent;
         const keptTheme = currentState.activeTheme;
         const keptTotalPlayTime = currentState.totalPlayTime;
+        const keptIsOffline = currentState.isOffline;
+        const keptLastCloudSync = currentState.lastCloudSyncTime;
         const keptPegMuted = currentState.pegMuted;
         const keptBasketMuted = currentState.basketMuted;
         const keptPeakMps = currentState.peakMps; // All-time peak persists
@@ -124,6 +126,8 @@ export class SaveSystem {
             permanentMicroBoostPercent: keptPermMicro,
             activeTheme: keptTheme,
             totalPlayTime: keptTotalPlayTime,
+            isOffline: keptIsOffline,
+            lastCloudSyncTime: keptLastCloudSync,
             pegMuted: keptPegMuted,
             basketMuted: keptBasketMuted,
             peakMps: keptPeakMps,
