@@ -28,15 +28,49 @@ export class SaveSystem {
                 // Mission migration
                 missions: (parsed.missions && parsed.missions.activeDailies && parsed.missions.activeRepeatables) ? parsed.missions : INITIAL_STATE.missions,
                 // All-time earnings migration
-                allTimeEarnings: parsed.allTimeEarnings ?? (parsed.lifetimeEarnings || 0)
+                allTimeEarnings: parsed.allTimeEarnings ?? (parsed.lifetimeEarnings || 0),
+                tutorials: parsed.tutorials || INITIAL_STATE.tutorials
             };
             // Ensure upgrades object structure is complete even if loaded from partial save
             loaded.upgrades = { ...INITIAL_STATE.upgrades, ...(parsed.upgrades || {}) };
+            
+            // Migrate old localStorage tutorial keys
+            if (typeof window !== 'undefined') {
+                const keys = [
+                    'plinko_tutorial_v1', 
+                    'plinko_seen_bonus_tutorial_v1', 
+                    'plinko_seen_kinetic_tutorial_v1', 
+                    'plinko_seen_shardshop_tutorial_v1', 
+                    'plinko_seen_shardshop_skins_tutorial_v1'
+                ];
+                keys.forEach(k => {
+                    if (!loaded.tutorials[k] && localStorage.getItem(k)) {
+                        loaded.tutorials[k] = true;
+                    }
+                });
+            }
+
             // Reset bonus marble to prevent frozen state on load
             loaded.bonusMarble = JSON.parse(JSON.stringify(INITIAL_STATE.bonusMarble));
             return loaded;
         }
-        return JSON.parse(JSON.stringify(INITIAL_STATE));
+        
+        const freshState = JSON.parse(JSON.stringify(INITIAL_STATE));
+        if (typeof window !== 'undefined') {
+            const keys = [
+                'plinko_tutorial_v1', 
+                'plinko_seen_bonus_tutorial_v1', 
+                'plinko_seen_kinetic_tutorial_v1', 
+                'plinko_seen_shardshop_tutorial_v1', 
+                'plinko_seen_shardshop_skins_tutorial_v1'
+            ];
+            keys.forEach(k => {
+                if (localStorage.getItem(k)) {
+                    freshState.tutorials[k] = true;
+                }
+            });
+        }
+        return freshState;
     }
 
     static saveState(state: GameState) {
@@ -93,6 +127,7 @@ export class SaveSystem {
         const keptShardMulti = currentState.shardMultiplierPercent;
         const keptTheme = currentState.activeTheme;
         const keptTotalPlayTime = currentState.totalPlayTime;
+        const keptTutorials = { ...currentState.tutorials };
         const keptIsOffline = currentState.isOffline;
         const keptLastCloudSync = currentState.lastCloudSyncTime;
         const keptAllTimeEarnings = currentState.allTimeEarnings;
@@ -147,6 +182,7 @@ export class SaveSystem {
             shardMultiplierPercent: keptShardMulti,
             activeTheme: keptTheme,
             totalPlayTime: keptTotalPlayTime,
+            tutorials: keptTutorials,
             isOffline: keptIsOffline,
             lastCloudSyncTime: keptLastCloudSync,
             allTimeEarnings: keptAllTimeEarnings,

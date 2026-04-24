@@ -174,17 +174,23 @@ export class SupabaseService {
             if (localAllTime > cloudAllTime) {
                 // Local is better, sync to cloud
                 const { money, ...stats } = localState;
+                stats.bonusMarble = { active: false, x: 0, y: 0, baseY: 0, t: 0 }; // Sanitize before saving
                 await this.saveProgress(stats, money, {});
                 return localState;
             } else {
                 // Cloud is better or equal, use cloud
-                return {
+                const merged = {
                     ...localState,
                     ...cloudData.stats,
                     money: cloudData.currency,
                     // Ensure settings are merged if they exist
                     ...(cloudData.settings || {})
                 };
+                
+                // Always reset bonus marble on load to prevent stuck frozen marbles
+                merged.bonusMarble = { active: false, x: 0, y: 0, baseY: 0, t: 0 };
+                
+                return merged;
             }
         } catch (err) {
             console.error("Sync error:", err);

@@ -57,7 +57,7 @@ export const ShardShopModal = ({ onClose }: { onClose: () => void }) => {
         });
         
         // Trigger Shard Shop Tutorial if not seen
-        const seen = localStorage.getItem('plinko_seen_shardshop_tutorial_v1');
+        const seen = engine.state.tutorials['plinko_seen_shardshop_tutorial_v1'] || localStorage.getItem('plinko_seen_shardshop_tutorial_v1');
         if (!seen) {
             window.dispatchEvent(new CustomEvent('request-tutorial', { detail: { key: 'tut_shard' } }));
         }

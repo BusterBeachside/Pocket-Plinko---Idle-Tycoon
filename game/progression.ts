@@ -63,7 +63,8 @@ export class ProgressionManager {
     }
 
     static checkMissions(state: GameState, pushNotification: (msg: string, type: 'achievement' | 'mission') => void) {
-        const today = new Date().toISOString().slice(0, 10);
+        const now = new Date();
+        const today = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
         
         // Ensure missions object exists
         if (!state.missions) {

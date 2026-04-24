@@ -137,14 +137,14 @@ const App = () => {
             setTimeout(() => setToast(null), 5000);
             engine.offlineEarnings = 0; // clear
         }
-        const seen = localStorage.getItem('plinko_tutorial_v1');
+        const seen = gameState.tutorials['plinko_tutorial_v1'] || localStorage.getItem('plinko_tutorial_v1');
         if (!seen) { setTimeout(() => setShowTutorial(true), 500); }
     }, [started]);
 
     // Check for Kinetic Core Tutorial (>= 50 Marbles)
     useEffect(() => {
         const balls = gameState.upgrades.extraBall; // Fixed: Do not add +1, level is the count
-        if (balls >= 50 && !localStorage.getItem('plinko_seen_kinetic_tutorial_v1')) {
+        if (balls >= 50 && !gameState.tutorials['plinko_seen_kinetic_tutorial_v1'] && !localStorage.getItem('plinko_seen_kinetic_tutorial_v1')) {
              setSpecificTutorial('tut_kinetic');
         }
     }, [gameState.upgrades.extraBall]);
@@ -212,10 +212,23 @@ const App = () => {
     const handleTutorialClose = () => {
         const current = specificTutorial;
         // Mark current as seen
-        if (current === 'tut_bonus') localStorage.setItem('plinko_seen_bonus_tutorial_v1', '1');
-        if (current === 'tut_kinetic') localStorage.setItem('plinko_seen_kinetic_tutorial_v1', '1');
-        if (current === 'tut_shard') localStorage.setItem('plinko_seen_shardshop_tutorial_v1', '1');
-        if (current === 'tut_skins') localStorage.setItem('plinko_seen_shardshop_skins_tutorial_v1', '1');
+        if (current === 'tut_bonus') {
+            engine.state.tutorials['plinko_seen_bonus_tutorial_v1'] = true;
+            localStorage.setItem('plinko_seen_bonus_tutorial_v1', '1');
+        }
+        if (current === 'tut_kinetic') {
+            engine.state.tutorials['plinko_seen_kinetic_tutorial_v1'] = true;
+            localStorage.setItem('plinko_seen_kinetic_tutorial_v1', '1');
+        }
+        if (current === 'tut_shard') {
+            engine.state.tutorials['plinko_seen_shardshop_tutorial_v1'] = true;
+            localStorage.setItem('plinko_seen_shardshop_tutorial_v1', '1');
+        }
+        if (current === 'tut_skins') {
+            engine.state.tutorials['plinko_seen_shardshop_skins_tutorial_v1'] = true;
+            localStorage.setItem('plinko_seen_shardshop_skins_tutorial_v1', '1');
+        }
+        engine.saveState(false);
 
         // Unpause bonus marble if that was the tutorial
         if (current === 'tut_bonus') {
@@ -224,7 +237,7 @@ const App = () => {
         
         // Chain Shard -> Skins tutorial
         if (current === 'tut_shard') {
-            if (!localStorage.getItem('plinko_seen_shardshop_skins_tutorial_v1')) {
+            if (!engine.state.tutorials['plinko_seen_shardshop_skins_tutorial_v1'] && !localStorage.getItem('plinko_seen_shardshop_skins_tutorial_v1')) {
                 setSpecificTutorial(null); // Close current first to allow fade out
                 setTimeout(() => setSpecificTutorial('tut_skins'), 300); 
                 return;
@@ -254,7 +267,12 @@ const App = () => {
             {uiState.prestigeAnim && <PrestigeOverlay onComplete={completePrestige} />}
             
             {/* Standard First-run Tutorial */}
-            {started && showTutorial && !specificTutorial && <TutorialOverlay onClose={() => { setShowTutorial(false); localStorage.setItem('plinko_tutorial_v1', '1'); }} />}
+            {started && showTutorial && !specificTutorial && <TutorialOverlay onClose={() => { 
+                setShowTutorial(false); 
+                engine.state.tutorials['plinko_tutorial_v1'] = true;
+                localStorage.setItem('plinko_tutorial_v1', '1'); 
+                engine.saveState(false);
+            }} />}
             
             {/* Specific Tutorial from Menu or Logic Trigger */}
             {started && specificTutorial && <TutorialOverlay imageKey={specificTutorial} onClose={handleTutorialClose} />}

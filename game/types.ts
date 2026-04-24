@@ -95,6 +95,9 @@ export interface GameState {
     activeMarbleTexture: string | null;
     bonusChance: number;
 
+    // Tutorials Seen
+    tutorials: { [key: string]: boolean };
+
     // Runtime (not always persisted fully, but good to have in type)
     bonusMarble?: BonusMarbleState;
     achievements: { [key: string]: any };
@@ -189,6 +192,7 @@ export const INITIAL_STATE: GameState = {
     activeMarbleSkinID: 'tie_dye_1',
     activeMarbleTexture: null,
     bonusChance: 0.5,
+    tutorials: {},
     
     bonusMarble: { active: false, x: 0, y: 0, baseY: 0, t: 0 },
     achievements: {},

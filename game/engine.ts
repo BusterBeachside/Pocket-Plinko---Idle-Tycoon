@@ -113,6 +113,8 @@ export class GameEngine {
             if (this.state.bonusMarble) {
                 this.state.bonusMarble.paused = false;
             }
+            // Reset bonus spawn timer so it doesn't instantly spawn a second one after the first is resolved
+            this.lastBonusSpawn = Date.now();
             
             // Calculate offline income from tab-out
             if (this.state.lastTabOutTime && this.isGameStarted) {
@@ -168,6 +170,7 @@ export class GameEngine {
                 const user = await SupabaseService.getCurrentUser();
                 if (user) {
                     const { money, ...stats } = this.state;
+                    stats.bonusMarble = { active: false, x: 0, y: 0, baseY: 0, t: 0 };
                     console.log("Syncing stats:", stats);
                     // Sync both progress and leaderboard on the same cycle
                     await Promise.all([
@@ -333,7 +336,7 @@ export class GameEngine {
             if (Date.now() - this.lastBonusSpawn > 60000 && this.isGameStarted) {
                 if (!this.state.bonusMarble?.active) {
                     const roll = Math.random();
-                    const tutorialSeen = typeof window !== 'undefined' && localStorage.getItem('plinko_seen_bonus_tutorial_v1');
+                    const tutorialSeen = this.state.tutorials['plinko_seen_bonus_tutorial_v1'] || (typeof window !== 'undefined' && localStorage.getItem('plinko_seen_bonus_tutorial_v1'));
                     
                     // Force first spawn if tutorial not seen
                     if (roll < this.state.bonusChance || !tutorialSeen) {

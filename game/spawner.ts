@@ -97,7 +97,7 @@ export class Spawner {
     static spawnBonusMarble(state: GameState, width: number, requestTutorial: (key: string) => void) {
         if (!state.bonusMarble) state.bonusMarble = { active: false, x: 0, y: 0, baseY: 0, t: 0, paused: false };
         
-        if (typeof window !== 'undefined' && !localStorage.getItem('plinko_seen_bonus_tutorial_v1')) {
+        if (typeof window !== 'undefined' && !state.tutorials['plinko_seen_bonus_tutorial_v1'] && !localStorage.getItem('plinko_seen_bonus_tutorial_v1')) {
             state.bonusMarble.paused = true;
             requestTutorial('tut_bonus');
         }

@@ -71,32 +71,6 @@ export class GameRenderer {
             ctx.shadowBlur = 0;
         });
 
-        // Draw Bonus Marble
-        if (state.bonusMarble && state.bonusMarble.active) {
-            const bm = state.bonusMarble;
-            ctx.save();
-            ctx.translate(bm.x, bm.y);
-            
-            const bonusImage = assets.get('bonus');
-            
-            if (bonusImage && bonusImage.complete && bonusImage.naturalWidth > 0) {
-                const aspectRatio = bonusImage.naturalWidth / bonusImage.naturalHeight;
-                const drawW = 75; // Increased size
-                const drawH = drawW / aspectRatio;
-                ctx.shadowBlur = 20;
-                ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
-                ctx.drawImage(bonusImage, -drawW/2, -drawH/2, drawW, drawH);
-                ctx.shadowBlur = 0;
-            } else {
-                ctx.fillStyle = '#ff6b6b';
-                ctx.beginPath(); ctx.arc(0,0,16,0,Math.PI*2); ctx.fill();
-                ctx.fillStyle = 'white';
-                ctx.beginPath(); ctx.ellipse(-20, 0, 16, 8, 0, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.ellipse(20, 0, 16, 8, 0, 0, Math.PI*2); ctx.fill();
-            }
-            ctx.restore();
-        }
-
         // Draw Visual Effects
         for (let i = visualEffects.length - 1; i >= 0; i--) {
             const e = visualEffects[i];
@@ -355,6 +329,32 @@ export class GameRenderer {
             ctx.textAlign = 'center';
             ctx.fillText(p.text, p.x, p.y - yOff);
         });
+
+        // Draw Bonus Marble
+        if (state.bonusMarble && state.bonusMarble.active) {
+            const bm = state.bonusMarble;
+            ctx.save();
+            ctx.translate(bm.x, bm.y);
+            
+            const bonusImage = assets.get('bonus');
+            
+            if (bonusImage && bonusImage.complete && bonusImage.naturalWidth > 0) {
+                const aspectRatio = bonusImage.naturalWidth / bonusImage.naturalHeight;
+                const drawW = 75; // Increased size
+                const drawH = drawW / aspectRatio;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
+                ctx.drawImage(bonusImage, -drawW/2, -drawH/2, drawW, drawH);
+                ctx.shadowBlur = 0;
+            } else {
+                ctx.fillStyle = '#ff6b6b';
+                ctx.beginPath(); ctx.arc(0,0,16,0,Math.PI*2); ctx.fill();
+                ctx.fillStyle = 'white';
+                ctx.beginPath(); ctx.ellipse(-20, 0, 16, 8, 0, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(20, 0, 16, 8, 0, 0, Math.PI*2); ctx.fill();
+            }
+            ctx.restore();
+        }
     }
 
     private drawMasterRainbow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
