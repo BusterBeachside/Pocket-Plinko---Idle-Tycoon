@@ -162,7 +162,7 @@ export class ProgressionManager {
         return false;
     }
 
-    static rerollMission(state: GameState, instanceId: string, pushNotification: (msg: string, type: 'achievement' | 'mission') => void): boolean {
+    static rerollMission(state: GameState, instanceId: string, useShards: boolean, pushNotification: (msg: string, type: 'achievement' | 'mission') => void): boolean {
         const dailyIdx = state.missions.activeDailies.findIndex(m => m.instanceId === instanceId);
         const repeatableIdx = state.missions.activeRepeatables.findIndex(m => m.instanceId === instanceId);
         
@@ -179,11 +179,23 @@ export class ProgressionManager {
         if (!active || active.completed) return false;
 
         const peakMps = state.currentRunPeakMps || state.currentMps || 10;
-        const cost = Math.floor(peakMps * (isRepeatable ? 60 : 600)); // 1 min vs 10 min of peak income
+        const moneyCost = Math.floor(peakMps * (isRepeatable ? 10 : 30)); // 10s vs 30s of peak income
+        const shardCost = isRepeatable ? 1 : 3;
 
-        if (state.money >= cost) {
-            state.money -= cost;
-            
+        let canAfford = false;
+        if (useShards) {
+            if (state.kineticShards >= shardCost) {
+                state.kineticShards -= shardCost;
+                canAfford = true;
+            }
+        } else {
+            if (state.money >= moneyCost) {
+                state.money -= moneyCost;
+                canAfford = true;
+            }
+        }
+
+        if (canAfford) {
             const pool = isRepeatable ? REPEATABLE_MISSIONS : DAILY_MISSIONS;
             const activeIds = [...state.missions.activeDailies.map(m => m.id), ...state.missions.activeRepeatables.map(m => m.id)];
             const newMissions = this.getRandomMissions(pool, 1, isRepeatable ? 'repeatable' : 'daily', activeIds);

@@ -130,7 +130,6 @@ export class SaveSystem {
         const keptTutorials = { ...currentState.tutorials };
         const keptIsOffline = currentState.isOffline;
         const keptLastCloudSync = currentState.lastCloudSyncTime;
-        const keptAllTimeEarnings = currentState.allTimeEarnings;
         const keptPegMuted = currentState.pegMuted;
         const keptBasketMuted = currentState.basketMuted;
         const keptPeakMps = currentState.peakMps; // All-time peak persists
@@ -140,6 +139,15 @@ export class SaveSystem {
         const keptRepeatableCompleted = currentState.repeatableCompleted;
         const keptLifetimeMissions = currentState.lifetimeMissionsCompleted;
         const keptAchievementsUnlocked = currentState.achievementsUnlocked;
+
+        // Keep lifetime stats
+        const keptLifetimeEarnings = currentState.lifetimeEarnings;
+        const keptAllTimeEarnings = currentState.allTimeEarnings;
+        const keptLifetimePegHits = currentState.lifetimePegHits;
+        const keptLifetimeBaskets = currentState.lifetimeBaskets;
+        const keptLifetimeBonusMarbles = currentState.lifetimeBonusMarbles;
+        const keptLifetimeUpgradesBought = currentState.lifetimeUpgradesBought;
+        const keptLifetimeCriticalHits = currentState.lifetimeCriticalHits;
         
         // Deep copy INITIAL_STATE to avoid reference issues, then override mutable fields explicitly
         const baseState = JSON.parse(JSON.stringify(INITIAL_STATE));
@@ -194,7 +202,14 @@ export class SaveSystem {
             dailyCompleted: keptDailyCompleted,
             repeatableCompleted: keptRepeatableCompleted,
             lifetimeMissionsCompleted: keptLifetimeMissions,
-            achievementsUnlocked: keptAchievementsUnlocked
+            achievementsUnlocked: keptAchievementsUnlocked,
+            lifetimeEarnings: keptLifetimeEarnings,
+            allTimeEarnings: keptAllTimeEarnings,
+            lifetimePegHits: keptLifetimePegHits,
+            lifetimeBaskets: keptLifetimeBaskets,
+            lifetimeBonusMarbles: keptLifetimeBonusMarbles,
+            lifetimeUpgradesBought: keptLifetimeUpgradesBought,
+            lifetimeCriticalHits: keptLifetimeCriticalHits
         };
         
         this.calculateDerivedState(newState);

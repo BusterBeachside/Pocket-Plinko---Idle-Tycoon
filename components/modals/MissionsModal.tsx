@@ -60,8 +60,11 @@ export const MissionsModal = ({ onClose }: { onClose: () => void }) => {
         if (!missionDef) return null;
 
         const isRepeatable = active.type === 'repeatable';
-        const rerollCost = Math.floor(peakMps * (isRepeatable ? 60 : 600));
+        const rerollCost = Math.floor(peakMps * (isRepeatable ? 10 : 30));
         const canAffordReroll = engine.state.money >= rerollCost;
+        
+        const shardCost = isRepeatable ? 1 : 3;
+        const canAffordShards = engine.state.kineticShards >= shardCost;
 
         return (
             <div key={active.instanceId} className={`mission-tile ${active.type} ${active.completed ? 'completed' : ''} ${active.claimed ? 'claimed' : ''}`}>
@@ -78,13 +81,24 @@ export const MissionsModal = ({ onClose }: { onClose: () => void }) => {
                         <button className="claim-btn" onClick={() => engine.claimMission(active.instanceId)}>Claim Reward</button>
                     )}
                     {!active.completed && !active.claimed && (
-                        <button 
-                            className={`reroll-btn ${canAffordReroll ? '' : 'disabled'}`} 
-                            onClick={() => engine.rerollMission(active.instanceId)}
-                            title={`Reroll for $${formatNumber(rerollCost)}`}
-                        >
-                            🔄 Reroll (${formatNumber(rerollCost)})
-                        </button>
+                        <div className="reroll-options" style={{ display: 'flex', gap: '5px' }}>
+                            <button 
+                                className={`reroll-btn ${canAffordReroll ? '' : 'disabled'}`} 
+                                onClick={() => engine.rerollMission(active.instanceId, false)}
+                                title={`Reroll for $${formatNumber(rerollCost)}`}
+                                style={{ flex: 1 }}
+                            >
+                                🔄 Reroll (${formatNumber(rerollCost)})
+                            </button>
+                            <button 
+                                className={`reroll-btn shard-reroll ${canAffordShards ? '' : 'disabled'}`} 
+                                onClick={() => engine.rerollMission(active.instanceId, true)}
+                                title={`Reroll for ${shardCost} Shard${shardCost !== 1 ? 's' : ''}`}
+                                style={{ flex: 1, backgroundColor: '#9b59b6', borderColor: '#8e44ad', color: 'white' }}
+                            >
+                                🔄 Reroll ({shardCost} 💎)
+                            </button>
+                        </div>
                     )}
                     {active.claimed && (
                         <div className="claimed-badge">Claimed</div>

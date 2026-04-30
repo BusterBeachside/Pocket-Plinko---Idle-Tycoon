@@ -23,7 +23,6 @@ export class ShopSystem {
         if (state.money >= cost) {
             state.money -= cost;
             state.upgrades[id]++;
-            state.lifetimeEarnings += cost;
             
             SaveSystem.calculateDerivedState(state);
             audio.play('upgrade');

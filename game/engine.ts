@@ -527,8 +527,8 @@ export class GameEngine {
         return false;
     }
 
-    rerollMission(instanceId: string) {
-        if (ProgressionManager.rerollMission(this.state, instanceId, (m, t) => this.pushNotification(m, t))) {
+    rerollMission(instanceId: string, useShards: boolean = false) {
+        if (ProgressionManager.rerollMission(this.state, instanceId, useShards, (m, t) => this.pushNotification(m, t))) {
             this.audio.play('upgrade');
             this.notify();
             this.saveState();
