@@ -19,7 +19,7 @@ export const ACHIEVEMENT_GROUPS: AchievementGroup[] = [
     {
         id: 'tycoon',
         name: 'Tycoon',
-        stat: 'lifetimeEarnings',
+        stat: 'allTimeEarnings',
         descriptionTemplate: 'Earn ${n} in total',
         baseTarget: 1000000,
         targetScale: 10,

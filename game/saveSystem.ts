@@ -141,7 +141,6 @@ export class SaveSystem {
         const keptAchievementsUnlocked = currentState.achievementsUnlocked;
 
         // Keep lifetime stats
-        const keptLifetimeEarnings = currentState.lifetimeEarnings;
         const keptAllTimeEarnings = currentState.allTimeEarnings;
         const keptLifetimePegHits = currentState.lifetimePegHits;
         const keptLifetimeBaskets = currentState.lifetimeBaskets;
@@ -193,7 +192,6 @@ export class SaveSystem {
             tutorials: keptTutorials,
             isOffline: keptIsOffline,
             lastCloudSyncTime: keptLastCloudSync,
-            allTimeEarnings: keptAllTimeEarnings,
             pegMuted: keptPegMuted,
             basketMuted: keptBasketMuted,
             peakMps: keptPeakMps,
@@ -203,7 +201,6 @@ export class SaveSystem {
             repeatableCompleted: keptRepeatableCompleted,
             lifetimeMissionsCompleted: keptLifetimeMissions,
             achievementsUnlocked: keptAchievementsUnlocked,
-            lifetimeEarnings: keptLifetimeEarnings,
             allTimeEarnings: keptAllTimeEarnings,
             lifetimePegHits: keptLifetimePegHits,
             lifetimeBaskets: keptLifetimeBaskets,

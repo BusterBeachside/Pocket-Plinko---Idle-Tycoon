@@ -35,7 +35,8 @@ export const StatsModal = ({ onClose }: { onClose: () => void }) => {
                     <button className="close-core" onClick={onClose}>Close</button>
                 </div>
                 <div className="stats-grid">
-                    <div className="stat-tile"><div className="stat-label">All-Time $</div><div className="stat-value" style={{color:'#ffd700'}}>${format((s.allTimeEarnings || 0) + s.money)}</div></div>
+                    <div className="stat-tile"><div className="stat-label">Lifetime (This Run)</div><div className="stat-value" style={{color:'#ffd700'}}>${format(s.lifetimeEarnings)}</div></div>
+                    <div className="stat-tile"><div className="stat-label">All-Time $</div><div className="stat-value" style={{color:'#ffd700'}}>${format(s.allTimeEarnings || 0)}</div></div>
                     <div className="stat-tile"><div className="stat-label">Peak $/s (This Run)</div><div className="stat-value">${format(s.currentRunPeakMps || 0)}/s</div></div>
                     <div className="stat-tile"><div className="stat-label">Peak $/s (All-Time)</div><div className="stat-value">${format(s.peakMps)}/s</div></div>
                     <div className="stat-tile"><div className="stat-label">Times Prestiged</div><div className="stat-value">{s.timesPrestiged}</div></div>
