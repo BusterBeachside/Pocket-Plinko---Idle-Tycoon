@@ -10,6 +10,37 @@ interface AvatarDisplayProps {
 }
 
 export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ avatarId, size = 32, className = '', ownedSkins = [] }) => {
+    const isExternalUrl = avatarId.startsWith('http://') || avatarId.startsWith('https://') || avatarId.includes('/');
+    
+    if (isExternalUrl) {
+        const containerStyle: React.CSSProperties = {
+            width: size,
+            height: size,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+            background: '#25262b',
+            border: '1px solid rgba(255,255,255,0.1)',
+            flexShrink: 0,
+            position: 'relative'
+        };
+        return (
+            <div className={`avatar-display ${className}`} style={containerStyle}>
+                <img 
+                    src={avatarId} 
+                    alt="User Avatar" 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                    }}
+                />
+            </div>
+        );
+    }
+
     const avatar = getAvatarById(avatarId, ownedSkins);
     const isMarble = avatarId.includes('marble') || avatarId.includes('tie_dye');
     const isPeg = avatarId.includes('peg');
