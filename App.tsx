@@ -369,6 +369,16 @@ const App = () => {
 
     const handleToggleChallengeMode = () => {
         setFadeActive(true);
+        
+        // Immediately close the Challenge Dome panel
+        setUiState(prev => ({
+            ...prev,
+            challengesOpen: false
+        }));
+
+        // Smoothly fade out sound effects over 800ms
+        engine.audio.fadeSfx(0, 800);
+
         setTimeout(() => {
             // Respawn all broken pegs from Sand Peg (or other states) immediately on scene switch
             engine.respawnAllPegs();
@@ -393,6 +403,8 @@ const App = () => {
             
             setTimeout(() => {
                 setFadeActive(false);
+                // Smoothly fade sound effects back in over 800ms once board is visible
+                engine.audio.fadeSfx(1, 800);
             }, 400);
         }, 1200);
     };
@@ -604,7 +616,8 @@ const App = () => {
                     <GameCanvas inChallengeMode={gameState.inChallengeMode} />
                     <GemSocketHud onUpdate={() => setGameState({ ...engine.state })} />
                     <div className="mobile-controls">
-                        {(() => {
+                        <button className="mobile-btn" onClick={() => togglePanel('upgrades')}>⚡ Upgrades</button>
+                        {gameState.inChallengeMode && (() => {
                             const activeRot = ChallengesManager.getRotationInfo();
                             const activeChall = CHALLENGES[activeRot.activeChallengeId];
                             const challengeState = gameState.challengeState || { money: 0, lifetimeEarnings: 0, lifetimePegsBroken: 0 };
@@ -615,7 +628,7 @@ const App = () => {
                             const isSilverAchieved = currentVal >= activeChall.goals.silver.target;
                             const isGoldAchieved = currentVal >= activeChall.goals.gold.target;
 
-                            return gameState.inChallengeMode ? (
+                            return (
                                 <button 
                                     className="mobile-btn flex flex-col items-center justify-center py-1" 
                                     style={{ color: '#f59e0b' }} 
@@ -629,8 +642,6 @@ const App = () => {
                                         <div className={`w-2 h-2 rounded-full border border-white/20 transition-all ${isGoldAchieved ? 'bg-[#fbbf24]' : 'bg-transparent'}`} title="Gold" />
                                     </div>
                                 </button>
-                            ) : (
-                                <button className="mobile-btn" onClick={() => togglePanel('upgrades')}>⚡ Upgrades</button>
                             );
                         })()}
                         <button className={`mobile-btn ${(hasClaimableMissions || hasClaimableAchievements || claimableToday) ? 'glow-breathing' : ''}`} onClick={() => togglePanel('options')}>⚙ Options</button>

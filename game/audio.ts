@@ -242,6 +242,21 @@ export class AudioController {
         }
     }
 
+    fadeSfx(targetVolScale: number, durationMs: number = 500) {
+        if (!this.ctx || !this.sfxGain) return;
+        try {
+            const baseVol = this.sfxMuted ? 0 : this.sfxVolume;
+            const targetVal = baseVol * targetVolScale;
+            const t = this.ctx.currentTime;
+            
+            this.sfxGain.gain.cancelScheduledValues(t);
+            this.sfxGain.gain.setValueAtTime(this.sfxGain.gain.value, t);
+            this.sfxGain.gain.linearRampToValueAtTime(targetVal, t + (durationMs / 1000));
+        } catch (e) {
+            console.error("Audio fadeSfx failed:", e);
+        }
+    }
+
     private applyVolumes() {
         if (this.ctx) {
             try {
