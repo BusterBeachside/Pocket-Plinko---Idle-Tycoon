@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { engine } from '../../game/engine';
 import { assets } from '../../game/assets';
 import { formatNumber } from '../../game/utils';
+import { DailyEventsManager } from '../../game/dailyEvents';
 
 export const CoreModal = ({ onClose, onOpenShop, onActivate }: { onClose: () => void, onOpenShop: () => void, onActivate: (shards: number, mult: number) => void }) => {
     const [view, setView] = useState<'main' | 'activate'>('main');
@@ -14,7 +15,7 @@ export const CoreModal = ({ onClose, onOpenShop, onActivate }: { onClose: () => 
     
     // Requirements
     const reqBalls = 50;
-    const reqMoney = 100000000; // $100M
+    const reqMoney = 100000000 * Math.pow(2.0, s.timesPrestiged || 0); // Scales dynamically
     const hasBalls = balls >= reqBalls;
     const hasMoney = money >= reqMoney;
     
@@ -43,6 +44,8 @@ export const CoreModal = ({ onClose, onOpenShop, onActivate }: { onClose: () => 
     if (shardMultiPercent > 0) {
         totalShards = Math.floor(baseShards * (1 + shardMultiPercent / 100));
     }
+    const eventShardMult = DailyEventsManager.getPrestigeShardMultiplier();
+    totalShards *= eventShardMult;
 
     // Master Multiplier Calculation
     // Base: 5 for every 50 marbles
@@ -100,7 +103,7 @@ export const CoreModal = ({ onClose, onOpenShop, onActivate }: { onClose: () => 
                     <p style={{marginBottom:'10px'}}>The energy required to activate the Core is immense.</p>
                     <ul style={{textAlign:'left', marginBottom:'15px', color:'#ccc'}}>
                         <li>Marbles: <span style={{color:'#ff6b6b'}}>{balls} / {reqBalls}</span></li>
-                        <li>Money: <span style={{color: hasMoney ? '#4caf50' : '#ff6b6b'}}>${formatNumber(money)} / $100M</span></li>
+                        <li>Money: <span style={{color: hasMoney ? '#4caf50' : '#ff6b6b'}}>${formatNumber(money)} / ${formatNumber(reqMoney)}</span></li>
                         <li>Lifetime (This Run): <span style={{color:'#ffd700'}}>${formatNumber(lifetime)}</span></li>
                     </ul>
                     <p>Keep expanding your operation to unlock the ultimate power.</p>
@@ -129,7 +132,7 @@ export const CoreModal = ({ onClose, onOpenShop, onActivate }: { onClose: () => 
                 <div className="prestige-body">
                     <p>The Kinetic Core allows you to <strong>melt down your marbles</strong> into a single, powerful <strong>Master Marble</strong> which provides a massive profit boost!</p>
                     <p>This process also creates <strong>KINETIC SHARDS</strong>, which can be used in the Shard Shop to buy powerful, permanent upgrades!</p>
-                    <p>Powering the Kinetic Core requires <strong>$100M</strong> and will <strong>reset all of your stats and upgrades to ZERO!</strong></p>
+                    <p>Powering the Kinetic Core requires <strong>${formatNumber(reqMoney)}</strong> and will <strong>reset all of your stats and upgrades to ZERO!</strong></p>
                     
                     <div className="prestige-stats">
                         <div className="prestige-stat">
@@ -137,7 +140,10 @@ export const CoreModal = ({ onClose, onOpenShop, onActivate }: { onClose: () => 
                             <div className="value" style={{color:'#ffd700'}}>${formatNumber(lifetime)}</div>
                         </div>
                         <div className="prestige-stat">
-                            <div className="label">Kinetic Shards</div>
+                            <div className="label" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <span>Kinetic Shards</span>
+                                {eventShardMult > 1 && <span style={{ color: '#00ffff', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>x2 Event Active</span>}
+                            </div>
                             <div className="value" style={{color:'#00ffff'}}>{formatNumber(totalShards)}</div>
                         </div>
                         <div className="prestige-stat">

@@ -139,13 +139,23 @@ export const UnderdogAuth: React.FC<UnderdogAuthProps> = ({ onAuthComplete, onCl
       case 'login':
         return (
           <form onSubmit={handleLogin} className="space-y-4">
-            <div className="text-center mb-8">
+            <div className="text-center mb-6">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600/10 border border-blue-500/20 mb-4 shadow-inner">
                 <ShieldCheck className="w-8 h-8 text-blue-500" />
               </div>
               <h2 className="text-2xl font-black tracking-tight text-white">UNDERDOG <span className="text-blue-500">ID</span></h2>
               <p className="text-xs text-slate-500 mt-2 uppercase tracking-widest font-mono">Access Global Profile</p>
             </div>
+
+            <div className="bg-blue-950/40 border border-blue-500/20 rounded-xl p-4 text-[12px] leading-relaxed text-slate-300">
+              <div className="flex gap-2 items-start">
+                <span className="text-lg">📢</span>
+                <p>
+                  No login or personal information is required to play. Creating an account allows <strong className="text-blue-400 font-extrabold">Cloud Saves</strong> (Sync progress between devices) and the ability to view/appear on the global <strong className="text-blue-400 font-extrabold">Leaderboard</strong>.
+                </p>
+              </div>
+            </div>
+
             <div className="space-y-3">
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -192,9 +202,9 @@ export const UnderdogAuth: React.FC<UnderdogAuthProps> = ({ onAuthComplete, onCl
               <button
                 type="button"
                 onClick={handlePlayOffline}
-                className="w-full bg-white/5 hover:bg-white/10 text-slate-400 text-[11px] font-bold py-3 rounded-lg transition-all border border-white/5 uppercase tracking-widest"
+                className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-500 hover:from-emerald-400 hover:via-teal-400 hover:to-blue-400 text-white text-xs font-black py-4 rounded-lg transition-all hover:shadow-[0_0_20px_rgba(16,185,129,0.35)] uppercase tracking-wider flex items-center justify-center gap-2 active:scale-[0.98] border border-emerald-400/20"
               >
-                Continue as Guest (Local Only)
+                <span>🎮</span> Continue as Guest (Local Only)
               </button>
             </div>
           </form>

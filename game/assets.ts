@@ -7,7 +7,11 @@ export const ASSET_PATHS = {
     tut_bonus: 'images/TUT_BonusMarble.png',
     tut_kinetic: 'images/TUT_KineticCore.png',
     tut_shard: 'images/TUT_ShardShop.png',
-    tut_skins: 'images/TUT_MarbleSkins.png'
+    tut_skins: 'images/TUT_MarbleSkins.png',
+    tut_sockets: 'images/diamond-gem.png',
+    ruby_gem: 'images/ruby-gem.png',
+    emerald_gem: 'images/emerald-gem.png',
+    diamond_gem: 'images/diamond-gem.png'
 };
 
 export class AssetLoader {

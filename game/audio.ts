@@ -5,6 +5,7 @@ export class AudioController {
     
     private buffers: Map<string, AudioBuffer[]> = new Map();
     private musicSource: AudioBufferSourceNode | null = null;
+    private activeMusicSources: AudioBufferSourceNode[] = [];
     
     private sfxVolume: number = 0.5;
     private musicVolume: number = 0.3;
@@ -49,7 +50,12 @@ export class AudioController {
         tasks.push({ type: 'single', key: 'bonus', url: 'sounds/Bonus.wav' });
         tasks.push({ type: 'single', key: 'prestige1', url: 'sounds/Prestige1.wav' });
         tasks.push({ type: 'single', key: 'prestige2', url: 'sounds/Prestige2.wav' });
-        tasks.push({ type: 'single', key: 'music', url: 'sounds/Music.ogg' });
+        tasks.push({ type: 'single', key: 'music', url: 'sounds/music.ogg' });
+        tasks.push({ type: 'single', key: 'music_start', url: 'sounds/music_start.ogg' });
+        tasks.push({ type: 'single', key: 'sand_break', url: 'sounds/sand_break.ogg' });
+        tasks.push({ type: 'single', key: 'explode', url: 'sounds/explode.wav' });
+        tasks.push({ type: 'single', key: 'goal_complete', url: 'sounds/goal_complete.wav' });
+        tasks.push({ type: 'single', key: 'crit', url: 'sounds/crit.wav' });
 
         let totalFiles = 0;
         tasks.forEach(t => totalFiles += (t.type === 'group' ? (t.count || 1) : 1));
@@ -94,35 +100,60 @@ export class AudioController {
     }
 
     startMusic() {
-        if (!this.ctx || this.musicSource) return;
+        if (!this.ctx || this.activeMusicSources.length > 0) return;
         if (this.musicMuted) return;
 
-        const musicBuffer = this.buffers.get('music')?.[0];
-        if (!musicBuffer) return; // assumed loaded via loadAll
+        const startBuffer = this.buffers.get('music_start')?.[0];
+        const loopBuffer = this.buffers.get('music')?.[0];
+        if (!loopBuffer) return; // loopBuffer is absolutely required
 
         try {
             if (this.ctx.state === 'suspended') {
                 this.ctx.resume().catch(()=>{});
             }
 
-            this.musicSource = this.ctx.createBufferSource();
-            this.musicSource.buffer = musicBuffer;
-            this.musicSource.loop = true;
-            this.musicSource.connect(this.musicGain!);
-            this.musicSource.start(0);
+            const startTime = this.ctx.currentTime + 0.05; // tiny start delay for stability
+
+            if (startBuffer) {
+                // Play intro track first
+                const startSource = this.ctx.createBufferSource();
+                startSource.buffer = startBuffer;
+                startSource.connect(this.musicGain!);
+                startSource.start(startTime);
+                this.musicSource = startSource;
+
+                // Schedule looping track to start immediately when intro ends
+                const loopSource = this.ctx.createBufferSource();
+                loopSource.buffer = loopBuffer;
+                loopSource.loop = true;
+                loopSource.connect(this.musicGain!);
+                loopSource.start(startTime + startBuffer.duration);
+
+                this.activeMusicSources = [startSource, loopSource];
+            } else {
+                // If intro is missing, just loop music
+                const loopSource = this.ctx.createBufferSource();
+                loopSource.buffer = loopBuffer;
+                loopSource.loop = true;
+                loopSource.connect(this.musicGain!);
+                loopSource.start(startTime);
+                this.musicSource = loopSource;
+                this.activeMusicSources = [loopSource];
+            }
         } catch (e) {
             console.error("Failed to start music:", e);
         }
     }
 
     stopMusic() {
-        if (this.musicSource) {
+        this.activeMusicSources.forEach(source => {
             try {
-                this.musicSource.stop();
-                this.musicSource.disconnect();
+                source.stop();
+                source.disconnect();
             } catch(e) {}
-            this.musicSource = null;
-        }
+        });
+        this.activeMusicSources = [];
+        this.musicSource = null;
     }
 
     restartMusic() {

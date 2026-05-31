@@ -1,5 +1,5 @@
 
-import { GameState, Ball, Peg, Popup, VisualEffect } from './types';
+import { GameState, Ball, Peg, Popup, VisualEffect, SandParticle } from './types';
 import { AudioController } from './audio';
 import { formatNumber } from './utils';
 import { SaveSystem } from './saveSystem';
@@ -9,6 +9,8 @@ import { ProgressionManager } from './progression';
 import { PhysicsManager } from './physics';
 import { Spawner } from './spawner';
 import { SupabaseService } from '../services/supabaseService';
+import { DailyEventsManager } from './dailyEvents';
+import { ChallengesManager } from './challenges';
 
 export class GameEngine {
     state: GameState;
@@ -16,11 +18,16 @@ export class GameEngine {
     audio: AudioController;
     renderer: GameRenderer;
     
+    // Peg Socket Mode State
+    socketingActive: boolean = false;
+    selectedSocketIndex: number | null = null;
+    
     // Physics State
     balls: Ball[] = [];
     pegs: Peg[] = [];
     popups: Popup[] = [];
     visualEffects: VisualEffect[] = [];
+    sandParticles: SandParticle[] = [];
     
     canvas: HTMLCanvasElement | null = null;
     ctx: CanvasRenderingContext2D | null = null;
@@ -73,7 +80,11 @@ export class GameEngine {
             window.addEventListener('keydown', async (e) => {
                 if (e.shiftKey) {
                     const user = await SupabaseService.getCurrentUser();
-                    if (user?.id !== 'a7155004-5e2c-4949-89ea-505daa903a31') return;
+                    const isDev = window.location.hostname === 'localhost' || 
+                                  window.location.hostname.includes('ais-dev') || 
+                                  window.location.hostname.includes('run.app') ||
+                                  localStorage.getItem('plinko_challenge_debug_override') !== null;
+                    if (user?.id !== 'a7155004-5e2c-4949-89ea-505daa903a31' && !isDev) return;
 
                     switch(e.key.toLowerCase()) {
                         case 'm': 
@@ -87,6 +98,34 @@ export class GameEngine {
                         case 'b': 
                             this.spawnBonusMarble(); 
                             break;
+                        case 'k': // Add pegs broken in active challenge
+                            if (this.state.inChallengeMode && this.state.challengeState) {
+                                this.state.challengeState.lifetimePegsBroken = (this.state.challengeState.lifetimePegsBroken || 0) + 1000;
+                                this.state.challengeState.pegsBrokenCurrency = (this.state.challengeState.pegsBrokenCurrency || 0) + 1000;
+                                this.notify();
+                            }
+                            break;
+                        case 'p': {
+                            const ballsCount = this.state.upgrades.extraBall;
+                            const lifetimeVal = this.state.lifetimeEarnings;
+                            const peakVal = this.state.peakMps;
+                            const rawShardsVal = (ballsCount / 10) + (lifetimeVal / 2000000000) + (peakVal / 1000000);
+                            let baseShardsVal = Math.floor(rawShardsVal);
+                            baseShardsVal = Math.max(1, baseShardsVal);
+                            const shardMultiPercentVal = this.state.shardMultiplierPercent || 0;
+                            let totalShardsVal = baseShardsVal;
+                            if (shardMultiPercentVal > 0) {
+                                totalShardsVal = Math.floor(baseShardsVal * (1 + shardMultiPercentVal / 100));
+                            }
+                            totalShardsVal *= DailyEventsManager.getPrestigeShardMultiplier();
+                            
+                            const baseMasterMultVal = Math.floor(5 * (ballsCount / 50));
+                            const ownedMasterBonusVal = this.state.derivedMasterBonus || 0;
+                            const totalMasterMultGainVal = baseMasterMultVal + ownedMasterBonusVal;
+
+                            this.resetForPrestige(totalShardsVal, totalMasterMultGainVal);
+                            break;
+                        }
                     }
                 }
             });
@@ -118,22 +157,7 @@ export class GameEngine {
             
             // Calculate offline income from tab-out
             if (this.state.lastTabOutTime && this.isGameStarted) {
-                const now = Date.now();
-                const diffSeconds = (now - this.state.lastTabOutTime) / 1000;
-                
-                // Only award if > 5 seconds (to avoid quick switching spam)
-                if (diffSeconds > 5 && this.state.currentRunPeakMps > 0) {
-                    // Cap at 24 hours
-                    const cappedSeconds = Math.min(diffSeconds, 86400);
-                    const earnings = Math.floor(this.state.currentRunPeakMps * 0.25 * cappedSeconds);
-                    
-                    if (earnings > 0) {
-                        this.addMoney(earnings, false); // Don't count towards income buffer to avoid spiking MPS
-                        this.offlineEarnings = earnings;
-                        this.pushNotification(`Welcome back! You earned $${formatNumber(earnings)} while away.`, 'mission');
-                    }
-                }
-                this.state.lastTabOutTime = undefined;
+                this.applyAllOfflineIncome(true);
             }
         }
     }
@@ -143,7 +167,7 @@ export class GameEngine {
         this.isGameStarted = true;
         this.lastTime = performance.now();
         this.lastBonusSpawn = Date.now(); 
-        this.checkOfflineIncome(); // Check for long-term offline (closed browser)
+        this.applyAllOfflineIncome(false); // Check for long-term offline (closed browser)
         this.spawnBalls();
     }
 
@@ -223,32 +247,180 @@ export class GameEngine {
             this.notify();
         }
     }
+
+    socketGem(pegIndex: number, type: 'ruby' | 'emerald' | 'diamond') {
+        if (!this.state.gems) {
+            this.state.gems = { crimson: 0, azure: 0, amber: 0 };
+        }
+        if (!this.pegs || pegIndex < 0 || pegIndex >= this.pegs.length) return false;
+        
+        // If there's already a gem in this peg, unsocket it first!
+        const existingType = this.state.socketedPegs[pegIndex];
+        if (existingType) {
+            this.unsocketGem(pegIndex);
+        }
+        
+        // Ensure we have the gem in inventory
+        const gemKey = type === 'ruby' ? 'crimson' : (type === 'diamond' ? 'azure' : 'amber');
+        if ((this.state.gems[gemKey] || 0) > 0) {
+            this.state.gems[gemKey]--;
+            this.state.socketedPegs[pegIndex] = type;
+            this.syncSocketedPegs();
+            this.saveState();
+            this.notify();
+            this.audio.play('upgrade');
+            return true;
+        }
+        return false;
+    }
+
+    unsocketGem(pegIndex: number) {
+        if (!this.pegs || pegIndex < 0 || pegIndex >= this.pegs.length) return false;
+        
+        const existingType = this.state.socketedPegs[pegIndex];
+        if (existingType) {
+            delete this.state.socketedPegs[pegIndex];
+            if (!this.state.gems) {
+                this.state.gems = { crimson: 0, azure: 0, amber: 0 };
+            }
+            const gemKey = existingType === 'ruby' ? 'crimson' : (existingType === 'diamond' ? 'azure' : 'amber');
+            this.state.gems[gemKey] = (this.state.gems[gemKey] || 0) + 1;
+            this.syncSocketedPegs();
+            this.saveState();
+            this.notify();
+            this.audio.play('upgrade');
+            return true;
+        }
+        return false;
+    }
+
+    autoAssignGems() {
+        if (!this.pegs) return;
+        if (!this.state.gems) {
+            this.state.gems = { crimson: 0, azure: 0, amber: 0 };
+        }
+
+        const types: { gemType: 'ruby' | 'emerald' | 'diamond', key: 'crimson' | 'azure' | 'amber' }[] = [
+            { gemType: 'ruby', key: 'crimson' },
+            { gemType: 'emerald', key: 'amber' },
+            { gemType: 'diamond', key: 'azure' }
+        ];
+        let madeChanges = false;
+        
+        for (const t of types) {
+            while ((this.state.gems[t.key] || 0) > 0) {
+                const emptyPegIdx = this.pegs.findIndex((p, idx) => !this.state.socketedPegs[idx]);
+                if (emptyPegIdx === -1) break;
+                
+                this.state.gems[t.key]--;
+                this.state.socketedPegs[emptyPegIdx] = t.gemType;
+                madeChanges = true;
+            }
+        }
+        
+        if (madeChanges) {
+            this.syncSocketedPegs();
+            this.saveState();
+            this.notify();
+            this.audio.play('upgrade');
+        }
+    }
+
+    clearAllGems() {
+        if (!this.pegs) return;
+        let madeChanges = false;
+        this.pegs.forEach((p, idx) => {
+            const existingType = this.state.socketedPegs[idx];
+            if (existingType) {
+                delete this.state.socketedPegs[idx];
+                if (!this.state.gems) {
+                    this.state.gems = { crimson: 0, azure: 0, amber: 0 };
+                }
+                const gemKey = existingType === 'ruby' ? 'crimson' : (existingType === 'diamond' ? 'azure' : 'amber');
+                this.state.gems[gemKey] = (this.state.gems[gemKey] || 0) + 1;
+                madeChanges = true;
+            }
+        });
+        if (madeChanges) {
+            this.syncSocketedPegs();
+            this.saveState();
+            this.notify();
+            this.audio.play('upgrade');
+        }
+    }
     
     equipSkin(id: string) {
         ShopSystem.equipSkin(this.state, id, () => this.saveState());
         this.notify();
     }
     
-    private checkOfflineIncome() {
-        if (this.state.lastSaveTime) {
-            const now = Date.now();
-            let diffSeconds = (now - this.state.lastSaveTime) / 1000;
+    public applyAllOfflineIncome(fromTabIn: boolean = false) {
+        const threshold = fromTabIn ? 5 : 30;
+        const now = Date.now();
+        
+        // --- 1. MAIN BOARD OFFLINE INCOME ---
+        const lastMainTime = fromTabIn 
+            ? (this.state.lastTabOutTime || this.state.lastMainPlayTime || this.state.lastSaveTime)
+            : (this.state.lastMainPlayTime || this.state.lastSaveTime);
             
-            // Cap to 24 hours (86400 seconds)
-            if (diffSeconds > 86400) diffSeconds = 86400;
-
-            // Only award if > 30 seconds away
-            // Use currentRunPeakMps for calculation
-            if (diffSeconds > 30 && this.state.currentRunPeakMps > 0) {
+        if (lastMainTime) {
+            let diffSeconds = (now - lastMainTime) / 1000;
+            if (diffSeconds > 86400) diffSeconds = 86400; // Cap to 24 hours
+            
+            if (diffSeconds > threshold && this.state.currentRunPeakMps > 0) {
                 const earnings = Math.floor(this.state.currentRunPeakMps * 0.25 * diffSeconds);
                 if (earnings > 0) {
                     this.state.money += earnings;
                     this.state.lifetimeEarnings += earnings;
-                    this.offlineEarnings = earnings;
-                    this.saveState();
+                    this.state.allTimeEarnings = (this.state.allTimeEarnings || 0) + earnings;
+                    this.pushNotification(`Welcome back! Offline: +$${formatNumber(earnings)} Career Cash.`, 'mission');
+                    if (!this.state.inChallengeMode) {
+                        this.offlineEarnings = earnings;
+                    }
                 }
             }
         }
+        this.state.lastMainPlayTime = now;
+        
+        // --- 2. CHALLENGE BOARD OFFLINE INCOME ---
+        if (this.state.challengeState) {
+            const lastChallengeTime = fromTabIn
+                ? (this.state.lastTabOutTime || this.state.challengeState.lastPlayTime)
+                : this.state.challengeState.lastPlayTime;
+                
+            if (lastChallengeTime) {
+                let diffSeconds = (now - lastChallengeTime) / 1000;
+                if (diffSeconds > 86400) diffSeconds = 86400; // Cap to 24 hours
+                
+                const peakMps = this.state.challengeState.currentRunPeakMps || 0;
+                if (diffSeconds > threshold && peakMps > 0) {
+                    const earnings = Math.floor(peakMps * 0.25 * diffSeconds);
+                    if (earnings > 0) {
+                        const cid = this.state.challengeState.challengeId;
+                        if (cid === 'sand_peg') {
+                            this.state.challengeState.pegsBrokenCurrency = (this.state.challengeState.pegsBrokenCurrency || 0) + earnings;
+                            this.state.challengeState.lifetimePegsBroken = (this.state.challengeState.lifetimePegsBroken || 0) + earnings;
+                            this.pushNotification(`Welcome back! Offline busters broke +${formatNumber(earnings)} Pegs!`, 'mission');
+                            if (this.state.inChallengeMode) {
+                                this.offlineEarnings = earnings;
+                            }
+                        } else {
+                            this.state.challengeState.money = (this.state.challengeState.money || 0) + earnings;
+                            this.state.challengeState.lifetimeEarnings = (this.state.challengeState.lifetimeEarnings || 0) + earnings;
+                            this.pushNotification(`Welcome back! Offline: +$${formatNumber(earnings)} Challenge Cash.`, 'mission');
+                            if (this.state.inChallengeMode) {
+                                this.offlineEarnings = earnings;
+                            }
+                        }
+                    }
+                }
+            }
+            this.state.challengeState.lastPlayTime = now;
+        }
+        
+        this.state.lastTabOutTime = undefined;
+        this.saveState();
+        this.notify();
     }
 
     attachCanvas(canvas: HTMLCanvasElement) {
@@ -265,6 +437,34 @@ export class GameEngine {
         this.grid = grid;
         this.gridCols = gridCols;
         this.gridRows = gridRows;
+        this.syncSocketedPegs();
+    }
+
+    syncSocketedPegs() {
+        if (!this.pegs || !this.state.socketedPegs) return;
+        this.pegs.forEach((p, idx) => {
+            if (this.state.inChallengeMode) {
+                p.gemType = undefined;
+                p.diamondHits = 0;
+            } else {
+                p.gemType = this.state.socketedPegs[idx] || undefined;
+                if (p.gemType !== 'diamond') {
+                    p.diamondHits = 0;
+                }
+            }
+        });
+    }
+
+    respawnAllPegs() {
+        if (this.pegs) {
+            this.pegs.forEach(p => {
+                p.broken = false;
+                p.hp = 3;
+                p.glow = 1.0;
+                p.reformingStarted = false;
+                p.respawnTimer = 0;
+            });
+        }
     }
 
     spawnBalls() {
@@ -274,6 +474,9 @@ export class GameEngine {
     spawnMicroMarble(ignoredX: number, ignoredY: number) {
         Spawner.spawnMicroMarble(this.width, (o) => this.spawnBall(o), (e) => this.visualEffects.push(e));
         ProgressionManager.updateMissionProgress(this.state, 'micro_marbles', 1);
+        if (this.state.inChallengeMode && this.state.challengeState) {
+            this.state.challengeState.lifetimeMicroMarblesDropped = (this.state.challengeState.lifetimeMicroMarblesDropped || 0) + 1;
+        }
     }
 
     rollRarity(): 'normal' | 'uncommon' | 'rare' | 'legendary' {
@@ -314,32 +517,43 @@ export class GameEngine {
             if (!this.running) return;
             
             const mps = Math.round(this.incomeBuffer);
-            this.state.currentMps = mps;
-            
-            // Update All-time Peak
-            if (mps > this.state.peakMps) {
-                this.state.peakMps = mps;
-                // Force immediate sync to cloud and leaderboard
-                if (!this.state.isOffline) {
-                    this.saveState(true);
+            if (this.state.inChallengeMode && this.state.challengeState) {
+                this.state.challengeState.currentMps = mps;
+                if (mps > (this.state.challengeState.currentRunPeakMps || 0)) {
+                    this.state.challengeState.currentRunPeakMps = mps;
                 }
-            }
-            
-            // Update Current Run Peak
-            if (mps > (this.state.currentRunPeakMps || 0)) {
-                this.state.currentRunPeakMps = mps;
+            } else {
+                this.state.currentMps = mps;
+                
+                // Update All-time Peak
+                if (mps > this.state.peakMps) {
+                    this.state.peakMps = mps;
+                    // Force immediate sync to cloud and leaderboard
+                    if (!this.state.isOffline) {
+                        this.saveState(true);
+                    }
+                }
+                
+                // Update Current Run Peak
+                if (mps > (this.state.currentRunPeakMps || 0)) {
+                    this.state.currentRunPeakMps = mps;
+                }
             }
             
             this.incomeBuffer = 0;
             this.saveState();
             
-            if (Date.now() - this.lastBonusSpawn > 60000 && this.isGameStarted) {
+            // Allow bonus marble spawns in challenge mode but ignore the windfall_wednesday daily event if active
+            const bSpawnMult = this.state.inChallengeMode ? 1.0 : DailyEventsManager.getBonusSpawnMultiplier();
+            const spawnTimerLimit = 60000 / bSpawnMult;
+            if (Date.now() - this.lastBonusSpawn > spawnTimerLimit && this.isGameStarted) {
                 if (!this.state.bonusMarble?.active) {
                     const roll = Math.random();
                     const tutorialSeen = this.state.tutorials['plinko_seen_bonus_tutorial_v1'] || (typeof window !== 'undefined' && localStorage.getItem('plinko_seen_bonus_tutorial_v1'));
                     
+                    const bonusChance = this.state.bonusChance || 0.08;
                     // Force first spawn if tutorial not seen
-                    if (roll < this.state.bonusChance || !tutorialSeen) {
+                    if (roll < bonusChance || !tutorialSeen) {
                         this.spawnBonusMarble();
                     } else {
                         this.lastBonusSpawn = Date.now(); 
@@ -368,13 +582,39 @@ export class GameEngine {
             const by = this.state.bonusMarble.y;
             const dist = Math.sqrt((x-bx)*(x-bx) + (y-by)*(y-by));
             if (dist < 40) {
-                const bonusRate = 0.10 + (this.state.upgrades.bonusValue * 0.05); 
-                // Use currentRunPeakMps instead of all-time peak
-                const peakToUse = this.state.currentRunPeakMps || this.state.currentMps || 0;
-                const amount = Math.max(100, Math.round(peakToUse * bonusRate));
-                this.addMoney(amount, false);
+                const isChallenge = this.state.inChallengeMode;
+                const isSandPeg = isChallenge && this.state.challengeState?.challengeId === 'sand_peg';
+                const bonusLevel = isChallenge 
+                    ? (this.state.challengeState?.upgrades?.bonusValue || 0)
+                    : (this.state.upgrades?.bonusValue || 0);
+
+                const bonusRate = 0.10 + (bonusLevel * 0.05); 
+                
+                let amount = 0;
+                if (isChallenge) {
+                    if (isSandPeg) {
+                        // Sand Peg: give pegs based on broken peg yield upgrade (sandPegMultiplier) and bonus level
+                        const mult = 1 + (this.state.challengeState?.upgrades?.sandPegMultiplier || 0);
+                        amount = Math.max(5, Math.round(5 * mult * (1 + bonusLevel * 0.5)));
+                        
+                        this.state.challengeState.pegsBrokenCurrency = (this.state.challengeState.pegsBrokenCurrency || 0) + amount;
+                        this.state.challengeState.lifetimePegsBroken = (this.state.challengeState.lifetimePegsBroken || 0) + amount;
+                    } else {
+                        // Other challenges: give challenge cash based on peak MPS in the active challenge
+                        const peakToUse = this.state.challengeState?.currentRunPeakMps || this.state.challengeState?.currentMps || 0;
+                        amount = Math.max(100, Math.round(peakToUse * bonusRate));
+                        
+                        this.state.challengeState.money = (this.state.challengeState.money || 0) + amount;
+                        this.state.challengeState.lifetimeEarnings = (this.state.challengeState.lifetimeEarnings || 0) + amount;
+                    }
+                } else {
+                    const peakToUse = this.state.currentRunPeakMps || this.state.currentMps || 0;
+                    amount = Math.max(100, Math.round(peakToUse * bonusRate));
+                    this.addMoney(amount, false);
+                }
+
                 // NOTE: We do NOT push to popups here anymore to let UI handle it externally
-                this.audio.play('bonus');
+                this.audio.play('bonus', 0, 0.35);
                 this.state.bonusMarble.active = false;
                 this.state.lifetimeBonusMarbles = (this.state.lifetimeBonusMarbles || 0) + 1;
 
@@ -389,11 +629,22 @@ export class GameEngine {
     }
 
     addMoney(amount: number, countTowardsIncome: boolean = true) {
-        this.state.money += amount;
-        this.state.lifetimeEarnings += amount;
-        this.state.allTimeEarnings = (this.state.allTimeEarnings || 0) + amount;
-        if (countTowardsIncome) {
-            this.incomeBuffer += amount;
+        if (this.state.inChallengeMode && countTowardsIncome) {
+            ChallengesManager.checkAndSyncChallengeState(this.state);
+            if (this.state.challengeState.challengeId === 'sand_peg') {
+                this.incomeBuffer += amount;
+            } else {
+                this.state.challengeState.money = (this.state.challengeState.money || 0) + amount;
+                this.state.challengeState.lifetimeEarnings = (this.state.challengeState.lifetimeEarnings || 0) + amount;
+                this.incomeBuffer += amount;
+            }
+        } else {
+            this.state.money += amount;
+            this.state.lifetimeEarnings += amount;
+            this.state.allTimeEarnings = (this.state.allTimeEarnings || 0) + amount;
+            if (countTowardsIncome) {
+                this.incomeBuffer += amount;
+            }
         }
     }
 
@@ -411,7 +662,10 @@ export class GameEngine {
         this.state.totalPlayTime = (this.state.totalPlayTime || 0) + dt;
 
         // Micro Autoclicker Logic
-        const autoLevel = this.state.permUpgradesLevels['perm_micro_autoclicker'] || 0;
+        let autoLevel = this.state.inChallengeMode ? 0 : (this.state.permUpgradesLevels['perm_micro_autoclicker'] || 0);
+        if (this.state.inChallengeMode && this.state.challengeState?.challengeId === 'micro_mania') {
+            autoLevel = this.state.challengeState.upgrades.microAutoclicker || 0;
+        }
         if (autoLevel > 0) {
             const marblesPerSecond = autoLevel * 0.1;
             const interval = 1 / marblesPerSecond;
@@ -457,10 +711,56 @@ export class GameEngine {
             (amount) => this.addMoney(amount),
             (p) => this.popups.push(p),
             (e) => this.visualEffects.push(e),
-            this.audio
+            this.audio,
+            (peg) => this.spawnSandExplosion(peg)
         );
         
+        // Challenge-specific physics updates (e.g. sand peg respawning)
+        if (this.state.inChallengeMode && this.state.challengeState?.challengeId === 'sand_peg') {
+            this.pegs.forEach(p => {
+                if (p.broken) {
+                    p.respawnTimer = (p.respawnTimer || 5) - dt;
+                    if (p.respawnTimer <= 1.2 && !p.reformingStarted) {
+                        p.reformingStarted = true;
+                        this.spawnSandForming(p);
+                    }
+                    if (p.respawnTimer <= 0) {
+                        p.broken = false;
+                        p.hp = 3;
+                        p.glow = 1.0;
+                        p.reformingStarted = false;
+                    }
+                }
+            });
+        }
+
+        this.updateSandParticles(dt);
+
         this.spawnBalls();
+
+        // Automated Challenge Milestone Evaluation
+        if (this.state.inChallengeMode) {
+            const completedAny = ChallengesManager.updateGoalMilestones(
+                this.state,
+                (msg, type) => {
+                    // 1. Dispatch custom event for React-level toast
+                    const event = new CustomEvent('challenge-notif', { detail: { msg, type } });
+                    window.dispatchEvent(event);
+
+                    // 2. Add to standard in-game notification drawer (extremely robust & visible)
+                    this.pushNotification(msg, 'achievement');
+
+                    // 3. Play the custom goal_complete sound
+                    this.audio.play('goal_complete');
+                },
+                (amount, countTowardsIncome) => this.addMoney(amount, countTowardsIncome)
+            );
+            if (completedAny) {
+                this.saveState();
+                this.notify();
+            }
+        }
+
         this.pegs.forEach(p => { if (p.glow > 0) p.glow -= dt * 3; });
         
         if (this.popups.length > 50) {
@@ -484,8 +784,133 @@ export class GameEngine {
             this.balls, 
             this.pegs, 
             this.visualEffects, 
-            this.popups
+            this.popups,
+            this.sandParticles,
+            this.socketingActive
         );
+    }
+
+    spawnSandExplosion(peg: Peg) {
+        // Explode into 15-20 sand particles
+        const count = 15 + Math.floor(Math.random() * 6);
+        const colors = [
+            'rgba(230, 200, 120, 0.95)', // sand gold
+            'rgba(245, 222, 179, 0.95)', // wheat
+            'rgba(210, 180, 140, 0.95)', // tan
+            'rgba(244, 164, 96, 0.95)'   // sandy brown
+        ];
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 40 + Math.random() * 90;
+            const p: SandParticle = {
+                id: Math.random().toString(),
+                x: peg.x + (Math.random() - 0.5) * 4,
+                y: peg.y + (Math.random() - 0.5) * 4,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - 50, // eject slightly upwards
+                color: colors[Math.floor(Math.random() * colors.length)],
+                size: 1.2 + Math.random() * 1.5,
+                alpha: 1.0,
+                life: 0,
+                maxLife: 2.5 + Math.random() * 1.0, // total 2.5s-3.5s life
+                type: 'explode'
+            };
+            this.sandParticles.push(p);
+        }
+    }
+
+    spawnSandForming(peg: Peg) {
+        // When pegs re-materialize, make particles fly up to the peg position
+        const count = 15 + Math.floor(Math.random() * 6);
+        const colors = [
+            'rgba(230, 200, 120, 0.95)',
+            'rgba(245, 222, 179, 0.95)',
+            'rgba(210, 180, 140, 0.95)'
+        ];
+        for (let i = 0; i < count; i++) {
+            // Start position: scattered at the bottom of the screen
+            const startX = peg.x + (Math.random() - 0.5) * 60;
+            const startY = this.height - 5 - Math.random() * 15;
+            
+            // Target position: forming the peg circumference
+            const r = Math.random() * this.pegRadius;
+            const theta = Math.random() * Math.PI * 2;
+            const targetX = peg.x + Math.cos(theta) * r;
+            const targetY = peg.y + Math.sin(theta) * r;
+
+            const p: SandParticle = {
+                id: Math.random().toString(),
+                x: startX,
+                y: startY,
+                vx: 0,
+                vy: 0,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                size: 1.2 + Math.random() * 1.5,
+                alpha: 0.0, // Start invisible, fade in rapidly
+                life: 0,
+                maxLife: 1.2, // Forming fits exactly inside the final 1.2 seconds of respawn cycle
+                type: 'form',
+                startX,
+                startY,
+                targetX,
+                targetY
+            };
+            this.sandParticles.push(p);
+        }
+    }
+
+    updateSandParticles(dt: number) {
+        // Prevent too many active particles
+        if (this.sandParticles.length > 400) {
+            this.sandParticles = this.sandParticles.slice(-400);
+        }
+
+        this.sandParticles.forEach(p => {
+            p.life += dt;
+            
+            if (p.type === 'explode') {
+                if (p.y < this.height - 5) {
+                    // Physics gravity
+                    p.vy += 220 * dt;
+                    p.x += p.vx * dt;
+                    p.y += p.vy * dt;
+                    
+                    // Boundary damp
+                    if (p.x < 5) { p.x = 5; p.vx = -p.vx * 0.3; }
+                    if (p.x > this.width - 5) { p.x = this.width - 5; p.vx = -p.vx * 0.3; }
+                } else {
+                    // Settle at the bottom/linger
+                    p.y = this.height - 5;
+                    p.vy = 0;
+                    p.vx *= 0.8; // friction
+                }
+
+                // Linger and then fade out
+                const remaining = p.maxLife - p.life;
+                if (remaining < 0.6) {
+                    p.alpha = Math.max(0, remaining / 0.6);
+                } else {
+                    p.alpha = 1.0;
+                }
+            } else if (p.type === 'form') {
+                // Fly dynamically from start (bottom) to peg target!
+                const pct = Math.min(1.0, p.life / p.maxLife);
+                
+                // Position interpolation
+                p.x = p.startX! + (p.targetX! - p.startX!) * pct;
+                p.y = p.startY! + (p.targetY! - p.startY!) * pct;
+                
+                // Fade in at start and fade out slightly
+                if (pct < 0.2) {
+                    p.alpha = pct / 0.2;
+                } else {
+                    p.alpha = 1.0;
+                }
+            }
+        });
+
+        // Filter expired particles
+        this.sandParticles = this.sandParticles.filter(p => p.life < p.maxLife);
     }
 
     pushNotification(message: string, type: 'achievement' | 'mission') {
@@ -545,6 +970,24 @@ export class GameEngine {
             return true;
         }
         return false;
+    }
+
+    findClosestPegIndex(x: number, y: number, maxDist: number = 20): number | null {
+        if (!this.pegs) return null;
+        let bestIdx: number | null = null;
+        let bestDist = maxDist;
+        
+        for (let i = 0; i < this.pegs.length; i++) {
+            const p = this.pegs[i];
+            const dx = p.x - x;
+            const dy = p.y - y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestIdx = i;
+            }
+        }
+        return bestIdx;
     }
 }
 

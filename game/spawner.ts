@@ -40,14 +40,40 @@ export class Spawner {
     }
 
     static spawnBalls(state: GameState, balls: Ball[], width: number, height: number, spawnBall: (overrides?: Partial<Ball>) => void) {
-        const targetCount = state.upgrades.extraBall;
-        const currentNormalBalls = balls.filter(b => !b.micro).length;
-
-        if (currentNormalBalls < targetCount) {
-            const hasMasterUnlock = state.masterMultiplier > 0 || state.timesPrestiged > 0;
-            const masterExists = balls.some(b => b.master);
+        if (state.inChallengeMode) {
+            const cid = state.challengeState.challengeId;
+            if (cid === 'micro_mania') {
+                // Absolutely no normal or master marbles allowed to start!
+                return;
+            }
+            if (cid === 'single_marble') {
+                // Exactly 1 Master marble allowed!
+                const currentNormalBalls = balls.filter(b => !b.micro).length;
+                if (currentNormalBalls < 1) {
+                    spawnBall({ master: true });
+                }
+                return;
+            }
             
-            if (hasMasterUnlock && !masterExists) {
+            // Other challenges
+            const targetCount = state.challengeState.upgrades.extraBall;
+            const currentNormalBalls = balls.filter(b => !b.micro && !b.isSplit).length;
+            if (currentNormalBalls < targetCount) {
+                spawnBall();
+            }
+            return;
+        }
+
+        const targetCount = state.upgrades.extraBall;
+        const currentNormalBalls = balls.filter(b => !b.micro && !b.isSplit).length;
+        const hasMasterUnlock = state.masterMultiplier > 0 || state.timesPrestiged > 0;
+        const targetMasterCount = hasMasterUnlock ? (1 + (state.permUpgradesLevels?.['perm_extra_master'] || 0)) : 0;
+        const currentMasterCount = balls.filter(b => b.master && !b.isSplit).length;
+
+        const maxAllowed = Math.max(targetCount, targetMasterCount);
+
+        if (currentNormalBalls < maxAllowed) {
+            if (currentMasterCount < targetMasterCount) {
                 spawnBall({ master: true });
             } else {
                 spawnBall();

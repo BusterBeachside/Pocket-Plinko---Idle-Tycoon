@@ -4,6 +4,7 @@ import { UPGRADES } from './config';
 import { PERM_UPGRADES, MARBLE_SKINS } from './shardShopConfig';
 import { AudioController } from './audio';
 import { SaveSystem } from './saveSystem';
+import { DailyEventsManager } from './dailyEvents';
 
 export class ShopSystem {
     
@@ -12,7 +13,8 @@ export class ShopSystem {
         if (!cfg) return false;
 
         const level = state.upgrades[id];
-        const cost = Math.floor(cfg.baseCost * Math.pow(cfg.costMultiplier, level));
+        const rawCost = Math.floor(cfg.baseCost * Math.pow(cfg.costMultiplier, level));
+        const cost = Math.floor(rawCost * DailyEventsManager.getUpgradeCostMultiplier());
 
         if (cfg.unlocksAt && (state.upgrades.extraBall) < cfg.unlocksAt) return false;
         if (cfg.maxPercent) {
@@ -36,7 +38,8 @@ export class ShopSystem {
         const cfg = UPGRADES.find(u => u.id === id);
         if (!cfg) return 0;
         const level = state.upgrades[id];
-        return Math.floor(cfg.baseCost * Math.pow(cfg.costMultiplier, level));
+        const rawCost = Math.floor(cfg.baseCost * Math.pow(cfg.costMultiplier, level));
+        return Math.floor(rawCost * DailyEventsManager.getUpgradeCostMultiplier());
     }
 
     static buyPermanentUpgrade(state: GameState, id: string, audio: AudioController, saveCallback: () => void): boolean {
@@ -47,11 +50,12 @@ export class ShopSystem {
         const currentCost = state.permUpgradeCosts[id] || cfg.baseCost;
         
         if (state.kineticShards >= currentCost) {
-            if (cfg.maxLevel && currentLevel >= cfg.maxLevel) return false;
+            if (cfg.maxLevel !== undefined && cfg.maxLevel > 0 && currentLevel >= cfg.maxLevel) return false;
 
             state.kineticShards -= currentCost;
             state.permUpgradesLevels[id] = currentLevel + 1;
-            state.permUpgradeCosts[id] = Math.floor(currentCost * 1.4);
+            const multiplier = id === 'perm_extra_master' ? 3.0 : 1.4;
+            state.permUpgradeCosts[id] = Math.floor(currentCost * multiplier);
             
             SaveSystem.calculateDerivedState(state);
             

@@ -12,6 +12,44 @@ export interface BonusMarbleState {
     paused?: boolean;
 }
 
+export interface ChallengeState {
+    challengeId: string;
+    money: number;
+    lifetimeEarnings: number;
+    pegsBrokenCurrency: number;
+    lifetimePegsBroken: number;
+    lifetimeMicroMarblesDropped?: number;
+    upgrades: {
+        extraBall: number;
+        pegValue: number;
+        ballSpeed: number;
+        basketValue: number;
+        uncommonChance: number;
+        rareChance: number;
+        legendaryChance: number;
+        criticalChance: number;
+        microValue: number;
+        bonusValue: number;
+        sandPegMultiplier: number;
+        microAutoclicker?: number;
+    };
+    currentMps?: number;
+    currentRunPeakMps?: number;
+    lastPlayTime?: number;
+}
+
+export interface ChallengeSummary {
+    challengeId: string;
+    challengeName: string;
+    metric: 'money' | 'pegsBroken';
+    finalValue: number;
+    medalsClaimed: {
+        bronze: boolean;
+        silver: boolean;
+        gold: boolean;
+    };
+}
+
 export interface GameState {
     version: number; // For save migration
     money: number;
@@ -64,6 +102,7 @@ export interface GameState {
     musicMuted: boolean;
     pegMuted: boolean;
     basketMuted: boolean;
+    critMuted: boolean;
     disableMoneyPopups: boolean;
     activeTheme: 'dark' | 'purple'; // New theme setting
 
@@ -83,6 +122,9 @@ export interface GameState {
     lifetimeBonusMarbles: number;
     lifetimeUpgradesBought: number;
     lifetimeCriticalHits: number;
+    lifetimeBronzeMedals: number;
+    lifetimeSilverMedals: number;
+    lifetimeGoldMedals: number;
     
     // Prestige / Core
     kineticShards: number;
@@ -110,6 +152,32 @@ export interface GameState {
     repeatableCompleted: number;
     lifetimeMissionsCompleted: number;
     achievementsUnlocked: number;
+    lastSeenDailyEventId?: string;
+
+    // Challenge and Gem States
+    gems: {
+        crimson: number;
+        azure: number;
+        amber: number;
+    };
+    inChallengeMode: boolean;
+    challengeGoalClaimed: { [challengeId: string]: { bronze: boolean; silver: boolean; gold: boolean } };
+    challengeState: ChallengeState;
+    gemInventory: {
+        ruby: number;
+        emerald: number;
+        diamond: number;
+    };
+    socketedPegs: {
+        [pegIndex: number]: 'ruby' | 'emerald' | 'diamond' | null;
+    };
+    dailyLogin: {
+        lastClaimedDate: string;
+        streak: number;
+    };
+    lastMainPlayTime?: number;
+    pendingChallengeSummary?: ChallengeSummary;
+    showChallengeSummary?: boolean;
 }
 
 export interface ActiveMission {
@@ -167,6 +235,7 @@ export const INITIAL_STATE: GameState = {
     musicMuted: false,
     pegMuted: false,
     basketMuted: false,
+    critMuted: false,
     disableMoneyPopups: false,
     activeTheme: 'dark', // Default to dark
 
@@ -183,6 +252,9 @@ export const INITIAL_STATE: GameState = {
     lifetimeBonusMarbles: 0,
     lifetimeUpgradesBought: 0,
     lifetimeCriticalHits: 0,
+    lifetimeBronzeMedals: 0,
+    lifetimeSilverMedals: 0,
+    lifetimeGoldMedals: 0,
     
     kineticShards: 0,
     masterMultiplier: 0,
@@ -205,6 +277,48 @@ export const INITIAL_STATE: GameState = {
     repeatableCompleted: 0,
     lifetimeMissionsCompleted: 0,
     achievementsUnlocked: 0,
+    lastSeenDailyEventId: '',
+
+    // Challenge and Gems Statuses
+    dailyLogin: {
+        lastClaimedDate: '',
+        streak: 0
+    },
+    gems: {
+        crimson: 0,
+        azure: 0,
+        amber: 0
+    },
+    inChallengeMode: false,
+    challengeGoalClaimed: {},
+    challengeState: {
+        challengeId: '',
+        money: 0,
+        lifetimeEarnings: 0,
+        pegsBrokenCurrency: 0,
+        lifetimePegsBroken: 0,
+        lifetimeMicroMarblesDropped: 0,
+        upgrades: {
+            extraBall: 1, // Start at 1 ball
+            pegValue: 0,
+            ballSpeed: 0,
+            basketValue: 0,
+            uncommonChance: 0,
+            rareChance: 0,
+            legendaryChance: 0,
+            criticalChance: 0,
+            microValue: 0,
+            bonusValue: 0,
+            sandPegMultiplier: 0,
+            microAutoclicker: 0
+        }
+    },
+    gemInventory: {
+        ruby: 0,
+        emerald: 0,
+        diamond: 0
+    },
+    socketedPegs: {}
 };
 
 export interface UpgradeConfig {
@@ -227,10 +341,38 @@ export interface Ball {
     trail: {x:number, y:number}[];
     _pegCooldown: number;
     _remove?: boolean;
+    age?: number;
+    maxAge?: number;
+    isSplit?: boolean;
 }
 
 export interface Peg {
     x: number; y: number; glow: number; cooldown: number;
+    hitType?: 'normal' | 'uncommon' | 'rare' | 'legendary' | 'master' | 'micro';
+    hp?: number;
+    broken?: boolean;
+    respawnTimer?: number;
+    reformingStarted?: boolean;
+    gemType?: 'ruby' | 'emerald' | 'diamond' | null;
+    diamondHits?: number;
+}
+
+export interface SandParticle {
+    id: string;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    color: string;
+    size: number;
+    alpha: number;
+    life: number;
+    maxLife: number;
+    type: 'explode' | 'form';
+    startX?: number;
+    startY?: number;
+    targetX?: number;
+    targetY?: number;
 }
 
 export interface Popup {
@@ -238,5 +380,5 @@ export interface Popup {
 }
 
 export interface VisualEffect {
-    x: number; y: number; t: number; duration: number; type: 'micro_spawn' | 'critical_hit';
+    x: number; y: number; t: number; duration: number; type: 'micro_spawn' | 'critical_hit' | 'explosion';
 }

@@ -2,6 +2,7 @@
 import { GameState, ActiveMission } from './types';
 import { ACHIEVEMENT_GROUPS, romanize, getAchievementTier } from './achievements';
 import { DAILY_MISSIONS, REPEATABLE_MISSIONS, getMissionById, Mission } from './missions';
+import { DailyEventsManager } from './dailyEvents';
 
 export class ProgressionManager {
     static checkAchievements(state: GameState, addMoney: (amount: number, count: boolean) => void, pushNotification: (msg: string, type: 'achievement' | 'mission') => void) {
@@ -56,7 +57,7 @@ export class ProgressionManager {
             addMoney(reward, false);
             
             const achievementName = `${group.name} ${romanize(tierIndex + 1)}`;
-            pushNotification(`Claimed ${achievementName} reward!`, 'achievement');
+            pushNotification(`Claimed ${achievementName} reward: +$${reward.toLocaleString()} Career Cash!`, 'achievement');
             return true;
         }
         return false;
@@ -148,9 +149,10 @@ export class ProgressionManager {
             state.lifetimeMissionsCompleted = (state.lifetimeMissionsCompleted || 0) + 1;
 
             const peakMps = state.currentRunPeakMps || state.currentMps || 10;
-            const reward = Math.floor(peakMps * missionDef.reward.moneyMultiplier);
+            const eventMultiplier = DailyEventsManager.getMissionCashMultiplier();
+            const reward = Math.floor(peakMps * missionDef.reward.moneyMultiplier * eventMultiplier);
             addMoney(reward, false);
-            pushNotification(`Claimed ${missionDef.name} reward!`, 'mission');
+            pushNotification(`Claimed ${missionDef.name} reward: +$${reward.toLocaleString()} Career Cash!`, 'mission');
 
             // If repeatable, remove it so checkMissions can replace it
             if (isRepeatable) {

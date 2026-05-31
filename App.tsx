@@ -8,6 +8,8 @@ import './App.css';
 import { GameCanvas } from './components/GameCanvas';
 import { Header } from './components/Header';
 import { StatsBar } from './components/StatsBar';
+import { DailyEventsManager } from './game/dailyEvents';
+import { DailyEventModal } from './components/modals/DailyEventModal';
 import { TitleScreen } from './components/TitleScreen';
 import { UnderdogAuth } from './components/UnderdogAuth';
 import { Toast } from './components/Toast';
@@ -23,6 +25,12 @@ import { MissionsModal } from './components/modals/MissionsModal';
 import { LeaderboardModal } from './components/modals/LeaderboardModal';
 import { UpgradesPanel } from './components/panels/UpgradesPanel';
 import { OptionsPanel } from './components/panels/OptionsPanel';
+import { ChallengesPanel } from './components/panels/ChallengesPanel';
+import { CHALLENGES, ChallengesManager } from './game/challenges';
+import { GemSocketHud } from './components/GemSocketHud';
+import { DailyLoginModal } from './components/modals/DailyLoginModal';
+import { getTodayDateString } from './game/dailyLoginRewards';
+import { ChallengeSummaryModal } from './components/modals/ChallengeSummaryModal';
 
 const FloatingTextLayer = () => {
     const [items, setItems] = useState<any[]>([]);
@@ -52,7 +60,7 @@ const FloatingTextLayer = () => {
 
 const App = () => {
     const [gameState, setGameState] = useState(engine.state);
-    const [uiState, setUiState] = useState({ upgradesOpen: false, optionsOpen: false, statsOpen: false, shardShopOpen: false, coreModalOpen: false, prestigeAnim: false, achievementsOpen: false, missionsOpen: false, leaderboardOpen: false });
+    const [uiState, setUiState] = useState({ upgradesOpen: false, optionsOpen: false, statsOpen: false, shardShopOpen: false, coreModalOpen: false, prestigeAnim: false, achievementsOpen: false, missionsOpen: false, leaderboardOpen: false, challengesOpen: false, dailyRewardOpen: false });
     const [started, setStarted] = useState(false);
     const [authModalOpen, setAuthModalOpen] = useState(true);
     const [isAuthChecking, setIsAuthChecking] = useState(true);
@@ -69,6 +77,38 @@ const App = () => {
     const [specificTutorial, setSpecificTutorial] = useState<any>(null); // keyof ASSET_PATHS
     const [resetStep, setResetStep] = useState<0 | 1 | 2>(0);
     const [notifications, setNotifications] = useState(engine.notifications);
+    const [dailyEventModalOpen, setDailyEventModalOpen] = useState(false);
+    const [timeLeftStr, setTimeLeftStr] = useState('');
+
+    useEffect(() => {
+        const updateTimeLeft = () => {
+            const rot = ChallengesManager.getRotationInfo();
+            setTimeLeftStr(rot.timeLeftStr);
+        };
+        updateTimeLeft();
+        const interval = setInterval(updateTimeLeft, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    useEffect(() => {
+        const checkChallengeRotation = () => {
+            if (engine.state) {
+                const rotationChanged = ChallengesManager.checkAndSyncChallengeState(engine.state);
+                if (rotationChanged) {
+                    if (engine.state.showChallengeSummary) {
+                        if (engine.state.inChallengeMode) {
+                            engine.running = false; // Pause the plinko board physics loop
+                        }
+                        engine.saveState();
+                        setGameState({ ...engine.state });
+                        engine.notify();
+                    }
+                }
+            }
+        };
+        const interval = setInterval(checkChallengeRotation, 1000);
+        return () => clearInterval(interval);
+    }, [gameState.inChallengeMode]);
 
     useEffect(() => {
         // Check for existing session
@@ -89,6 +129,11 @@ const App = () => {
                 }
                 engine.isSyncing = false;
                 engine.state.isOffline = false;
+                engine.notify();
+            } else {
+                // Bypass login screen under guest (Local Only) status
+                setAuthModalOpen(false);
+                engine.state.isOffline = true;
                 engine.notify();
             }
             setIsAuthChecking(false);
@@ -137,9 +182,35 @@ const App = () => {
             setTimeout(() => setToast(null), 5000);
             engine.offlineEarnings = 0; // clear
         }
+
+        // Check if there is an unannounced Daily Event
+        const currentEvent = DailyEventsManager.getCurrentEvent();
+        if (engine.state.lastSeenDailyEventId !== currentEvent.id) {
+            const isFirstLogin = !localStorage.getItem('plinko_react_v1');
+            if (!isFirstLogin) {
+                setDailyEventModalOpen(true);
+            }
+            engine.state.lastSeenDailyEventId = currentEvent.id;
+            engine.saveState(false);
+        }
+
         const seen = gameState.tutorials['plinko_tutorial_v1'] || localStorage.getItem('plinko_tutorial_v1');
         if (!seen) { setTimeout(() => setShowTutorial(true), 500); }
-    }, [started]);
+    }, [started, gameState.tutorials]);
+
+    // Challenge real-time progress notification listeners
+    useEffect(() => {
+        const handleChallengeNotif = (e: any) => {
+            const { msg } = e.detail;
+            setToast({ msg, visible: true });
+            engine.audio.play('goal_complete');
+            setTimeout(() => {
+                setToast(prev => prev && prev.msg === msg ? { ...prev, visible: false } : prev);
+            }, 4500);
+        };
+        window.addEventListener('challenge-notif', handleChallengeNotif);
+        return () => window.removeEventListener('challenge-notif', handleChallengeNotif);
+    }, []);
 
     // Check for Kinetic Core Tutorial (>= 50 Marbles)
     useEffect(() => {
@@ -149,11 +220,12 @@ const App = () => {
         }
     }, [gameState.upgrades.extraBall]);
 
-    const togglePanel = (panel: 'upgrades' | 'options') => {
+    const togglePanel = (panel: 'upgrades' | 'options' | 'challenges') => {
         setUiState(prev => ({
             ...prev,
             upgradesOpen: panel === 'upgrades' ? !prev.upgradesOpen : false,
-            optionsOpen: panel === 'options' ? !prev.optionsOpen : false
+            optionsOpen: panel === 'options' ? !prev.optionsOpen : false,
+            challengesOpen: panel === 'challenges' ? !prev.challengesOpen : false
         }));
     };
 
@@ -197,7 +269,51 @@ const App = () => {
         }
     };
 
-    const handleBuy = (id: any) => { engine.buyUpgrade(id); };
+    const [fadeActive, setFadeActive] = useState(false);
+
+    const handleToggleChallengeMode = () => {
+        setFadeActive(true);
+        setTimeout(() => {
+            // Respawn all broken pegs from Sand Peg (or other states) immediately on scene switch
+            engine.respawnAllPegs();
+            
+            // Clear income buffer to ensure no leak into challenges, but preserve main board's persistent stats
+            engine.incomeBuffer = 0;
+            engine.socketingActive = false; // Turn off gem socketing view
+            
+            // Check & apply offline income for either layer before toggling state
+            engine.applyAllOfflineIncome(false);
+            
+            engine.state.inChallengeMode = !engine.state.inChallengeMode;
+            ChallengesManager.checkAndSyncChallengeState(engine.state);
+            
+            // Re-sync socketed pegs to correctly apply or strip gem modifiers
+            engine.syncSocketedPegs();
+            
+            engine.balls = []; // Clear existing balls
+            engine.saveState();
+            setGameState({ ...engine.state });
+            engine.notify();
+            
+            setTimeout(() => {
+                setFadeActive(false);
+            }, 400);
+        }, 1200);
+    };
+
+    const handleBuy = (id: any) => {
+        if (gameState.inChallengeMode) {
+            if (ChallengesManager.buyUpgrade(engine.state, id)) {
+                engine.audio.play('upgrade');
+                engine.saveState();
+                setGameState({ ...engine.state });
+                engine.notify();
+            }
+        } else {
+            engine.buyUpgrade(id);
+        }
+    };
+
     const handleCoreClick = () => { setUiState(s => ({ ...s, coreModalOpen: true })); };
     const handleActivatePrestige = (shards: number, mult: number) => {
         setPendingPrestige({ shards, mult });
@@ -228,6 +344,10 @@ const App = () => {
             engine.state.tutorials['plinko_seen_shardshop_skins_tutorial_v1'] = true;
             localStorage.setItem('plinko_seen_shardshop_skins_tutorial_v1', '1');
         }
+        if (current === 'tut_sockets') {
+            engine.state.tutorials['plinko_seen_sockets_tutorial_v1'] = true;
+            localStorage.setItem('plinko_seen_sockets_tutorial_v1', '1');
+        }
         engine.saveState(false);
 
         // Unpause bonus marble if that was the tutorial
@@ -251,15 +371,23 @@ const App = () => {
 
     const hasClaimableMissions = [...gameState.missions.activeDailies, ...gameState.missions.activeRepeatables].some(m => m.completed && !m.claimed);
     const hasClaimableAchievements = Object.values(gameState.achievements).some(a => (a === true || (a && a.completed)) && !(a && a.claimed));
+    const claimableToday = gameState.dailyLogin?.lastClaimedDate !== getTodayDateString();
 
     return (
         <div className={`app-container ${isPurple ? 'theme-purple' : 'theme-dark'}`}>
+            {/* Visual Board-Switch Transition Overlay */}
+            <div 
+                className={`fixed inset-0 bg-black z-[99999] pointer-events-none transition-opacity duration-[800ms] ${
+                    fadeActive ? 'opacity-100' : 'opacity-0'
+                }`}
+            />
+
             {!started && <TitleScreen onStart={handleStart} loading={!assetsLoaded} progress={loadProgress} />}
             
             {!isAuthChecking && authModalOpen && (
                 <UnderdogAuth 
                     onAuthComplete={handleAuthComplete} 
-                    onClose={user ? () => setAuthModalOpen(false) : undefined}
+                    onClose={() => setAuthModalOpen(false)}
                     initialMode={user ? 'profile' : 'login'}
                 />
             )}
@@ -279,12 +407,33 @@ const App = () => {
             
             {toast && <Toast msg={toast.msg} visible={toast.visible} />}
             
+            {dailyEventModalOpen && <DailyEventModal currentEvent={DailyEventsManager.getCurrentEvent()} onClose={() => setDailyEventModalOpen(false)} />}
             {uiState.statsOpen && <StatsModal onClose={() => setUiState(s => ({...s, statsOpen: false}))} />}
             {uiState.shardShopOpen && <ShardShopModal onClose={() => setUiState(s => ({...s, shardShopOpen: false}))} />}
             {uiState.coreModalOpen && <CoreModal onClose={() => setUiState(s => ({...s, coreModalOpen: false}))} onOpenShop={() => setUiState(s => ({...s, coreModalOpen: false, shardShopOpen: true}))} onActivate={handleActivatePrestige} />}
             {uiState.achievementsOpen && <AchievementsModal gameState={gameState} onClose={() => setUiState(s => ({...s, achievementsOpen: false}))} />}
             {uiState.missionsOpen && <MissionsModal onClose={() => setUiState(s => ({...s, missionsOpen: false}))} />}
             {uiState.leaderboardOpen && <LeaderboardModal onClose={() => setUiState(s => ({...s, leaderboardOpen: false}))} />}
+            {uiState.dailyRewardOpen && <DailyLoginModal gameState={gameState} onClose={() => setUiState(s => ({...s, dailyRewardOpen: false}))} onUpdate={() => setGameState({...engine.state})} />}
+            
+            {gameState.showChallengeSummary && gameState.pendingChallengeSummary && (
+                <ChallengeSummaryModal 
+                    summary={gameState.pendingChallengeSummary} 
+                    onClose={() => {
+                        engine.state.inChallengeMode = false;
+                        engine.state.showChallengeSummary = false;
+                        engine.state.pendingChallengeSummary = undefined;
+                        engine.balls = [];
+                        engine.respawnAllPegs();
+                        ChallengesManager.checkAndSyncChallengeState(engine.state);
+                        engine.syncSocketedPegs();
+                        engine.running = true;
+                        engine.saveState();
+                        setGameState({ ...engine.state });
+                        engine.notify();
+                    }}
+                />
+            )}
             
             {tutorialMenuOpen && <TutorialMenu onClose={() => setTutorialMenuOpen(false)} onSelect={(key) => { setTutorialMenuOpen(false); setSpecificTutorial(key); }} />}
             
@@ -314,6 +463,8 @@ const App = () => {
                 onCoreClick={handleCoreClick} 
                 onAuthClick={() => setAuthModalOpen(true)} 
                 profile={profile}
+                onEventClick={() => setDailyEventModalOpen(true)}
+                onChallengeClick={() => togglePanel('challenges')}
             />
             
             <div className="main-content">
@@ -324,13 +475,65 @@ const App = () => {
                     onBuy={handleBuy} 
                 />
 
+                <ChallengesPanel
+                    isOpen={uiState.challengesOpen}
+                    onClose={() => togglePanel('challenges')}
+                    gameState={gameState}
+                    forceUpdateState={() => setGameState({ ...engine.state })}
+                    onToggleChallenge={handleToggleChallengeMode}
+                />
+
+                {/* Dismiss Backdrop: closes sidebar panels on click/touch-off */}
+                {(uiState.upgradesOpen || uiState.challengesOpen || uiState.optionsOpen) && (
+                    <div 
+                        className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[90] cursor-pointer" 
+                        onClick={() => {
+                            setUiState(prev => ({
+                                ...prev,
+                                upgradesOpen: false,
+                                challengesOpen: false,
+                                optionsOpen: false
+                            }));
+                        }}
+                    />
+                )}
+
                 <div className="game-area">
                     <StatsBar />
                     <FloatingTextLayer />
-                    <GameCanvas />
+                    <GameCanvas inChallengeMode={gameState.inChallengeMode} />
+                    <GemSocketHud onUpdate={() => setGameState({ ...engine.state })} />
                     <div className="mobile-controls">
-                        <button className="mobile-btn" onClick={() => togglePanel('upgrades')}>⚡ Upgrades</button>
-                        <button className={`mobile-btn ${(hasClaimableMissions || hasClaimableAchievements) ? 'glow-breathing' : ''}`} onClick={() => togglePanel('options')}>⚙ Options</button>
+                        {(() => {
+                            const activeRot = ChallengesManager.getRotationInfo();
+                            const activeChall = CHALLENGES[activeRot.activeChallengeId];
+                            const challengeState = gameState.challengeState || { money: 0, lifetimeEarnings: 0, lifetimePegsBroken: 0 };
+                            const trackerMetric = activeChall.goals.bronze.metric;
+                            const currentVal = trackerMetric === 'pegsBroken' ? (challengeState.lifetimePegsBroken || 0) : ((challengeState as any).lifetimeEarnings || challengeState.money || 0);
+
+                            const isBronzeAchieved = currentVal >= activeChall.goals.bronze.target;
+                            const isSilverAchieved = currentVal >= activeChall.goals.silver.target;
+                            const isGoldAchieved = currentVal >= activeChall.goals.gold.target;
+
+                            return gameState.inChallengeMode ? (
+                                <button 
+                                    className="mobile-btn flex flex-col items-center justify-center py-1" 
+                                    style={{ color: '#f59e0b' }} 
+                                    onClick={() => togglePanel('challenges')}
+                                >
+                                    <span className="text-[10px] font-extrabold leading-none uppercase">🏆 Challenge</span>
+                                    <span className="text-[8.5px] font-mono opacity-80 leading-none mt-0.5">{timeLeftStr}</span>
+                                    <div className="flex gap-1 mt-1">
+                                        <div className={`w-2 h-2 rounded-full border border-white/20 transition-all ${isBronzeAchieved ? 'bg-[#b45309]' : 'bg-transparent'}`} title="Bronze" />
+                                        <div className={`w-2 h-2 rounded-full border border-white/20 transition-all ${isSilverAchieved ? 'bg-[#94a3b8]' : 'bg-transparent'}`} title="Silver" />
+                                        <div className={`w-2 h-2 rounded-full border border-white/20 transition-all ${isGoldAchieved ? 'bg-[#fbbf24]' : 'bg-transparent'}`} title="Gold" />
+                                    </div>
+                                </button>
+                            ) : (
+                                <button className="mobile-btn" onClick={() => togglePanel('upgrades')}>⚡ Upgrades</button>
+                            );
+                        })()}
+                        <button className={`mobile-btn ${(hasClaimableMissions || hasClaimableAchievements || claimableToday) ? 'glow-breathing' : ''}`} onClick={() => togglePanel('options')}>⚙ Options</button>
                     </div>
                 </div>
 
@@ -342,6 +545,7 @@ const App = () => {
                     onOpenStats={() => setUiState(s => ({...s, statsOpen: true, optionsOpen: false}))}
                     onOpenTutorials={() => { setTutorialMenuOpen(true); setUiState(s => ({...s, optionsOpen: false})); }}
                     onReset={() => { setResetStep(1); setUiState(s => ({...s, optionsOpen: false})); }}
+                    onOpenChallenges={() => togglePanel('challenges')}
                     uiState={uiState}
                     setUiState={setUiState}
                     hasClaimableMissions={hasClaimableMissions}

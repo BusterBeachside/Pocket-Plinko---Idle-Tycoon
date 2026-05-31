@@ -49,7 +49,7 @@ body {
     position: fixed;
     top: 20px;
     left: 50%;
-    transform: translateX(-50%) translateY(-100%);
+    transform: translateX(-50%) translateY(calc(-100% - 40px));
     background: rgba(50, 205, 50, 0.9);
     color: #fff;
     padding: 15px 25px;
@@ -371,6 +371,27 @@ canvas {
     max-width: 100%;
     object-fit: contain; /* Maintain Aspect Ratio */
     cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+@keyframes challengePulse {
+    0% {
+        box-shadow: 0 0 20px rgba(245, 158, 11, 0.25), 0 20px 50px rgba(0,0,0,0.8);
+        background: radial-gradient(circle at center, #1b0c03 0%, #000000 75%);
+    }
+    50% {
+        box-shadow: 0 0 35px rgba(245, 158, 11, 0.55), 0 20px 50px rgba(0,0,0,0.95);
+        background: radial-gradient(circle at center, #351a07 0%, #000000 90%);
+    }
+    100% {
+        box-shadow: 0 0 20px rgba(245, 158, 11, 0.25), 0 20px 50px rgba(0,0,0,0.8);
+        background: radial-gradient(circle at center, #1b0c03 0%, #000000 75%);
+    }
+}
+
+canvas.challenge-board {
+    animation: challengePulse 3s ease-in-out infinite;
+    border: 1px solid rgba(245, 158, 11, 0.4) !important;
 }
 
 /* Title Screen */
@@ -596,8 +617,11 @@ canvas {
     .mobile-btn {
         background: #333; color: #fff; border: 1px solid #555;
         padding: 10px 16px; border-radius: 20px; font-weight: bold;
-        flex: 1; text-align: center;
+        flex: 1; min-width: 0; text-align: center;
         font-size: 0.9rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: hidden;
     }
     .close-btn {
         display: block;

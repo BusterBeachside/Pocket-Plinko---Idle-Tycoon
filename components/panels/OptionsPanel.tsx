@@ -1,8 +1,10 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { engine } from '../../game/engine';
 import { GameState } from '../../game/types';
+import { CHALLENGES, ChallengesManager } from '../../game/challenges';
+import { getTodayDateString } from '../../game/dailyLoginRewards';
 
 interface OptionsPanelProps {
     isOpen: boolean;
@@ -11,6 +13,7 @@ interface OptionsPanelProps {
     onOpenStats: () => void;
     onOpenTutorials: () => void;
     onReset: () => void;
+    onOpenChallenges: () => void;
     forceUpdate: () => void;
     uiState: any;
     setUiState: (state: any) => void;
@@ -18,9 +21,20 @@ interface OptionsPanelProps {
     hasClaimableAchievements: boolean;
 }
 
-export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTutorials, onReset, forceUpdate, uiState, setUiState, hasClaimableMissions, hasClaimableAchievements }: OptionsPanelProps) => {
+export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTutorials, onReset, onOpenChallenges, forceUpdate, uiState, setUiState, hasClaimableMissions, hasClaimableAchievements }: OptionsPanelProps) => {
     const touchStart = useRef<{x: number, y: number} | null>(null);
     const isSwiping = useRef(false);
+    const [timeLeftStr, setTimeLeftStr] = useState('');
+
+    useEffect(() => {
+        const updateTimeLeft = () => {
+            const rot = ChallengesManager.getRotationInfo();
+            setTimeLeftStr(rot.timeLeftStr);
+        };
+        updateTimeLeft();
+        const interval = setInterval(updateTimeLeft, 1000);
+        return () => clearInterval(interval);
+    }, []);
 
     const handleTouchStart = (e: React.TouchEvent) => {
         touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -63,6 +77,16 @@ export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTu
         ? new Date(gameState.lastCloudSyncTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
         : 'Never';
 
+    const rot = ChallengesManager.getRotationInfo();
+    const challenge = CHALLENGES[rot.activeChallengeId];
+    const cState = gameState.challengeState || { money: 0, lifetimePegsBroken: 0 };
+    const metricType = challenge.goals.bronze.metric;
+    const currentMetricVal = metricType === 'pegsBroken' ? (cState.lifetimePegsBroken || 0) : (cState.lifetimeEarnings || cState.money || 0);
+
+    const isBronzeAchieved = currentMetricVal >= challenge.goals.bronze.target;
+    const isSilverAchieved = currentMetricVal >= challenge.goals.silver.target;
+    const isGoldAchieved = currentMetricVal >= challenge.goals.gold.target;
+
     return (
         <div 
             className={`sidebar-right ${isOpen ? 'open' : ''}`}
@@ -75,9 +99,46 @@ export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTu
             </div>
             <div className="sidebar-content">
                 
+                <button 
+                    className={`btn-toggle ${!gameState.inChallengeMode ? 'glow-breathing' : ''} flex flex-col items-center justify-center p-3`} 
+                    style={{ 
+                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', 
+                        border: '1px solid #fbbf24', 
+                        color: 'black',
+                        textTransform: 'uppercase',
+                        fontWeight: '900',
+                        fontSize: gameState.inChallengeMode ? '0.75rem' : '0.8rem',
+                        letterSpacing: '0.05em',
+                        boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)',
+                        marginBottom: '15px'
+                    }} 
+                    onClick={onOpenChallenges}
+                >
+                    <span className="font-extrabold flex items-center justify-center gap-1.5 whitespace-nowrap flex-nowrap w-full">
+                        🏆 {gameState.inChallengeMode ? `Challenge (${timeLeftStr})` : 'Challenge Dome'}
+                    </span>
+                    <div className="flex gap-2 mt-2 justify-center">
+                        <div className={`w-3.5 h-3.5 rounded-full border border-black/30 transition-all ${isBronzeAchieved ? 'bg-[#b45309]' : 'bg-transparent'}`} title={isBronzeAchieved ? "Bronze Complete" : "Bronze Incomplete"} />
+                        <div className={`w-3.5 h-3.5 rounded-full border border-black/30 transition-all ${isSilverAchieved ? 'bg-[#94a3b8]' : 'bg-transparent'}`} title={isSilverAchieved ? "Silver Complete" : "Silver Incomplete"} />
+                        <div className={`w-3.5 h-3.5 rounded-full border border-black/30 transition-all ${isGoldAchieved ? 'bg-[#fbbf24]' : 'bg-transparent'}`} title={isGoldAchieved ? "Gold Complete" : "Gold Incomplete"} />
+                    </div>
+                </button>
+                
                 <button className="btn-toggle" onClick={onOpenStats}>
                     Stats
                 </button>
+                
+                {(() => {
+                    const isDailyRewardClaimable = gameState.dailyLogin?.lastClaimedDate !== getTodayDateString();
+                    return (
+                        <button 
+                            className={`btn-toggle ${isDailyRewardClaimable ? 'glow-breathing !bg-[#0f1124] !border-amber-500/40 !text-amber-400' : ''}`} 
+                            onClick={() => setUiState((s: any) => ({...s, dailyRewardOpen: true}))}
+                        >
+                            🎁 {isDailyRewardClaimable ? "Claim Daily Reward!" : "Daily Reward Calendar"}
+                        </button>
+                    );
+                })()}
                 
                 <button className="btn-toggle" onClick={onOpenTutorials}>
                     Tutorials
@@ -160,6 +221,18 @@ export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTu
                         }}>Off</button>
                         <button className={`toggle-switch ${!gameState.basketMuted ? 'active' : ''}`} onClick={() => {
                             engine.state.basketMuted = false; forceUpdate();
+                        }}>On</button>
+                    </div>
+                </div>
+
+                <div className="option-row" style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop: '5px'}}>
+                    <span style={{fontSize:'0.9rem', color:'#ccc'}}>Critical Sounds</span>
+                    <div style={{background:'rgba(255,255,255,0.1)', borderRadius:'12px', padding:'2px', display:'flex'}}>
+                        <button className={`toggle-switch ${gameState.critMuted ? 'active' : ''}`} onClick={() => {
+                            engine.state.critMuted = true; forceUpdate();
+                        }}>Off</button>
+                        <button className={`toggle-switch ${!gameState.critMuted ? 'active' : ''}`} onClick={() => {
+                            engine.state.critMuted = false; forceUpdate();
                         }}>On</button>
                     </div>
                 </div>

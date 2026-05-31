@@ -1,7 +1,8 @@
 
-import { GameState, Ball, Peg, Popup, VisualEffect } from './types';
+import { GameState, Ball, Peg, Popup, VisualEffect, SandParticle } from './types';
 import { assets } from './assets';
 import { formatNumber } from './utils';
+import { PhysicsManager } from './physics';
 
 export class GameRenderer {
     private textureCache: Map<string, HTMLImageElement> = new Map();
@@ -15,18 +16,41 @@ export class GameRenderer {
         balls: Ball[], 
         pegs: Peg[], 
         visualEffects: VisualEffect[], 
-        popups: Popup[]
+        popups: Popup[],
+        sandParticles?: SandParticle[],
+        socketingActive?: boolean
     ) {
         ctx.clearRect(0, 0, width, height);
         
         // Faint Tech Grid Background
         ctx.save();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for(let gx=0; gx<=width; gx+=40) { ctx.moveTo(gx, 0); ctx.lineTo(gx, height); }
-        for(let gy=0; gy<=height; gy+=40) { ctx.moveTo(0, gy); ctx.lineTo(width, gy); }
-        ctx.stroke();
+        if (state.inChallengeMode) {
+            // Animated scrolling tech grid for Challenges!
+            const t = (Date.now() / 1500) % 1; // 0 to 1
+            const offset = t * 40;
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.07)'; // Golden/Amber challenge theme
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            // Vertical static lines
+            for(let gx=0; gx<=width; gx+=40) { ctx.moveTo(gx, 0); ctx.lineTo(gx, height); }
+            // Horizontal scrolling lines
+            for(let gy=-40; gy<=height+40; gy+=40) { ctx.moveTo(0, gy+offset); ctx.lineTo(width, gy+offset); }
+            ctx.stroke();
+
+            // Render a watermark text behind elements
+            ctx.fillStyle = 'rgba(245, 158, 11, 0.04)';
+            ctx.font = '800 24px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('⚡ CHALLENGE ACTIVE ⚡', width / 2, height / 2 - 40);
+        } else {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for(let gx=0; gx<=width; gx+=40) { ctx.moveTo(gx, 0); ctx.lineTo(gx, height); }
+            for(let gy=0; gy<=height; gy+=40) { ctx.moveTo(0, gy); ctx.lineTo(width, gy); }
+            ctx.stroke();
+        }
         ctx.restore();
 
         // Enhanced Neon Side Glow/Walls
@@ -46,17 +70,97 @@ export class GameRenderer {
         
         // Draw Pegs with 3D spherical look + neon hit glow
         pegs.forEach(p => {
+            const isSandPeg = state.inChallengeMode && state.challengeState?.challengeId === 'sand_peg';
+
+            if (p.broken) {
+                // Faint dashed outline showing former peg placement
+                ctx.save();
+                ctx.strokeStyle = 'rgba(230, 200, 120, 0.12)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([2, 3]);
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, this.pegRadius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+                return;
+            }
+
             ctx.beginPath();
             // Spherical gradient
             const grad = ctx.createRadialGradient(p.x - 2, p.y - 2, 1, p.x, p.y, this.pegRadius);
             
-            if (p.glow > 0) {
-                // Active Glow (Gold burst)
+            if (isSandPeg) {
+                // 7. Color pegs differently in this mode to show their current HP. Green for 3, yellow for 2, and red for 1.
+                const hp = p.hp !== undefined ? p.hp : 3;
+                let hpColor = '#39ff14'; // green
+                let hpStart = '#ffffff';
+                let hpMid = '#b0ff9e';
+                let hpEnd = '#1b8010';
+
+                if (hp === 2) {
+                    hpColor = '#ffd214'; // yellow
+                    hpStart = '#ffffff';
+                    hpMid = '#fff99e';
+                    hpEnd = '#b38800';
+                } else if (hp <= 1) {
+                    hpColor = '#ff3b3b'; // red
+                    hpStart = '#ffffff';
+                    hpMid = '#ff9e9e';
+                    hpEnd = '#a60c0c';
+                }
+
+                if (p.glow > 0) {
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = hpColor;
+                    grad.addColorStop(0, hpStart);
+                    grad.addColorStop(0.2, hpMid);
+                    grad.addColorStop(1, hpColor);
+                } else {
+                    grad.addColorStop(0, hpStart);
+                    grad.addColorStop(0.3, hpMid);
+                    grad.addColorStop(1, hpEnd);
+                    ctx.shadowBlur = 0;
+                }
+            } else if (p.glow > 0) {
+                // Active Glow based on hit type
                 ctx.shadowBlur = 15;
-                ctx.shadowColor = '#ffd700';
-                grad.addColorStop(0, '#fff');
-                grad.addColorStop(0.2, '#fff7cc');
-                grad.addColorStop(1, '#ffab00');
+                let glowColor = '#ffd700'; // Default gold
+                let startCol = '#fff';
+                let midCol = '#fff7cc';
+                let endCol = '#ffab00';
+                
+                if (p.hitType === 'master') {
+                    const hue = (performance.now() / 5) % 360;
+                    glowColor = `hsl(${hue}, 100%, 70%)`;
+                    startCol = '#fff';
+                    midCol = `hsl(${hue}, 100%, 85%)`;
+                    endCol = `hsl(${hue}, 100%, 60%)`;
+                } else if (p.hitType === 'micro') {
+                    glowColor = '#b200ff';
+                    startCol = '#fff';
+                    midCol = '#e5b3ff';
+                    endCol = '#b200ff';
+                } else if (p.hitType === 'legendary') {
+                    glowColor = '#39ff14';
+                    startCol = '#fff';
+                    midCol = '#b0ff9e';
+                    endCol = '#39ff14';
+                } else if (p.hitType === 'rare') {
+                    glowColor = '#ff2e2e';
+                    startCol = '#fff';
+                    midCol = '#ff9e9e';
+                    endCol = '#ff2e2e';
+                } else if (p.hitType === 'uncommon') {
+                    glowColor = '#00f5ff';
+                    startCol = '#fff';
+                    midCol = '#b0faff';
+                    endCol = '#00f5ff';
+                }
+                
+                ctx.shadowColor = glowColor;
+                grad.addColorStop(0, startCol);
+                grad.addColorStop(0.2, midCol);
+                grad.addColorStop(1, endCol);
             } else {
                 // Idle Metallic/Glass look
                 grad.addColorStop(0, '#e6e6e6');
@@ -69,6 +173,116 @@ export class GameRenderer {
             ctx.arc(p.x, p.y, this.pegRadius, 0, Math.PI * 2);
             ctx.fill();
             ctx.shadowBlur = 0;
+
+            if (socketingActive && !p.broken) {
+                ctx.save();
+                const pulseAlpha = 0.35 + Math.sin(Date.now() / 120) * 0.15;
+                ctx.strokeStyle = p.gemType 
+                    ? (p.gemType === 'ruby' ? `rgba(244, 63, 94, ${pulseAlpha + 0.35})` : (p.gemType === 'emerald' ? `rgba(16, 185, 129, ${pulseAlpha + 0.35})` : `rgba(56, 189, 248, ${pulseAlpha + 0.35})`)) 
+                    : `rgba(255, 255, 255, ${pulseAlpha})`;
+                ctx.lineWidth = p.gemType ? 1.5 : 1;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, (p.gemType ? 11 : 9) + Math.sin(Date.now() / 120) * 1.5, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            if (p.gemType) {
+                ctx.save();
+                // Glowing outer ring
+                ctx.strokeStyle = p.gemType === 'ruby' ? '#f43f5e' : (p.gemType === 'emerald' ? '#10b981' : '#38bdf8');
+                ctx.lineWidth = 1.5;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = ctx.strokeStyle;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, this.pegRadius + 1.5, 0, Math.PI * 2);
+                ctx.stroke();
+
+                if (p.gemType === 'ruby') {
+                    // Draw a ruby vector crystal! (Octagonal or diamond-shaped)
+                    ctx.fillStyle = '#ef4444';
+                    ctx.strokeStyle = '#fee2e2';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y - 7);
+                    ctx.lineTo(p.x + 5, p.y - 3);
+                    ctx.lineTo(p.x + 5, p.y + 3);
+                    ctx.lineTo(p.x, p.y + 7);
+                    ctx.lineTo(p.x - 5, p.y + 3);
+                    ctx.lineTo(p.x - 5, p.y - 3);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Tiny highlight
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(p.x - 1.5, p.y - 2, 1, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (p.gemType === 'emerald') {
+                    // Draw an emerald vector crystal! (Hexagon or oblong diamond)
+                    ctx.fillStyle = '#10b981';
+                    ctx.strokeStyle = '#d1fae5';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x - 5, p.y - 4);
+                    ctx.lineTo(p.x + 5, p.y - 4);
+                    ctx.lineTo(p.x + 7, p.y);
+                    ctx.lineTo(p.x + 5, p.y + 4);
+                    ctx.lineTo(p.x - 5, p.y + 4);
+                    ctx.lineTo(p.x - 7, p.y);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Highlight
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(p.x - 2, p.y - 1.5, 1, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (p.gemType === 'diamond') {
+                    // Draw a diamond vector shape!
+                    ctx.fillStyle = '#06b6d4';
+                    ctx.strokeStyle = '#ecfeff';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y - 7);
+                    ctx.lineTo(p.x + 5, p.y);
+                    ctx.lineTo(p.x, p.y + 7);
+                    ctx.lineTo(p.x - 5, p.y);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Draw charge indicators around or on the diamond!
+                    const hits = p.diamondHits || 0;
+                    if (hits > 0) {
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = 'bold 8px system-ui';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(hits.toString(), p.x, p.y + 1);
+                    } else {
+                        // Diamond highlight
+                        ctx.fillStyle = '#ffffff';
+                        ctx.beginPath();
+                        ctx.arc(p.x - 1.5, p.y - 2, 1, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                
+                // Overlay preloaded HTMLImageElement if they exist and are loaded (not 1x1 transparent)
+                const gemImg = assets.get(`${p.gemType}_gem` as any);
+                if (gemImg && gemImg.src && !gemImg.src.startsWith('data:')) {
+                    try {
+                        ctx.drawImage(gemImg, p.x - 8, p.y - 8, 16, 16);
+                    } catch (e) {
+                        // safe
+                    }
+                }
+                ctx.restore();
+            }
         });
 
         // Draw Visual Effects
@@ -90,6 +304,39 @@ export class GameRenderer {
                 ctx.strokeStyle = `rgba(100,220,255,${0.9 * alpha})`;
                 ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
                 ctx.stroke();
+                ctx.restore();
+            } else if (e.type === 'explosion') {
+                const r = pct * 150;
+                ctx.save();
+                
+                // Outer shockwave distortion ring (fast, bright neon cyan/blue)
+                ctx.beginPath();
+                ctx.lineWidth = 4 + 10 * (1 - pct);
+                ctx.strokeStyle = `rgba(56, 189, 248, ${alpha})`;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = 'rgba(56, 189, 248, 1)';
+                ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // Secondary intense white/blue sharp expansion wave
+                ctx.beginPath();
+                ctx.lineWidth = 1.5 + 4 * (1 - pct);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.95})`;
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = '#ffffff';
+                ctx.arc(e.x, e.y, r * 0.9, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Inner radial energy expanding core
+                ctx.beginPath();
+                const grad = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r * 0.75);
+                grad.addColorStop(0, `rgba(251, 113, 133, 0)`);
+                grad.addColorStop(0.3, `rgba(244, 63, 94, ${alpha * 0.35})`);
+                grad.addColorStop(1, `rgba(56, 189, 248, ${alpha * 0.15})`);
+                ctx.fillStyle = grad;
+                ctx.arc(e.x, e.y, r * 0.85, 0, Math.PI * 2);
+                ctx.fill();
+                
                 ctx.restore();
             } else if (e.type === 'critical_hit') {
                 const scale = 5 + (pct * 25);
@@ -249,59 +496,110 @@ export class GameRenderer {
         const basketW = width / 5;
         const basketH = 35; // Visual height
         
-        const marbleCountMult = Math.max(1, (state.upgrades.extraBall) * 0.75); // Removed 1+
-        const totalIncomePercent = (state.permanentIncomeBoostPercent || 0) + (state.derivedIncomeBoostPercent || 0);
+        const stats = PhysicsManager.getEffectiveStats(state);
+        const marbleCountMult = Math.max(1, stats.upgrades.extraBall * 0.75);
+        const totalIncomePercent = (stats.permanentIncomeBoostPercent || 0) + (stats.derivedIncomeBoostPercent || 0);
         const permIncomeMult = 1 + (totalIncomePercent / 100);
         const displayMult = marbleCountMult * permIncomeMult;
+
+        const isAntiGravity = state.inChallengeMode && state.challengeState?.challengeId === 'anti_gravity';
 
         for(let i=0; i<5; i++) {
             const bx = i * basketW;
             const by = height - basketH;
-            const col = basketColors[i];
+            const col = isAntiGravity ? '#fd79a8' : basketColors[i];
             
             ctx.save();
             
-            // Strong Neon Glow
-            ctx.shadowBlur = 30; // Increased blur
-            ctx.shadowColor = col;
-            
-            // Background with Gradient
-            const bgGrad = ctx.createLinearGradient(bx, by, bx, height);
-            bgGrad.addColorStop(0, col); // Solid at top
-            bgGrad.addColorStop(1, 'rgba(0,0,0,0.2)'); // Fade to dark
-            
-            ctx.fillStyle = bgGrad;
-            ctx.globalAlpha = 0.3;
-            // Draw shape with rounded top
-            ctx.beginPath();
-            ctx.moveTo(bx + 4, by);
-            ctx.lineTo(bx + basketW - 4, by);
-            ctx.lineTo(bx + basketW - 4, height);
-            ctx.lineTo(bx + 4, height);
-            ctx.closePath();
-            ctx.fill();
-            
-            ctx.globalAlpha = 1.0;
-            
-            // Bright Top Line (The "Lip")
-            ctx.strokeStyle = col;
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(bx + 4, by);
-            ctx.lineTo(bx + basketW - 4, by);
-            ctx.stroke();
-            
-            // Text
-            const val = (baseValues[i] + state.basketValueBonus) * displayMult;
-            ctx.fillStyle = '#fff';
-            ctx.font = '800 13px "Segoe UI", Roboto, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.shadowColor = 'rgba(0,0,0,0.8)';
-            ctx.shadowBlur = 4;
-            
-            let txt = formatNumber(val);
-            ctx.fillText(`$${txt}`, bx + basketW/2, by + basketH/2 + 2);
+            if (isAntiGravity) {
+                // Strong Pink Neon Glow
+                ctx.shadowBlur = 40;
+                ctx.shadowColor = '#fd79a8';
+                
+                const cx = bx + basketW / 2;
+                const cy = by + basketH / 2;
+                const rx = basketW / 2 - 12;
+                const ry = 8;
+                
+                ctx.fillStyle = 'rgba(253, 121, 168, 0.25)';
+                ctx.strokeStyle = '#fd79a8';
+                ctx.lineWidth = 4;
+                
+                ctx.beginPath();
+                const x1 = cx - rx;
+                const x2 = cx + rx;
+                const y1 = cy - ry;
+                const y2 = cy + ry;
+                ctx.arc(x1, cy, ry, Math.PI * 0.5, Math.PI * 1.5);
+                ctx.lineTo(x2, y1);
+                ctx.arc(x2, cy, ry, Math.PI * 1.5, Math.PI * 0.5);
+                ctx.lineTo(x1, y2);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                
+                // Capsule shining light core
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(x1 + 2, cy - ry + 3, 2, Math.PI, Math.PI * 1.5);
+                ctx.lineTo(x2 - 2, cy - ry + 1);
+                ctx.stroke();
+                
+                // Text label
+                ctx.fillStyle = '#fff';
+                ctx.font = '900 11px font-mono, "Segoe UI", Roboto, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                ctx.shadowBlur = 4;
+                ctx.fillText(`BOUNCE`, cx, cy + 1);
+            } else {
+                // Strong Neon Glow
+                ctx.shadowBlur = 30; // Increased blur
+                ctx.shadowColor = col;
+                
+                // Background with Gradient
+                const bgGrad = ctx.createLinearGradient(bx, by, bx, height);
+                bgGrad.addColorStop(0, col); // Solid at top
+                bgGrad.addColorStop(1, 'rgba(0,0,0,0.2)'); // Fade to dark
+                
+                ctx.fillStyle = bgGrad;
+                ctx.globalAlpha = 0.3;
+                // Draw shape with rounded top
+                ctx.beginPath();
+                ctx.moveTo(bx + 4, by);
+                ctx.lineTo(bx + basketW - 4, by);
+                ctx.lineTo(bx + basketW - 4, height);
+                ctx.lineTo(bx + 4, height);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.globalAlpha = 1.0;
+                
+                // Bright Top Line (The "Lip")
+                ctx.strokeStyle = col;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(bx + 4, by);
+                ctx.lineTo(bx + basketW - 4, by);
+                ctx.stroke();
+                
+                const isSandPegMode = state.inChallengeMode && state.challengeState?.challengeId === 'sand_peg';
+                if (!isSandPegMode) {
+                    // Text
+                    const val = (baseValues[i] + stats.basketValueBonus) * displayMult;
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '800 13px "Segoe UI", Roboto, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                    ctx.shadowBlur = 4;
+                    
+                    let txt = formatNumber(val);
+                    ctx.fillText(`$${txt}`, bx + basketW/2, by + basketH/2 + 2);
+                }
+            }
             
             ctx.restore();
         }
@@ -353,6 +651,19 @@ export class GameRenderer {
                 ctx.beginPath(); ctx.ellipse(-20, 0, 16, 8, 0, 0, Math.PI*2); ctx.fill();
                 ctx.beginPath(); ctx.ellipse(20, 0, 16, 8, 0, 0, Math.PI*2); ctx.fill();
             }
+            ctx.restore();
+        }
+
+        // Render Sand Particles
+        if (sandParticles && sandParticles.length > 0) {
+            ctx.save();
+            sandParticles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.alpha;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
             ctx.restore();
         }
     }

@@ -89,7 +89,7 @@ export const ShardShopModal = ({ onClose }: { onClose: () => void }) => {
                             {PERM_UPGRADES.map(u => {
                                 const level = engine.state.permUpgradesLevels[u.id] || 0;
                                 const cost = engine.state.permUpgradeCosts[u.id] || u.baseCost;
-                                const isMax = u.maxLevel && level >= u.maxLevel;
+                                const isMax = u.maxLevel !== undefined && u.maxLevel > 0 && level >= u.maxLevel;
                                 const canAfford = shards >= cost;
                                 return (
                                     <div className="perm-card" key={u.id}>

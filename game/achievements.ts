@@ -95,6 +95,36 @@ export const ACHIEVEMENT_GROUPS: AchievementGroup[] = [
         targetScale: 5,
         baseRewardMult: 30,
         rewardScale: 2
+    },
+    {
+        id: 'bronze_medals',
+        name: 'Bronze Challenger',
+        stat: 'lifetimeBronzeMedals',
+        descriptionTemplate: 'Earn {n} Bronze Challenge Medals',
+        baseTarget: 1,
+        targetScale: 2,
+        baseRewardMult: 40,
+        rewardScale: 2
+    },
+    {
+        id: 'silver_medals',
+        name: 'Silver Challenger',
+        stat: 'lifetimeSilverMedals',
+        descriptionTemplate: 'Earn {n} Silver Challenge Medals',
+        baseTarget: 1,
+        targetScale: 2,
+        baseRewardMult: 60,
+        rewardScale: 2
+    },
+    {
+        id: 'gold_medals',
+        name: 'Gold Challenger',
+        stat: 'lifetimeGoldMedals',
+        descriptionTemplate: 'Earn {n} Gold Challenge Medals',
+        baseTarget: 1,
+        targetScale: 2,
+        baseRewardMult: 80,
+        rewardScale: 2
     }
 ];
 

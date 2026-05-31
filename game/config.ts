@@ -6,7 +6,7 @@ export const UPGRADES: UpgradeConfig[] = [
         id: 'extraBall', 
         name: 'Extra Marble', 
         baseCost: 18, // Adjusted from 25 so Level 2 (18 * 1.4^1 = 25.2) matches previous first upgrade cost
-        costMultiplier: 1.4, 
+        costMultiplier: 1.34, 
         description: 'Adds another marble to the board.',
         unlocksAt: 1 
     },

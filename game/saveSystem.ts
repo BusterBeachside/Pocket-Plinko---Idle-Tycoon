@@ -1,6 +1,7 @@
 
 import { GameState, INITIAL_STATE } from './types';
-import { MARBLE_SKINS } from './shardShopConfig';
+import { MARBLE_SKINS, PERM_UPGRADES } from './shardShopConfig';
+import { ChallengesManager } from './challenges';
 
 export class SaveSystem {
     static loadState(): GameState {
@@ -29,10 +30,30 @@ export class SaveSystem {
                 missions: (parsed.missions && parsed.missions.activeDailies && parsed.missions.activeRepeatables) ? parsed.missions : INITIAL_STATE.missions,
                 // All-time earnings migration
                 allTimeEarnings: parsed.allTimeEarnings ?? (parsed.lifetimeEarnings || 0),
-                tutorials: parsed.tutorials || INITIAL_STATE.tutorials
+                tutorials: parsed.tutorials || INITIAL_STATE.tutorials,
+                gemInventory: { ...INITIAL_STATE.gemInventory, ...(parsed.gemInventory || {}) },
+                socketedPegs: parsed.socketedPegs || INITIAL_STATE.socketedPegs
             };
             // Ensure upgrades object structure is complete even if loaded from partial save
             loaded.upgrades = { ...INITIAL_STATE.upgrades, ...(parsed.upgrades || {}) };
+
+            // Sync/recalculate upgrade costs for all existing permanent upgrades to avoid any desync or lock issues from older saves/cached configs
+            PERM_UPGRADES.forEach(u => {
+                const lvl = loaded.permUpgradesLevels[u.id] || 0;
+                if (lvl > 0) {
+                    let expectedCost = u.baseCost;
+                    const mult = u.id === 'perm_extra_master' ? 3.0 : 1.4;
+                    for (let i = 0; i < lvl; i++) {
+                        expectedCost = Math.floor(expectedCost * mult);
+                    }
+                    const currentCost = loaded.permUpgradeCosts[u.id];
+                    if (currentCost === undefined || currentCost < expectedCost) {
+                        loaded.permUpgradeCosts[u.id] = expectedCost;
+                    }
+                } else if (loaded.permUpgradeCosts[u.id] === undefined) {
+                    loaded.permUpgradeCosts[u.id] = u.baseCost;
+                }
+            });
             
             // Migrate old localStorage tutorial keys
             if (typeof window !== 'undefined') {
@@ -49,6 +70,27 @@ export class SaveSystem {
                     }
                 });
             }
+
+            // Ensure challenge integrity and sync
+            ChallengesManager.checkAndSyncChallengeState(loaded);
+
+            // Backcheck calculate lifetime medal statistics for existing historical completions
+            let bronzeCount = 0;
+            let silverCount = 0;
+            let goldCount = 0;
+            if (loaded.challengeGoalClaimed) {
+                for (const challengeId in loaded.challengeGoalClaimed) {
+                    const claims = loaded.challengeGoalClaimed[challengeId];
+                    if (claims) {
+                        if (claims.bronze) bronzeCount++;
+                        if (claims.silver) silverCount++;
+                        if (claims.gold) goldCount++;
+                    }
+                }
+            }
+            loaded.lifetimeBronzeMedals = Math.max(loaded.lifetimeBronzeMedals || 0, bronzeCount);
+            loaded.lifetimeSilverMedals = Math.max(loaded.lifetimeSilverMedals || 0, silverCount);
+            loaded.lifetimeGoldMedals = Math.max(loaded.lifetimeGoldMedals || 0, goldCount);
 
             // Reset bonus marble to prevent frozen state on load
             loaded.bonusMarble = JSON.parse(JSON.stringify(INITIAL_STATE.bonusMarble));
@@ -75,6 +117,11 @@ export class SaveSystem {
 
     static saveState(state: GameState) {
         state.lastSaveTime = Date.now();
+        if (state.inChallengeMode && state.challengeState) {
+            state.challengeState.lastPlayTime = Date.now();
+        } else {
+            state.lastMainPlayTime = Date.now();
+        }
         const stateToSave = { ...state };
         // Don't save bonus marble position/state
         stateToSave.bonusMarble = JSON.parse(JSON.stringify(INITIAL_STATE.bonusMarble));
@@ -106,10 +153,19 @@ export class SaveSystem {
 
         // Calculate permanent upgrades
         const p = state.permUpgradesLevels || {};
-        state.permanentIncomeBoostPercent = (p['perm_income_a'] || 0) * 5;
-        state.shardMultiplierPercent = (p['perm_shard_multi'] || 0) * 10;
-        state.permanentMicroBoostPercent = (p['perm_micro_boost'] || 0) * 2;
-        state.bonusChance = Math.min(1, 0.5 + ((p['perm_bonus_chance'] || 0) * 0.01));
+        if (state.inChallengeMode) {
+            state.permanentIncomeBoostPercent = 0;
+            state.shardMultiplierPercent = 0;
+            state.permanentMicroBoostPercent = 0;
+            state.bonusChance = 0.5;
+            state.derivedIncomeBoostPercent = 0;
+            state.derivedMasterBonus = 0;
+        } else {
+            state.permanentIncomeBoostPercent = (p['perm_income_a'] || 0) * 5 + (state.timesPrestiged || 0) * 100;
+            state.shardMultiplierPercent = (p['perm_shard_multi'] || 0) * 10;
+            state.permanentMicroBoostPercent = (p['perm_micro_boost'] || 0) * 2;
+            state.bonusChance = Math.min(1, 0.5 + ((p['perm_bonus_chance'] || 0) * 0.01));
+        }
     }
 
     static createPrestigeState(currentState: GameState, shardsEarned: number, masterMultiGain: number): GameState {
@@ -132,6 +188,7 @@ export class SaveSystem {
         const keptLastCloudSync = currentState.lastCloudSyncTime;
         const keptPegMuted = currentState.pegMuted;
         const keptBasketMuted = currentState.basketMuted;
+        const keptCritMuted = currentState.critMuted;
         const keptPeakMps = currentState.peakMps; // All-time peak persists
         const keptMissions = JSON.parse(JSON.stringify(currentState.missions));
         const keptAchievements = { ...currentState.achievements };
@@ -139,6 +196,15 @@ export class SaveSystem {
         const keptRepeatableCompleted = currentState.repeatableCompleted;
         const keptLifetimeMissions = currentState.lifetimeMissionsCompleted;
         const keptAchievementsUnlocked = currentState.achievementsUnlocked;
+
+        // Keep challenge data
+        const keptGems = currentState.gems || { crimson: 0, azure: 0, amber: 0 };
+        const keptInChallengeMode = currentState.inChallengeMode || false;
+        const keptChallengeGoalClaimed = currentState.challengeGoalClaimed || {};
+        const keptChallengeState = currentState.challengeState;
+        const keptGemInventory = currentState.gemInventory || { ruby: 0, emerald: 0, diamond: 0 };
+        const keptSocketedPegs = currentState.socketedPegs || {};
+        const keptDailyLogin = currentState.dailyLogin || { lastClaimedDate: '', streak: 0 };
 
         // Keep lifetime stats
         const keptAllTimeEarnings = currentState.allTimeEarnings;
@@ -194,6 +260,7 @@ export class SaveSystem {
             lastCloudSyncTime: keptLastCloudSync,
             pegMuted: keptPegMuted,
             basketMuted: keptBasketMuted,
+            critMuted: keptCritMuted,
             peakMps: keptPeakMps,
             missions: keptMissions,
             achievements: keptAchievements,
@@ -206,7 +273,16 @@ export class SaveSystem {
             lifetimeBaskets: keptLifetimeBaskets,
             lifetimeBonusMarbles: keptLifetimeBonusMarbles,
             lifetimeUpgradesBought: keptLifetimeUpgradesBought,
-            lifetimeCriticalHits: keptLifetimeCriticalHits
+            lifetimeCriticalHits: keptLifetimeCriticalHits,
+
+            // Restore challenge module status
+            gems: keptGems,
+            inChallengeMode: keptInChallengeMode,
+            challengeGoalClaimed: keptChallengeGoalClaimed,
+            challengeState: keptChallengeState,
+            gemInventory: keptGemInventory,
+            socketedPegs: keptSocketedPegs,
+            dailyLogin: keptDailyLogin
         };
         
         this.calculateDerivedState(newState);

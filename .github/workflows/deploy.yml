@@ -13,14 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        # Updated from v4 to v6 to support Node 24 runtime
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
       
       - name: Setup Node
-        # Updated from v4 to v6 to support Node 24 runtime
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "20"
           
       - name: Install dependencies
         run: npm install
@@ -28,9 +26,10 @@ jobs:
       - name: Build
         run: npm run build
         
+      # GitHub Actions automatically zips the path provided in upload-artifact.
+      # Pointing to 'dist/' creates a zip with index.html at the root.
       - name: Upload Artifact
-        # Updated from v4 to v6 to support Node 24 runtime
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: pocket-plinko-build
           path: dist/
