@@ -9,6 +9,8 @@ export interface CrazyGamesUser {
 export class CrazyGamesService {
     private static cachedAuthListener: any = null;
     private static isSdkBlocked = false;
+    private static isInitialized = false;
+    private static initPromise: Promise<void> | null = null;
 
     /**
      * Clear loaded cache or local references.
@@ -29,9 +31,63 @@ export class CrazyGamesService {
     }
 
     /**
+     * Initialize the CrazyGames SDK asynchronously.
+     * Ensures we only trigger init once and return the initialization promise.
+     * Generously times out after 3000ms if run outside of CrazyGames iframe.
+     */
+    static async initSDK(): Promise<void> {
+        if (this.isSdkBlocked) return;
+        if (this.isInitialized) return;
+        if (this.initPromise) return this.initPromise;
+
+        const sdk = this.getSDK();
+        if (!sdk) {
+            return;
+        }
+
+        this.initPromise = new Promise<void>((resolve) => {
+            const timeoutId = setTimeout(() => {
+                console.warn("[CrazyGames SDK] Association handshake with the parent frame timed out (3000ms). Activating Sandbox Mock Mode.");
+                this.isSdkBlocked = true;
+                resolve();
+            }, 3000);
+
+            try {
+                if (typeof sdk.init === 'function') {
+                    sdk.init()
+                        .then(() => {
+                            clearTimeout(timeoutId);
+                            this.isInitialized = true;
+                            console.log("[CrazyGames SDK] Successfully initialized handshake.");
+                            resolve();
+                        })
+                        .catch((err: any) => {
+                            clearTimeout(timeoutId);
+                            console.warn("[CrazyGames SDK] Handshake declined by CrazyGames wrapper:", err);
+                            this.isSdkBlocked = true;
+                            resolve();
+                        });
+                } else {
+                    clearTimeout(timeoutId);
+                    this.isSdkBlocked = true;
+                    resolve();
+                }
+            } catch (err) {
+                clearTimeout(timeoutId);
+                console.warn("[CrazyGames SDK] SDK initialization failed with exception:", err);
+                this.isSdkBlocked = true;
+                resolve();
+            }
+        });
+
+        return this.initPromise;
+    }
+
+    /**
      * Get the current authenticated user's profile.
      */
     static async getCurrentUser(): Promise<CrazyGamesUser | null> {
+        await this.initSDK();
         const sdk = this.getSDK();
         if (!sdk) {
             const username = localStorage.getItem('crazy_mock_username') || localStorage.getItem('guest_username');
@@ -59,11 +115,6 @@ export class CrazyGamesService {
             }
             return null;
         } catch (err: any) {
-            if (err && (err.code === "sdkNotInitialized" || String(err).includes("not initialized") || (err.message && err.message.includes("not initialized")))) {
-                console.warn("[CrazyGames SDK] SDK loaded but not initialized (running locally/preview outside of CrazyGames). Gracefully switching to Sandbox Mock Mode.");
-                this.isSdkBlocked = true;
-                return this.getCurrentUser(); // recurse once now that SDK is blocked to get mock user if any
-            }
             console.error("CrazyGames: Error checking signed-in user status", err);
             return null;
         }
@@ -73,6 +124,7 @@ export class CrazyGamesService {
      * Display CrazyGames native sign-in dialog prompt.
      */
     static async showAuthPrompt(): Promise<CrazyGamesUser | null> {
+        await this.initSDK();
         const sdk = this.getSDK();
         if (!sdk) {
             // Simulate local login inside preview sandbox
@@ -106,33 +158,37 @@ export class CrazyGamesService {
      * Listen to CrazyGames auth status changes.
      */
     static addAuthListener(callback: (user: CrazyGamesUser | null) => void) {
-        const sdk = this.getSDK();
-        if (!sdk) return;
+        this.initSDK().then(() => {
+            const sdk = this.getSDK();
+            if (!sdk) return;
 
-        try {
-            this.cachedAuthListener = async () => {
-                const user = await this.getCurrentUser();
-                callback(user);
-            };
-            sdk.user.addAuthListener(this.cachedAuthListener);
-        } catch (err) {
-            console.error("CrazyGames addAuthListener error", err);
-        }
+            try {
+                this.cachedAuthListener = async () => {
+                    const user = await this.getCurrentUser();
+                    callback(user);
+                };
+                sdk.user.addAuthListener(this.cachedAuthListener);
+            } catch (err) {
+                console.error("CrazyGames addAuthListener error", err);
+            }
+        });
     }
 
     /**
      * Remove the active auth status listener
      */
     static removeAuthListener() {
-        const sdk = this.getSDK();
-        if (!sdk || !this.cachedAuthListener) return;
+        this.initSDK().then(() => {
+            const sdk = this.getSDK();
+            if (!sdk || !this.cachedAuthListener) return;
 
-        try {
-            sdk.user.removeAuthListener(this.cachedAuthListener);
-            this.cachedAuthListener = null;
-        } catch (err) {
-            console.error("CrazyGames removeAuthListener error", err);
-        }
+            try {
+                sdk.user.removeAuthListener(this.cachedAuthListener);
+                this.cachedAuthListener = null;
+            } catch (err) {
+                console.error("CrazyGames removeAuthListener error", err);
+            }
+        });
     }
 
     /**
@@ -140,6 +196,7 @@ export class CrazyGamesService {
      * Maps to ID "mps" (money per second) or another specified ID.
      */
     static async submitScore(score: number, leaderboardId: string = 'mps'): Promise<void> {
+        await this.initSDK();
         const sdk = this.getSDK();
         if (!sdk) {
             console.log(`[CrazyGames Mock] High score submit: ${score} to ${leaderboardId}`);
@@ -162,25 +219,28 @@ export class CrazyGamesService {
      * Show the built-in, fully-featured Native Leaderboard Overlay.
      */
     static showLeaderboard(leaderboardId: string = 'mps') {
-        const sdk = this.getSDK();
-        if (!sdk) {
-            alert(`[Local Preview Sandbox]\nCrazyGames native leaderboard "${leaderboardId}" requested!\nDeployed builds will show the beautiful immersive full screen overlay.`);
-            return;
-        }
+        this.initSDK().then(() => {
+            const sdk = this.getSDK();
+            if (!sdk) {
+                alert(`[Local Preview Sandbox]\nCrazyGames native leaderboard "${leaderboardId}" requested!\nDeployed builds will show the beautiful immersive full screen overlay.`);
+                return;
+            }
 
-        try {
-            sdk.leaderboard.showLeaderboard({
-                leaderboardId
-            });
-        } catch (err) {
-            console.error("CrazyGames showLeaderboard error:", err);
-        }
+            try {
+                sdk.leaderboard.showLeaderboard({
+                    leaderboardId
+                });
+            } catch (err) {
+                console.error("CrazyGames showLeaderboard error:", err);
+            }
+        });
     }
 
     /**
      * Save current game progress using CrazyGames Data Module.
      */
     static async saveProgress(stats: any, currency: number = 0, settings: any = {}): Promise<void> {
+        await this.initSDK();
         const sdk = this.getSDK();
         if (!sdk) {
             // Emulated saved progress via standard localStorage API inside preview
@@ -210,6 +270,7 @@ export class CrazyGamesService {
      * Load game progress from CrazyGames Cloud.
      */
     static async loadProgress(): Promise<any | null> {
+        await this.initSDK();
         const sdk = this.getSDK();
         if (!sdk) {
             const currencyStr = localStorage.getItem('crazy_save_currency');
@@ -237,6 +298,7 @@ export class CrazyGamesService {
      * Sync data between local state and cloud state (uses highest allTimeEarnings/lifetimeEarnings)
      */
     static async syncData(localState: any): Promise<any> {
+        await this.initSDK();
         const user = await this.getCurrentUser();
         if (!user) return localState;
 
@@ -286,6 +348,7 @@ export class CrazyGamesService {
      * Logout / disconnect.
      */
     static async signOut(): Promise<void> {
+        await this.initSDK();
         // CrazyGames SDK doesn't support forcing sign out programmatically on player behalf, 
         // but we clear the local emulated state
         localStorage.removeItem('crazy_mock_username');
