@@ -148,8 +148,31 @@ export class CrazyGamesService {
                 };
             }
             return null;
-        } catch (err) {
-            console.error("CrazyGames Auth error", err);
+        } catch (err: any) {
+            console.warn("[CrazyGames SDK] Auth prompt native callback returned error:", err);
+            
+            // Check if the user is already signed in on CrazyGames.
+            // When already signed in, calling showAuthPrompt throws an error code of 'userAlreadySignedIn' or similar message
+            const errStr = String(err).toLowerCase();
+            const errMsg = (err && err.message) ? String(err.message).toLowerCase() : '';
+            const errCode = (err && err.code) ? String(err.code).toLowerCase() : '';
+            
+            if (
+                err === "userAlreadySignedIn" ||
+                errCode === "useralreadysignedin" ||
+                errStr.includes("already") ||
+                errMsg.includes("already")
+            ) {
+                console.log("[CrazyGames SDK] User is already signed in on CrazyGames portal. Fallback and load currently active logged-in user profile...");
+                try {
+                    const activeUser = await this.getCurrentUser();
+                    if (activeUser) {
+                        return activeUser;
+                    }
+                } catch (retryErr) {
+                    console.error("CrazyGames failed fallback check for already signed in user status", retryErr);
+                }
+            }
             throw err;
         }
     }
@@ -163,9 +186,18 @@ export class CrazyGamesService {
             if (!sdk) return;
 
             try {
-                this.cachedAuthListener = async () => {
-                    const user = await this.getCurrentUser();
-                    callback(user);
+                this.cachedAuthListener = async (userPayload?: any) => {
+                    console.log("[CrazyGames SDK] Auth status update event fired.", userPayload);
+                    if (userPayload && (userPayload.userId || userPayload.id || userPayload.username)) {
+                        callback({
+                            userId: userPayload.userId || userPayload.id || 'crazy_user',
+                            username: userPayload.username || 'CrazyPlayer',
+                            profilePictureUrl: userPayload.profilePictureUrl || 'marble_white'
+                        });
+                    } else {
+                        const user = await this.getCurrentUser();
+                        callback(user);
+                    }
                 };
                 sdk.user.addAuthListener(this.cachedAuthListener);
             } catch (err) {

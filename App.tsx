@@ -111,7 +111,37 @@ const App = () => {
     }, [gameState.inChallengeMode]);
 
     useEffect(() => {
-        // Check for existing session
+        // Check for existing session or dynamically handle state updates from the portal
+        CrazyGamesService.addAuthListener(async (u) => {
+            console.log("[CrazyGames Auth] dynamic auth update received:", u);
+            if (u) {
+                setUser(u);
+                setProfile({
+                    username: u.username,
+                    avatar_url: u.profilePictureUrl
+                });
+                setAuthModalOpen(false);
+                
+                // Sync progress with CrazyGames
+                engine.isSyncing = true;
+                const syncedState = await CrazyGamesService.syncData(engine.state);
+                if (syncedState) {
+                    engine.state = { ...syncedState };
+                    SaveSystem.calculateDerivedState(engine.state);
+                    engine.notify();
+                }
+                engine.isSyncing = false;
+                engine.state.isOffline = false;
+                engine.notify();
+            } else {
+                setUser(null);
+                setProfile(null);
+                engine.state.isOffline = true;
+                engine.notify();
+            }
+            setIsAuthChecking(false);
+        });
+
         CrazyGamesService.getCurrentUser().then(async u => {
             if (u) {
                 setUser(u);
@@ -172,6 +202,7 @@ const App = () => {
         window.addEventListener('request-tutorial', tutorialHandler);
 
         return () => { 
+            CrazyGamesService.removeAuthListener();
             unsub(); 
             window.removeEventListener('request-tutorial', tutorialHandler);
         };
