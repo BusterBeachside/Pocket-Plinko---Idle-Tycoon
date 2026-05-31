@@ -5,6 +5,7 @@ import { User, Mail, Lock, UserCircle, LogOut, X, ArrowRight, ShieldCheck, Refre
 import { AvatarDisplay } from './AvatarDisplay';
 import { getAvatarOptions } from '../game/avatars';
 import { engine } from '../game/engine';
+import { getTodayDateString } from '../game/dailyLoginRewards';
 
 interface UnderdogAuthProps {
   onAuthComplete: (user: any | null, isOffline: boolean) => void;
@@ -154,6 +155,48 @@ export const UnderdogAuth: React.FC<UnderdogAuthProps> = ({ onAuthComplete, onCl
                   No login or personal information is required to play. Creating an account allows <strong className="text-blue-400 font-extrabold">Cloud Saves</strong> (Sync progress between devices) and the ability to view/appear on the global <strong className="text-blue-400 font-extrabold">Leaderboard</strong>.
                 </p>
               </div>
+            </div>
+
+            {/* Daily Login Streak Indicator */}
+            <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 text-center select-none">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-1.5 text-xs text-amber-400 font-bold">
+                  <span>🔥</span>
+                  <span>{(engine?.state?.dailyLogin?.streak || 0)} Day Streak!</span>
+                </div>
+                <span className="text-[10px] text-slate-500 font-mono tracking-wider uppercase">
+                  {(engine?.state?.dailyLogin?.lastClaimedDate === getTodayDateString()) ? "Today Claimed ✓" : "Claim Available!"}
+                </span>
+              </div>
+              
+              {/* Streak bubble dots (1 to 7) */}
+              <div className="flex justify-between items-center gap-1.5 mt-1.5">
+                {[1, 2, 3, 4, 5, 6, 7].map((day) => {
+                  const streak = engine?.state?.dailyLogin?.streak || 0;
+                  const hasClaimedToday = engine?.state?.dailyLogin?.lastClaimedDate === getTodayDateString();
+                  const isCompleted = day <= streak;
+                  const isNext = !hasClaimedToday && day === (streak % 7) + 1;
+                  
+                  return (
+                    <div key={day} className="flex-1 flex flex-col items-center gap-1">
+                      <div 
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-mono leading-none transition-all duration-300 ${
+                          isCompleted 
+                            ? 'bg-gradient-to-br from-amber-400 to-[#f59e0b] text-slate-950 font-black shadow-[0_0_8px_rgba(245,158,11,0.4)] scale-105 border border-amber-300/30' 
+                            : isNext 
+                              ? 'bg-blue-500/25 text-blue-400 border border-blue-500/40 animate-pulse font-bold animate-duration-1000'
+                              : 'bg-black/40 text-slate-600 border border-slate-800/60'
+                        }`}
+                      >
+                        {day === 7 ? '👑' : day}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-slate-500 mt-2 text-center">
+                Keep returning daily to earn massive cash, shards, and free gems!
+              </p>
             </div>
 
             <div className="space-y-3">

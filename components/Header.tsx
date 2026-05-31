@@ -180,7 +180,16 @@ export const Header = ({
                 )}
             </div>
             
-            <div className={`kinetic-icon ${glow ? 'glow' : ''}`} onClick={onCoreClick} style={{cursor: 'pointer'}}>
+            <div 
+                className={`kinetic-icon ${glow && !inChallenge ? 'glow' : ''}`} 
+                onClick={inChallenge ? undefined : onCoreClick} 
+                style={{
+                    cursor: inChallenge ? 'not-allowed' : 'pointer',
+                    opacity: inChallenge ? 0.35 : 1,
+                    pointerEvents: inChallenge ? 'none' : 'auto'
+                }}
+                title={inChallenge ? "Kinetic Core is disabled while on a Challenge board!" : "Access Kinetic Core"}
+            >
                 {/* Use preloaded asset source if available, else raw path */}
                 <img src={assets.getSrc('core')} alt="Core" />
             </div>

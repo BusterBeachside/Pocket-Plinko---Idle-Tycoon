@@ -299,7 +299,7 @@ export class PhysicsManager {
                                             });
                                             ProgressionManager.updateMissionProgress(state, 'critical_hits', 1);
                                             if (!state.critMuted) {
-                                                audio.play('crit', 0.15, 0.4);
+                                                audio.play('crit', 0.15, 0.2);
                                             }
                                             pushPopup({
                                                 x: p.x,
@@ -376,7 +376,7 @@ export class PhysicsManager {
                                             });
                                             ProgressionManager.updateMissionProgress(state, 'critical_hits', 1);
                                             if (!state.critMuted) {
-                                                audio.play('crit', 0.15, 0.4);
+                                                audio.play('crit', 0.15, 0.2);
                                             }
                                         }
 
@@ -576,7 +576,7 @@ export class PhysicsManager {
 
                         ProgressionManager.updateMissionProgress(state, 'critical_hits', 1);
                         if (!state.critMuted) {
-                            audio.play('crit', 0.15, 0.4);
+                            audio.play('crit', 0.15, 0.2);
                         }
                     }
 

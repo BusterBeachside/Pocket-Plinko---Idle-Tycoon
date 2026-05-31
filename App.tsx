@@ -314,7 +314,10 @@ const App = () => {
         }
     };
 
-    const handleCoreClick = () => { setUiState(s => ({ ...s, coreModalOpen: true })); };
+    const handleCoreClick = () => { 
+        if (gameState.inChallengeMode) return;
+        setUiState(s => ({ ...s, coreModalOpen: true })); 
+    };
     const handleActivatePrestige = (shards: number, mult: number) => {
         setPendingPrestige({ shards, mult });
         setUiState(s => ({ ...s, coreModalOpen: false, prestigeAnim: true }));
