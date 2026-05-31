@@ -104,6 +104,7 @@ export interface GameState {
     basketMuted: boolean;
     critMuted: boolean;
     disableMoneyPopups: boolean;
+    hapticsDisabled?: boolean; // New: track haptic settings
     activeTheme: 'dark' | 'purple'; // New theme setting
 
     // Stats
@@ -237,6 +238,7 @@ export const INITIAL_STATE: GameState = {
     basketMuted: false,
     critMuted: false,
     disableMoneyPopups: false,
+    hapticsDisabled: false, // Default to enabled
     activeTheme: 'dark', // Default to dark
 
     peakMps: 0,

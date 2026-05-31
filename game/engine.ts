@@ -75,63 +75,8 @@ export class GameEngine {
         this.renderer = new GameRenderer();
         this.initPegs();
         
-        // Debug Keys
+        // Visibility Change Listener
         if (typeof window !== 'undefined') {
-            window.addEventListener('keydown', async (e) => {
-                if (e.shiftKey) {
-                    const user = await CrazyGamesService.getCurrentUser();
-                    const isDev = window.location.hostname === 'localhost' || 
-                                  window.location.hostname.includes('ais-dev') || 
-                                  window.location.hostname.includes('run.app') ||
-                                  localStorage.getItem('plinko_challenge_debug_override') !== null;
-                    const userId = user ? (user.userId || (user as any).id) : null;
-                    if (userId !== 'a7155004-5e2c-4949-89ea-505daa903a31' && !isDev) return;
-
-                    switch(e.key.toLowerCase()) {
-                        case 'm': 
-                            this.addMoney(10000000); 
-                            this.notify(); 
-                            break;
-                        case 's': 
-                            this.state.kineticShards += 1000; 
-                            this.notify(); 
-                            break;
-                        case 'b': 
-                            this.spawnBonusMarble(); 
-                            break;
-                        case 'k': // Add pegs broken in active challenge
-                            if (this.state.inChallengeMode && this.state.challengeState) {
-                                this.state.challengeState.lifetimePegsBroken = (this.state.challengeState.lifetimePegsBroken || 0) + 1000;
-                                this.state.challengeState.pegsBrokenCurrency = (this.state.challengeState.pegsBrokenCurrency || 0) + 1000;
-                                this.notify();
-                            }
-                            break;
-                        case 'p': {
-                            const ballsCount = this.state.upgrades.extraBall;
-                            const lifetimeVal = this.state.lifetimeEarnings;
-                            const peakVal = this.state.peakMps;
-                            const rawShardsVal = (ballsCount / 10) + (lifetimeVal / 2000000000) + (peakVal / 1000000);
-                            let baseShardsVal = Math.floor(rawShardsVal);
-                            baseShardsVal = Math.max(1, baseShardsVal);
-                            const shardMultiPercentVal = this.state.shardMultiplierPercent || 0;
-                            let totalShardsVal = baseShardsVal;
-                            if (shardMultiPercentVal > 0) {
-                                totalShardsVal = Math.floor(baseShardsVal * (1 + shardMultiPercentVal / 100));
-                            }
-                            totalShardsVal *= DailyEventsManager.getPrestigeShardMultiplier();
-                            
-                            const baseMasterMultVal = Math.floor(5 * (ballsCount / 50));
-                            const ownedMasterBonusVal = this.state.derivedMasterBonus || 0;
-                            const totalMasterMultGainVal = baseMasterMultVal + ownedMasterBonusVal;
-
-                            this.resetForPrestige(totalShardsVal, totalMasterMultGainVal);
-                            break;
-                        }
-                    }
-                }
-            });
-            
-            // Visibility Change Listener
             document.addEventListener('visibilitychange', () => {
                 this.handleVisibilityChange();
             });

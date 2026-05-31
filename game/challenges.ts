@@ -82,12 +82,6 @@ export const CHALLENGES: { [id: string]: ChallengeDefinition } = {
 
 export class ChallengesManager {
     static getActiveChallengeId(): string {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('plinko_challenge_debug_override');
-            if (saved && ['anti_gravity', 'sand_peg', 'micro_mania', 'single_marble', 'critical_meltdown'].includes(saved)) {
-                return saved;
-            }
-        }
         const msIn48Hours = 1000 * 60 * 60 * 24 * 2;
         const nowMs = Date.now();
         const cycleIndex = Math.floor(nowMs / msIn48Hours);

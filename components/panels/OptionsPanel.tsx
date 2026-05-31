@@ -259,6 +259,18 @@ export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTu
                     </div>
                 </div>
 
+                <div className="option-row" style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop: '5px'}}>
+                    <span style={{fontSize:'0.9rem', color:'#ccc'}}>Haptic Feedback</span>
+                    <div style={{background:'rgba(255,255,255,0.1)', borderRadius:'12px', padding:'2px', display:'flex'}}>
+                        <button className={`toggle-switch ${gameState.hapticsDisabled ? 'active' : ''}`} onClick={() => {
+                            engine.state.hapticsDisabled = true; forceUpdate(); engine.saveState();
+                        }}>Off</button>
+                        <button className={`toggle-switch ${!gameState.hapticsDisabled ? 'active' : ''}`} onClick={() => {
+                            engine.state.hapticsDisabled = false; forceUpdate(); engine.saveState();
+                        }}>On</button>
+                    </div>
+                </div>
+
                 <div className="option-row" style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'15px'}}>
                     <span style={{fontSize:'0.9rem', color:'#ccc'}}>Theme</span>
                     <div style={{background:'rgba(255,255,255,0.1)', borderRadius:'12px', padding:'2px', display:'flex'}}>

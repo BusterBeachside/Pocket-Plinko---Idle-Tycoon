@@ -17,7 +17,6 @@ interface ChallengesPanelProps {
 export const ChallengesPanel: React.FC<ChallengesPanelProps> = ({ isOpen, onClose, gameState, forceUpdateState, onToggleChallenge }) => {
     const [rotation, setRotation] = useState(ChallengesManager.getRotationInfo());
     const [activeId, setActiveId] = useState(ChallengesManager.getActiveChallengeId());
-    const [isDebugOpen, setIsDebugOpen] = useState(false);
 
     const touchStart = useRef<{x: number, y: number} | null>(null);
     const isSwiping = useRef(false);
@@ -319,107 +318,6 @@ export const ChallengesPanel: React.FC<ChallengesPanelProps> = ({ isOpen, onClos
                             );
                         })}
                     </div>
-                </div>
-
-                {/* Debug Panel Accordion */}
-                <div className="mt-4 border border-red-500/15 rounded-xl overflow-hidden bg-red-950/5">
-                    <button
-                        onClick={() => setIsDebugOpen(!isDebugOpen)}
-                        className="w-full px-4 py-3 bg-red-950/20 text-[11px] font-bold font-mono text-red-400 hover:bg-red-950/30 transition-all flex justify-between items-center tracking-widest uppercase"
-                    >
-                        <span>⚙️ Challenge Debug Panel</span>
-                        <span>{isDebugOpen ? '▲' : '▼'}</span>
-                    </button>
-                    {isDebugOpen && (
-                        <div className="p-4 space-y-4 border-t border-red-500/15 bg-[#0a0707]/90">
-                            {/* Override Dropdown */}
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block font-bold">
-                                    Force Selected Challenge:
-                                </label>
-                                <select
-                                    value={localStorage.getItem('plinko_challenge_debug_override') || 'auto'}
-                                    onChange={(e) => {
-                                        const id = e.target.value;
-                                        if (id === 'auto') {
-                                            localStorage.removeItem('plinko_challenge_debug_override');
-                                        } else {
-                                            localStorage.setItem('plinko_challenge_debug_override', id);
-                                        }
-                                        
-                                        // Sync new state
-                                        ChallengesManager.checkAndSyncChallengeState(engine.state);
-                                        
-                                        // Clean active balls
-                                        engine.balls = [];
-                                        engine.spawnBalls();
-                                        
-                                        // Update local states
-                                        engine.respawnAllPegs();
-                                        const rot = ChallengesManager.getRotationInfo();
-                                        setRotation(rot);
-                                        setActiveId(rot.activeChallengeId);
-                                        
-                                        engine.saveState();
-                                        forceUpdateState();
-                                        engine.notify();
-                                    }}
-                                    className="w-full bg-[#111622] border border-white/10 rounded-lg py-2 px-3 text-xs text-slate-200 outline-none focus:border-amber-500/50 cursor-pointer"
-                                >
-                                    <option value="auto">Standard Rotation (No Override)</option>
-                                    <option value="anti_gravity">Anti-Gravity Dome</option>
-                                    <option value="sand_peg">Sand Peg Erosion</option>
-                                    <option value="micro_mania">Micro Mania Grid</option>
-                                    <option value="single_marble">The One Master</option>
-                                    <option value="critical_meltdown">Critical Meltdown</option>
-                                </select>
-                            </div>
-
-                            {/* Reset Button */}
-                            <button
-                                onClick={() => {
-                                    if (window.confirm("Careful! Are you sure you want to completely reset all upgrades, earnings, and goals for the current challenge? This is irreversible.")) {
-                                        engine.state.challengeState = {
-                                            challengeId: activeId,
-                                            money: 0,
-                                            lifetimeEarnings: 0,
-                                            pegsBrokenCurrency: 0,
-                                            lifetimePegsBroken: 0,
-                                            lifetimeMicroMarblesDropped: 0,
-                                            upgrades: {
-                                                extraBall: activeId === 'micro_mania' ? 0 : 1,
-                                                pegValue: 0,
-                                                ballSpeed: 0,
-                                                basketValue: 0,
-                                                uncommonChance: 0,
-                                                rareChance: 0,
-                                                legendaryChance: 0,
-                                                criticalChance: 0,
-                                                microValue: 0,
-                                                bonusValue: 0,
-                                                sandPegMultiplier: 0,
-                                                microAutoclicker: 0
-                                            },
-                                            currentMps: 0,
-                                            currentRunPeakMps: 0
-                                        };
-                                        if (engine.state.challengeGoalClaimed) {
-                                            engine.state.challengeGoalClaimed[activeId] = { bronze: false, silver: false, gold: false };
-                                        }
-                                        engine.balls = [];
-                                        engine.spawnBalls();
-                                        
-                                        engine.saveState();
-                                        forceUpdateState();
-                                        engine.notify();
-                                    }
-                                }}
-                                className="w-full py-2.5 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg text-[10px] font-mono tracking-widest uppercase font-bold transition-all active:scale-95 cursor-pointer"
-                            >
-                                ⚠️ Reset Current Challenge Data
-                            </button>
-                        </div>
-                    )}
                 </div>
 
             </div>
