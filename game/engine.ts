@@ -187,26 +187,25 @@ export class GameEngine {
         // Always save to local storage as backup/offline mode
         SaveSystem.saveState(this.state);
 
-        // If online, sync to Supabase (Throttled to every 30 seconds)
+        // If online, sync to CrazyGames SDK (Throttled to every 30 seconds)
         const now = Date.now();
         if (!this.state.isOffline && !this.isSyncing && (force || (now - this.lastCloudSave > 30000))) {
             this.lastCloudSave = now;
             try {
-                const user = await CrazyGamesService.getCurrentUser();
-                if (user) {
-                    const { money, ...stats } = this.state;
-                    stats.bonusMarble = { active: false, x: 0, y: 0, baseY: 0, t: 0 };
-                    console.log("Syncing stats:", stats);
-                    // Sync both progress and leaderboard on the same cycle
-                    await Promise.all([
-                        CrazyGamesService.saveProgress(stats, money, {}),
-                        CrazyGamesService.submitScore(this.state.peakMps, 'mps')
-                    ]);
-                    this.state.lastCloudSyncTime = Date.now();
-                    this.lastLeaderboardSync = Date.now();
-                }
+                const { money, ...stats } = this.state;
+                // Clean temporary visual state
+                stats.bonusMarble = { active: false, x: 0, y: 0, baseY: 0, t: 0 };
+                console.log("[Engine Save] Syncing to CrazyGames SDK data and leaderboards:", stats);
+                
+                // Sync both progress and leaderboard on the same cycle for guest and authenticated sessions alike
+                await Promise.all([
+                    CrazyGamesService.saveProgress(stats, money, {}),
+                    CrazyGamesService.submitScore(this.state.peakMps, 'mps')
+                ]);
+                this.state.lastCloudSyncTime = Date.now();
+                this.lastLeaderboardSync = Date.now();
             } catch (err) {
-                console.error("Failed to sync to Supabase:", err);
+                console.error("Failed to sync to CrazyGames SDK:", err);
             }
         }
     }

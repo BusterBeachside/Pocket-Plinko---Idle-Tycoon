@@ -296,14 +296,76 @@ export class CrazyGamesService {
             return;
         }
 
-        try {
-            await sdk.leaderboard.submitScore({
-                leaderboardId,
-                score: Math.floor(score)
-            });
-            console.log(`[CrazyGames API] Submitted score: ${score} -> ${leaderboardId}`);
-        } catch (err) {
-            console.error("CrazyGames submitScore error:", err);
+        let submitted = false;
+        const payload = {
+            leaderboardId,
+            score: Math.floor(score)
+        };
+
+        // Try standard sdk.leaderboard.submitScore
+        if (sdk.leaderboard && typeof sdk.leaderboard.submitScore === 'function') {
+            try {
+                await sdk.leaderboard.submitScore(payload);
+                console.log(`[CrazyGames SDK] Submitted high score of ${score} using sdk.leaderboard.submitScore`);
+                submitted = true;
+            } catch (err) {
+                console.warn("[CrazyGames SDK] Failed option 1 (sdk.leaderboard.submitScore):", err);
+            }
+        }
+
+        // Try sdk.user.submitScore (sometimes registered here, or tracked in QA checklist under User category)
+        if (!submitted && sdk.user && typeof sdk.user.submitScore === 'function') {
+            try {
+                await sdk.user.submitScore(payload);
+                console.log(`[CrazyGames SDK] Submitted high score of ${score} using sdk.user.submitScore`);
+                submitted = true;
+            } catch (err) {
+                console.warn("[CrazyGames SDK] Failed option 2 (sdk.user.submitScore):", err);
+            }
+        }
+
+        // Try sdk.user.submitLeaderboardScore
+        if (!submitted && sdk.user && typeof sdk.user.submitLeaderboardScore === 'function') {
+            try {
+                await sdk.user.submitLeaderboardScore(payload);
+                console.log(`[CrazyGames SDK] Submitted high score of ${score} using sdk.user.submitLeaderboardScore`);
+                submitted = true;
+            } catch (err) {
+                console.warn("[CrazyGames SDK] Failed option 3 (sdk.user.submitLeaderboardScore):", err);
+            }
+        }
+
+        // Try direct sdk.submitScore
+        if (!submitted && typeof sdk.submitScore === 'function') {
+            try {
+                await sdk.submitScore(payload);
+                console.log(`[CrazyGames SDK] Submitted high score of ${score} using sdk.submitScore`);
+                submitted = true;
+            } catch (err) {
+                console.warn("[CrazyGames SDK] Failed option 4 (sdk.submitScore):", err);
+            }
+        }
+
+        // Try direct sdk.submitLeaderboardScore
+        if (!submitted && typeof sdk.submitLeaderboardScore === 'function') {
+            try {
+                await sdk.submitLeaderboardScore(payload);
+                console.log(`[CrazyGames SDK] Submitted high score of ${score} using sdk.submitLeaderboardScore`);
+                submitted = true;
+            } catch (err) {
+                console.warn("[CrazyGames SDK] Failed option 5 (sdk.submitLeaderboardScore):", err);
+            }
+        }
+
+        if (!submitted) {
+            console.error("[CrazyGames SDK] Failed to find any matching submitScore method on initialized SDK object.");
+            try {
+                console.log("[CrazyGames SDK Error Debug] sdk properties:", Object.getOwnPropertyNames(sdk));
+                if (sdk.leaderboard) console.log("[CrazyGames SDK Error Debug] sdk.leaderboard properties:", Object.getOwnPropertyNames(sdk.leaderboard));
+                if (sdk.user) console.log("[CrazyGames SDK Error Debug] sdk.user properties:", Object.getOwnPropertyNames(sdk.user));
+            } catch (e) {
+                console.warn("[CrazyGames SDK] SDK introspection failed:", e);
+            }
         }
     }
 
@@ -318,12 +380,73 @@ export class CrazyGamesService {
                 return;
             }
 
-            try {
-                sdk.leaderboard.showLeaderboard({
-                    leaderboardId
-                });
-            } catch (err) {
-                console.error("CrazyGames showLeaderboard error:", err);
+            let shown = false;
+            const payload = { leaderboardId };
+
+            // Try standard sdk.leaderboard.showLeaderboard
+            if (sdk.leaderboard && typeof sdk.leaderboard.showLeaderboard === 'function') {
+                try {
+                    sdk.leaderboard.showLeaderboard(payload);
+                    console.log(`[CrazyGames SDK] Opened leaderboard overlay using sdk.leaderboard.showLeaderboard`);
+                    shown = true;
+                } catch (err) {
+                    console.warn("[CrazyGames SDK] Failed option 1 (sdk.leaderboard.showLeaderboard):", err);
+                }
+            }
+
+            // Try sdk.user.showLeaderboard
+            if (!shown && sdk.user && typeof sdk.user.showLeaderboard === 'function') {
+                try {
+                    sdk.user.showLeaderboard(payload);
+                    console.log(`[CrazyGames SDK] Opened leaderboard overlay using sdk.user.showLeaderboard`);
+                    shown = true;
+                } catch (err) {
+                    console.warn("[CrazyGames SDK] Failed option 2 (sdk.user.showLeaderboard):", err);
+                }
+            }
+
+            // Try sdk.leaderboard.show
+            if (!shown && sdk.leaderboard && typeof sdk.leaderboard.show === 'function') {
+                try {
+                    sdk.leaderboard.show(payload);
+                    console.log(`[CrazyGames SDK] Opened leaderboard overlay using sdk.leaderboard.show`);
+                    shown = true;
+                } catch (err) {
+                    console.warn("[CrazyGames SDK] Failed option 3 (sdk.leaderboard.show):", err);
+                }
+            }
+
+            // Try direct sdk.showLeaderboard
+            if (!shown && typeof sdk.showLeaderboard === 'function') {
+                try {
+                    sdk.showLeaderboard(payload);
+                    console.log(`[CrazyGames SDK] Opened leaderboard overlay using sdk.showLeaderboard`);
+                    shown = true;
+                } catch (err) {
+                    console.warn("[CrazyGames SDK] Failed option 4 (sdk.showLeaderboard):", err);
+                }
+            }
+
+            // Try direct sdk.openLeaderboard
+            if (!shown && typeof sdk.openLeaderboard === 'function') {
+                try {
+                    sdk.openLeaderboard(payload);
+                    console.log(`[CrazyGames SDK] Opened leaderboard overlay using sdk.openLeaderboard`);
+                    shown = true;
+                } catch (err) {
+                    console.warn("[CrazyGames SDK] Failed option 5 (sdk.openLeaderboard):", err);
+                }
+            }
+
+            if (!shown) {
+                console.error("[CrazyGames SDK] Failed to find any matching showLeaderboard method on initialized SDK object.");
+                try {
+                    console.log("[CrazyGames SDK Error Debug] sdk properties:", Object.getOwnPropertyNames(sdk));
+                    if (sdk.leaderboard) console.log("[CrazyGames SDK Error Debug] sdk.leaderboard properties:", Object.getOwnPropertyNames(sdk.leaderboard));
+                    if (sdk.user) console.log("[CrazyGames SDK Error Debug] sdk.user properties:", Object.getOwnPropertyNames(sdk.user));
+                } catch (e) {
+                    console.warn("[CrazyGames SDK] SDK introspection failed:", e);
+                }
             }
         });
     }
@@ -454,94 +577,104 @@ export class CrazyGamesService {
      * Report loading start event with fallback
      */
     static loadingStart(): void {
-        const sdk = this.getSDK();
-        if (!sdk) {
-            console.log("[CrazyGames SDK Mock] Loading start.");
-            return;
-        }
-        try {
-            if (sdk.game && typeof sdk.game.loadingStart === 'function') {
-                sdk.game.loadingStart();
-                console.log("[CrazyGames SDK] Game loading start reported.");
+        this.initSDK().then(() => {
+            const sdk = this.getSDK();
+            if (!sdk) {
+                console.log("[CrazyGames SDK Mock] Loading start.");
+                return;
             }
-        } catch (err) {
-            console.error("CrazyGames loadingStart error:", err);
-        }
+            try {
+                if (sdk.game && typeof sdk.game.loadingStart === 'function') {
+                    sdk.game.loadingStart();
+                    console.log("[CrazyGames SDK] Game loading start reported.");
+                }
+            } catch (err) {
+                console.error("CrazyGames loadingStart error:", err);
+            }
+        });
     }
 
     /**
      * Report loading stop event with fallback
      */
     static loadingStop(): void {
-        const sdk = this.getSDK();
-        if (!sdk) {
-            console.log("[CrazyGames SDK Mock] Loading stop.");
-            return;
-        }
-        try {
-            if (sdk.game && typeof sdk.game.loadingStop === 'function') {
-                sdk.game.loadingStop();
-                console.log("[CrazyGames SDK] Game loading stop reported.");
+        this.initSDK().then(() => {
+            const sdk = this.getSDK();
+            if (!sdk) {
+                console.log("[CrazyGames SDK Mock] Loading stop.");
+                return;
             }
-        } catch (err) {
-            console.error("CrazyGames loadingStop error:", err);
-        }
+            try {
+                if (sdk.game && typeof sdk.game.loadingStop === 'function') {
+                    sdk.game.loadingStop();
+                    console.log("[CrazyGames SDK] Game loading stop reported.");
+                }
+            } catch (err) {
+                console.error("CrazyGames loadingStop error:", err);
+            }
+        });
     }
 
     /**
      * Report gameplay start event with fallback
      */
     static gameplayStart(): void {
-        const sdk = this.getSDK();
-        if (!sdk) {
-            console.log("[CrazyGames SDK Mock] Gameplay start.");
-            return;
-        }
-        try {
-            if (sdk.game && typeof sdk.game.gameplayStart === 'function') {
-                sdk.game.gameplayStart();
-                console.log("[CrazyGames SDK] Gameplay start reported.");
+        this.initSDK().then(() => {
+            const sdk = this.getSDK();
+            if (!sdk) {
+                console.log("[CrazyGames SDK Mock] Gameplay start.");
+                return;
             }
-        } catch (err) {
-            console.error("CrazyGames gameplayStart error:", err);
-        }
+            try {
+                if (sdk.game && typeof sdk.game.gameplayStart === 'function') {
+                    sdk.game.gameplayStart();
+                    console.log("[CrazyGames SDK] Gameplay start reported.");
+                }
+            } catch (err) {
+                console.error("CrazyGames gameplayStart error:", err);
+            }
+        });
     }
 
     /**
      * Report gameplay stop event with fallback
      */
     static gameplayStop(): void {
-        const sdk = this.getSDK();
-        if (!sdk) {
-            console.log("[CrazyGames SDK Mock] Gameplay stop.");
-            return;
-        }
-        try {
-            if (sdk.game && typeof sdk.game.gameplayStop === 'function') {
-                sdk.game.gameplayStop();
-                console.log("[CrazyGames SDK] Gameplay stop reported.");
+        this.initSDK().then(() => {
+            const sdk = this.getSDK();
+            if (!sdk) {
+                console.log("[CrazyGames SDK Mock] Gameplay stop.");
+                return;
             }
-        } catch (err) {
-            console.error("CrazyGames gameplayStop error:", err);
-        }
+            try {
+                if (sdk.game && typeof sdk.game.gameplayStop === 'function') {
+                    sdk.game.gameplayStop();
+                    console.log("[CrazyGames SDK] Gameplay stop reported.");
+                }
+            } catch (err) {
+                console.error("CrazyGames gameplayStop error:", err);
+            }
+        });
     }
 
     /**
      * Celebrate game milestone / exciting event
      */
     static happytime(): void {
-        const sdk = this.getSDK();
-        if (!sdk) {
-            console.log("[CrazyGames SDK Mock] Happytime celebrated!");
-            return;
-        }
-        try {
-            if (sdk.game && typeof sdk.game.happytime === 'function') {
-                sdk.game.happytime();
-                console.log("[CrazyGames SDK] Happytime celebrated successfully!");
+        this.initSDK().then(() => {
+            const sdk = this.getSDK();
+            if (!sdk) {
+                console.log("[CrazyGames SDK Mock] Happytime celebrated!");
+                return;
             }
-        } catch (err) {
-            console.error("CrazyGames happytime error:", err);
-        }
+            try {
+                if (sdk.game && typeof sdk.game.happytime === 'function') {
+                    sdk.game.happytime();
+                    console.log("[CrazyGames SDK] Happytime celebrated successfully!");
+                }
+            } catch (err) {
+                console.error("CrazyGames happytime error:", err);
+            }
+        });
     }
 }
