@@ -111,6 +111,7 @@ const App = () => {
     }, [gameState.inChallengeMode]);
 
     useEffect(() => {
+        CrazyGamesService.loadingStart();
         // Check for existing session or dynamically handle state updates from the portal
         CrazyGamesService.addAuthListener(async (u) => {
             console.log("[CrazyGames Auth] dynamic auth update received:", u);
@@ -186,6 +187,7 @@ const App = () => {
         Promise.all([pImages, pAudio]).then(() => {
             setLoadProgress(1);
             setAssetsLoaded(true);
+            CrazyGamesService.loadingStop();
         });
         
         // Use Subscription for updates
@@ -237,6 +239,7 @@ const App = () => {
             const { msg } = e.detail;
             setToast({ msg, visible: true });
             engine.audio.play('goal_complete');
+            CrazyGamesService.happytime();
             setTimeout(() => {
                 setToast(prev => prev && prev.msg === msg ? { ...prev, visible: false } : prev);
             }, 4500);
@@ -244,6 +247,63 @@ const App = () => {
         window.addEventListener('challenge-notif', handleChallengeNotif);
         return () => window.removeEventListener('challenge-notif', handleChallengeNotif);
     }, []);
+
+    // CrazyGames gameplay start/stop menu flow tracker
+    useEffect(() => {
+        if (!started) return;
+        const isMenuOpen = 
+            uiState.upgradesOpen || 
+            uiState.optionsOpen || 
+            uiState.challengesOpen || 
+            uiState.statsOpen || 
+            uiState.shardShopOpen || 
+            uiState.coreModalOpen || 
+            uiState.achievementsOpen || 
+            uiState.missionsOpen || 
+            uiState.leaderboardOpen || 
+            uiState.dailyRewardOpen || 
+            tutorialMenuOpen || 
+            dailyEventModalOpen || 
+            authModalOpen;
+
+        if (isMenuOpen) {
+            CrazyGamesService.gameplayStop();
+        } else {
+            CrazyGamesService.gameplayStart();
+        }
+    }, [
+        started,
+        uiState.upgradesOpen,
+        uiState.optionsOpen,
+        uiState.challengesOpen,
+        uiState.statsOpen,
+        uiState.shardShopOpen,
+        uiState.coreModalOpen,
+        uiState.achievementsOpen,
+        uiState.missionsOpen,
+        uiState.leaderboardOpen,
+        uiState.dailyRewardOpen,
+        tutorialMenuOpen,
+        dailyEventModalOpen,
+        authModalOpen
+    ]);
+
+    // CrazyGames achievement notification happytime celebrator
+    const seenNotificationIds = React.useRef(new Set<string>());
+    useEffect(() => {
+        let hasNewAchievement = false;
+        notifications.forEach(n => {
+            if (!seenNotificationIds.current.has(n.id)) {
+                seenNotificationIds.current.add(n.id);
+                if (n.type === 'achievement') {
+                    hasNewAchievement = true;
+                }
+            }
+        });
+        if (hasNewAchievement) {
+            CrazyGamesService.happytime();
+        }
+    }, [notifications]);
 
     // Check for Kinetic Core Tutorial (>= 50 Marbles)
     useEffect(() => {
@@ -269,6 +329,7 @@ const App = () => {
         engine.audio.startMusic();
         engine.start();
         setStarted(true);
+        CrazyGamesService.gameplayStart();
         // Apply saved volumes
         setTimeout(() => {
             engine.audio.setSfxVolume(engine.state.sfxVolume);
@@ -361,6 +422,7 @@ const App = () => {
         if (pendingPrestige) { engine.resetForPrestige(pendingPrestige.shards, pendingPrestige.mult); }
         setPendingPrestige(null);
         setUiState(s => ({ ...s, prestigeAnim: false }));
+        CrazyGamesService.happytime();
     };
 
     const handleTutorialClose = () => {

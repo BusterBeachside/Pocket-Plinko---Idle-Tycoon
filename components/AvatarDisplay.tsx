@@ -10,7 +10,8 @@ interface AvatarDisplayProps {
 }
 
 export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ avatarId, size = 32, className = '', ownedSkins = [] }) => {
-    const isExternalUrl = avatarId.startsWith('http://') || avatarId.startsWith('https://') || avatarId.includes('/');
+    const [imgError, setImgError] = React.useState(false);
+    const isExternalUrl = (avatarId.startsWith('http://') || avatarId.startsWith('https://') || avatarId.includes('/')) && !imgError;
     
     if (isExternalUrl) {
         const containerStyle: React.CSSProperties = {
@@ -33,8 +34,8 @@ export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ avatarId, size = 3
                     alt="User Avatar" 
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     referrerPolicy="no-referrer"
-                    onError={(e) => {
-                        e.currentTarget.style.display = 'none';
+                    onError={() => {
+                        setImgError(true);
                     }}
                 />
             </div>

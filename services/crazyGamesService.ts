@@ -132,7 +132,7 @@ export class CrazyGamesService {
                     return {
                         userId: user.userId || user.id || 'crazy_user',
                         username: user.username || 'CrazyPlayer',
-                        profilePictureUrl: user.profilePictureUrl || 'marble_white'
+                        profilePictureUrl: user.profilePictureUrl || user.profilePicture || user.profilePictureURL || user.avatarUrl || user.avatarURL || user.avatar || user.pictureUrl || user.pictureURL || user.picture || 'marble_white'
                     };
                 }
             }
@@ -160,7 +160,7 @@ export class CrazyGamesService {
                     return {
                         userId: user.userId || user.id || 'crazy_user',
                         username: user.username || 'CrazyPlayer',
-                        profilePictureUrl: user.profilePictureUrl || 'marble_white'
+                        profilePictureUrl: user.profilePictureUrl || user.profilePicture || user.profilePictureURL || user.avatarUrl || user.avatarURL || user.avatar || user.pictureUrl || user.pictureURL || user.picture || 'marble_white'
                     };
                 }
             }
@@ -205,7 +205,7 @@ export class CrazyGamesService {
                 return {
                     userId: user.userId || user.id,
                     username: user.username || 'CrazyPlayer',
-                    profilePictureUrl: user.profilePictureUrl || 'marble_white'
+                    profilePictureUrl: user.profilePictureUrl || user.profilePicture || user.profilePictureURL || user.avatarUrl || user.avatarURL || user.avatar || user.pictureUrl || user.pictureURL || user.picture || 'marble_white'
                 };
             }
             return null;
@@ -252,7 +252,7 @@ export class CrazyGamesService {
                         callback({
                             userId: userPayload.userId || userPayload.id || 'crazy_user',
                             username: userPayload.username || 'CrazyPlayer',
-                            profilePictureUrl: userPayload.profilePictureUrl || 'marble_white'
+                            profilePictureUrl: userPayload.profilePictureUrl || userPayload.profilePicture || userPayload.profilePictureURL || userPayload.avatarUrl || userPayload.avatarURL || userPayload.avatar || userPayload.pictureUrl || userPayload.pictureURL || userPayload.picture || 'marble_white'
                         });
                     } else {
                         const user = await this.getCurrentUser();
@@ -448,5 +448,100 @@ export class CrazyGamesService {
         localStorage.removeItem('crazy_save_stats');
         localStorage.removeItem('crazy_save_settings');
         localStorage.removeItem('crazy_save_timestamp');
+    }
+
+    /**
+     * Report loading start event with fallback
+     */
+    static loadingStart(): void {
+        const sdk = this.getSDK();
+        if (!sdk) {
+            console.log("[CrazyGames SDK Mock] Loading start.");
+            return;
+        }
+        try {
+            if (sdk.game && typeof sdk.game.loadingStart === 'function') {
+                sdk.game.loadingStart();
+                console.log("[CrazyGames SDK] Game loading start reported.");
+            }
+        } catch (err) {
+            console.error("CrazyGames loadingStart error:", err);
+        }
+    }
+
+    /**
+     * Report loading stop event with fallback
+     */
+    static loadingStop(): void {
+        const sdk = this.getSDK();
+        if (!sdk) {
+            console.log("[CrazyGames SDK Mock] Loading stop.");
+            return;
+        }
+        try {
+            if (sdk.game && typeof sdk.game.loadingStop === 'function') {
+                sdk.game.loadingStop();
+                console.log("[CrazyGames SDK] Game loading stop reported.");
+            }
+        } catch (err) {
+            console.error("CrazyGames loadingStop error:", err);
+        }
+    }
+
+    /**
+     * Report gameplay start event with fallback
+     */
+    static gameplayStart(): void {
+        const sdk = this.getSDK();
+        if (!sdk) {
+            console.log("[CrazyGames SDK Mock] Gameplay start.");
+            return;
+        }
+        try {
+            if (sdk.game && typeof sdk.game.gameplayStart === 'function') {
+                sdk.game.gameplayStart();
+                console.log("[CrazyGames SDK] Gameplay start reported.");
+            }
+        } catch (err) {
+            console.error("CrazyGames gameplayStart error:", err);
+        }
+    }
+
+    /**
+     * Report gameplay stop event with fallback
+     */
+    static gameplayStop(): void {
+        const sdk = this.getSDK();
+        if (!sdk) {
+            console.log("[CrazyGames SDK Mock] Gameplay stop.");
+            return;
+        }
+        try {
+            if (sdk.game && typeof sdk.game.gameplayStop === 'function') {
+                sdk.game.gameplayStop();
+                console.log("[CrazyGames SDK] Gameplay stop reported.");
+            }
+        } catch (err) {
+            console.error("CrazyGames gameplayStop error:", err);
+        }
+    }
+
+    /**
+     * Celebrate game milestone / exciting event
+     */
+    static happytime(): void {
+        const sdk = this.getSDK();
+        if (!sdk) {
+            console.log("[CrazyGames SDK Mock] Happytime celebrated!");
+            return;
+        }
+        try {
+            if (sdk.game && typeof sdk.game.happytime === 'function') {
+                sdk.game.happytime();
+                console.log("[CrazyGames SDK] Happytime celebrated successfully!");
+            }
+        } catch (err) {
+            console.error("CrazyGames happytime error:", err);
+        }
     }
 }
