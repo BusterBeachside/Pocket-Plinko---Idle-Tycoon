@@ -8,7 +8,7 @@ import { ShopSystem } from './shop';
 import { ProgressionManager } from './progression';
 import { PhysicsManager } from './physics';
 import { Spawner } from './spawner';
-import { SupabaseService } from '../services/supabaseService';
+import { CrazyGamesService } from '../services/crazyGamesService';
 import { DailyEventsManager } from './dailyEvents';
 import { ChallengesManager } from './challenges';
 
@@ -79,12 +79,13 @@ export class GameEngine {
         if (typeof window !== 'undefined') {
             window.addEventListener('keydown', async (e) => {
                 if (e.shiftKey) {
-                    const user = await SupabaseService.getCurrentUser();
+                    const user = await CrazyGamesService.getCurrentUser();
                     const isDev = window.location.hostname === 'localhost' || 
                                   window.location.hostname.includes('ais-dev') || 
                                   window.location.hostname.includes('run.app') ||
                                   localStorage.getItem('plinko_challenge_debug_override') !== null;
-                    if (user?.id !== 'a7155004-5e2c-4949-89ea-505daa903a31' && !isDev) return;
+                    const userId = user ? (user.userId || (user as any).id) : null;
+                    if (userId !== 'a7155004-5e2c-4949-89ea-505daa903a31' && !isDev) return;
 
                     switch(e.key.toLowerCase()) {
                         case 'm': 
@@ -191,15 +192,15 @@ export class GameEngine {
         if (!this.state.isOffline && !this.isSyncing && (force || (now - this.lastCloudSave > 30000))) {
             this.lastCloudSave = now;
             try {
-                const user = await SupabaseService.getCurrentUser();
+                const user = await CrazyGamesService.getCurrentUser();
                 if (user) {
                     const { money, ...stats } = this.state;
                     stats.bonusMarble = { active: false, x: 0, y: 0, baseY: 0, t: 0 };
                     console.log("Syncing stats:", stats);
                     // Sync both progress and leaderboard on the same cycle
                     await Promise.all([
-                        SupabaseService.saveProgress(stats, money, {}),
-                        SupabaseService.submitScore(this.state.peakMps, 'mps', stats)
+                        CrazyGamesService.saveProgress(stats, money, {}),
+                        CrazyGamesService.submitScore(this.state.peakMps, 'mps')
                     ]);
                     this.state.lastCloudSyncTime = Date.now();
                     this.lastLeaderboardSync = Date.now();

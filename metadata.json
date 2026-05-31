@@ -1,6 +1,6 @@
 {
   "name": "Pocket Plinko: Idle Tycoon",
-  "description": "A high-stakes idle Plinko game featuring global cloud saves and leaderboards via Underdog ID.",
+  "description": "A high-stakes idle Plinko game featuring global cloud saves and leaderboards via CrazyGames SDK v3.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

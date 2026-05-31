@@ -13,7 +13,7 @@ import { DailyEventModal } from './components/modals/DailyEventModal';
 import { TitleScreen } from './components/TitleScreen';
 import { UnderdogAuth } from './components/UnderdogAuth';
 import { Toast } from './components/Toast';
-import { SupabaseService } from './services/supabaseService';
+import { CrazyGamesService } from './services/crazyGamesService';
 import { TutorialOverlay, TutorialMenu } from './components/Tutorials';
 import { PrestigeOverlay } from './components/PrestigeOverlay';
 import { ShardShopModal } from './components/modals/ShardShopModal';
@@ -112,16 +112,18 @@ const App = () => {
 
     useEffect(() => {
         // Check for existing session
-        SupabaseService.getCurrentUser().then(async u => {
+        CrazyGamesService.getCurrentUser().then(async u => {
             if (u) {
                 setUser(u);
-                const p = await SupabaseService.getProfile(u.id);
-                setProfile(p);
+                setProfile({
+                    username: u.username,
+                    avatar_url: u.profilePictureUrl
+                });
                 setAuthModalOpen(false);
                 
-                // Sync progress with Supabase
+                // Sync progress with CrazyGames
                 engine.isSyncing = true;
-                const syncedState = await SupabaseService.syncData(engine.state);
+                const syncedState = await CrazyGamesService.syncData(engine.state);
                 if (syncedState) {
                     engine.state = { ...syncedState };
                     SaveSystem.calculateDerivedState(engine.state);
@@ -250,11 +252,13 @@ const App = () => {
         setAuthModalOpen(false);
         
         if (u) {
-            const p = await SupabaseService.getProfile(u.id);
-            setProfile(p);
+            setProfile({
+                username: u.username,
+                avatar_url: u.profilePictureUrl
+            });
             // Sync current local progress to cloud (as requested)
             engine.isSyncing = true;
-            const syncedState = await SupabaseService.syncData(engine.state);
+            const syncedState = await CrazyGamesService.syncData(engine.state);
             if (syncedState) {
                 engine.state = { ...syncedState };
                 SaveSystem.calculateDerivedState(engine.state);

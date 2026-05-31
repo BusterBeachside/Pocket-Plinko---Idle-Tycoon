@@ -129,7 +129,7 @@ export const Header = ({
                     <User className="w-3.5 h-3.5 text-emerald-500" />
                 )}
                 <span className="hidden sm:inline text-[10px] font-bold text-white/60 uppercase tracking-wider pr-2">
-                    {profile?.username || 'Underdog ID'}
+                    {profile?.username || 'Guest'}
                 </span>
             </div>
             
