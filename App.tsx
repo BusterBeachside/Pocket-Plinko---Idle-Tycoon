@@ -70,14 +70,24 @@ const App = () => {
     const [loadProgress, setLoadProgress] = useState(0);
     const [toast, setToast] = useState<{msg: string, visible: boolean} | null>(null);
     const [pendingPrestige, setPendingPrestige] = useState<{shards: number, mult: number} | null>(null);
-    const [showTutorial, setShowTutorial] = useState(false);
+    const initialTutorialSeen = () => {
+        return !!(engine.state.tutorials['plinko_tutorial_v1'] || (typeof window !== 'undefined' && localStorage.getItem('plinko_tutorial_v1')));
+    };
+    const [showTutorial, setShowTutorial] = useState(!initialTutorialSeen());
     
     // New States
     const [tutorialMenuOpen, setTutorialMenuOpen] = useState(false);
     const [specificTutorial, setSpecificTutorial] = useState<any>(null); // keyof ASSET_PATHS
     const [resetStep, setResetStep] = useState<0 | 1 | 2>(0);
     const [notifications, setNotifications] = useState(engine.notifications);
-    const [dailyEventModalOpen, setDailyEventModalOpen] = useState(false);
+
+    const initialEventModalOpen = () => {
+        const currentEvent = DailyEventsManager.getCurrentEvent();
+        const tutorialSeen = !!(engine.state.tutorials['plinko_tutorial_v1'] || (typeof window !== 'undefined' && localStorage.getItem('plinko_tutorial_v1')));
+        if (!tutorialSeen) return false; // Onboarding has precedence, don't show daily event modal
+        return engine.state.lastSeenDailyEventId !== currentEvent.id;
+    };
+    const [dailyEventModalOpen, setDailyEventModalOpen] = useState(initialEventModalOpen());
     const [timeLeftStr, setTimeLeftStr] = useState('');
 
     useEffect(() => {
@@ -218,19 +228,21 @@ const App = () => {
             engine.offlineEarnings = 0; // clear
         }
 
-        // Check if there is an unannounced Daily Event
         const currentEvent = DailyEventsManager.getCurrentEvent();
-        if (engine.state.lastSeenDailyEventId !== currentEvent.id) {
-            const isFirstLogin = !localStorage.getItem('plinko_react_v1');
-            if (!isFirstLogin) {
-                setDailyEventModalOpen(true);
-            }
+        const seen = gameState.tutorials['plinko_tutorial_v1'] || localStorage.getItem('plinko_tutorial_v1');
+        if (!seen) {
+            // New Player Onboarding takes precedence
+            setShowTutorial(true);
             engine.state.lastSeenDailyEventId = currentEvent.id;
             engine.saveState(false);
+        } else {
+            // Returning Player: Only show daily event if they haven't seen it today
+            if (engine.state.lastSeenDailyEventId !== currentEvent.id) {
+                setDailyEventModalOpen(true);
+                engine.state.lastSeenDailyEventId = currentEvent.id;
+                engine.saveState(false);
+            }
         }
-
-        const seen = gameState.tutorials['plinko_tutorial_v1'] || localStorage.getItem('plinko_tutorial_v1');
-        if (!seen) { setTimeout(() => setShowTutorial(true), 500); }
     }, [started, gameState.tutorials]);
 
     // Challenge real-time progress notification listeners
@@ -264,6 +276,7 @@ const App = () => {
             uiState.dailyRewardOpen || 
             tutorialMenuOpen || 
             dailyEventModalOpen || 
+            showTutorial ||
             authModalOpen;
 
         if (isMenuOpen) {
@@ -285,6 +298,7 @@ const App = () => {
         uiState.dailyRewardOpen,
         tutorialMenuOpen,
         dailyEventModalOpen,
+        showTutorial,
         authModalOpen
     ]);
 
@@ -329,7 +343,6 @@ const App = () => {
         engine.audio.startMusic();
         engine.start();
         setStarted(true);
-        CrazyGamesService.gameplayStart();
         // Apply saved volumes
         setTimeout(() => {
             engine.audio.setSfxVolume(engine.state.sfxVolume);
