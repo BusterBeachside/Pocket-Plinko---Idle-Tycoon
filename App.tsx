@@ -277,7 +277,8 @@ const App = () => {
             tutorialMenuOpen || 
             dailyEventModalOpen || 
             showTutorial ||
-            authModalOpen;
+            authModalOpen ||
+            gameState.showChallengeSummary;
 
         if (isMenuOpen) {
             CrazyGamesService.gameplayStop();
@@ -299,7 +300,8 @@ const App = () => {
         tutorialMenuOpen,
         dailyEventModalOpen,
         showTutorial,
-        authModalOpen
+        authModalOpen,
+        gameState.showChallengeSummary
     ]);
 
     // CrazyGames achievement notification happytime celebrator
@@ -532,7 +534,7 @@ const App = () => {
             
             {toast && <Toast msg={toast.msg} visible={toast.visible} />}
             
-            {dailyEventModalOpen && <DailyEventModal currentEvent={DailyEventsManager.getCurrentEvent()} onClose={() => setDailyEventModalOpen(false)} />}
+            {dailyEventModalOpen && !gameState.showChallengeSummary && <DailyEventModal currentEvent={DailyEventsManager.getCurrentEvent()} onClose={() => setDailyEventModalOpen(false)} />}
             {uiState.statsOpen && <StatsModal onClose={() => setUiState(s => ({...s, statsOpen: false}))} />}
             {uiState.shardShopOpen && <ShardShopModal onClose={() => setUiState(s => ({...s, shardShopOpen: false}))} />}
             {uiState.coreModalOpen && <CoreModal onClose={() => setUiState(s => ({...s, coreModalOpen: false}))} onOpenShop={() => setUiState(s => ({...s, coreModalOpen: false, shardShopOpen: true}))} onActivate={handleActivatePrestige} />}
