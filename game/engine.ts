@@ -8,7 +8,7 @@ import { ShopSystem } from './shop';
 import { ProgressionManager } from './progression';
 import { PhysicsManager } from './physics';
 import { Spawner } from './spawner';
-import { CrazyGamesService } from '../services/crazyGamesService';
+import { UnderdogService } from '../services/underdogService';
 import { DailyEventsManager } from './dailyEvents';
 import { ChallengesManager } from './challenges';
 
@@ -132,7 +132,7 @@ export class GameEngine {
         // Always save to local storage as backup/offline mode
         SaveSystem.saveState(this.state);
 
-        // If online, sync to CrazyGames SDK (Throttled to every 30 seconds)
+        // If online, sync to Underdog (Throttled to every 30 seconds)
         const now = Date.now();
         if (!this.state.isOffline && !this.isSyncing && (force || (now - this.lastCloudSave > 30000))) {
             this.lastCloudSave = now;
@@ -140,17 +140,25 @@ export class GameEngine {
                 const { money, ...stats } = this.state;
                 // Clean temporary visual state
                 stats.bonusMarble = { active: false, x: 0, y: 0, baseY: 0, t: 0 };
-                console.log("[Engine Save] Syncing to CrazyGames SDK data and leaderboards:", stats);
+                console.log("[Engine Save] Syncing to Underdog data and leaderboards:", stats);
                 
                 // Sync both progress and leaderboard on the same cycle for guest and authenticated sessions alike
                 await Promise.all([
-                    CrazyGamesService.saveProgress(stats, money, {}),
-                    CrazyGamesService.submitScore(this.state.peakMps, 'mps')
+                    UnderdogService.saveProgress(stats, money, {}),
+                    UnderdogService.submitScore(this.state.peakMps, 'mps', {
+                        timesPrestiged: this.state.timesPrestiged || 0,
+                        masterMultiplier: this.state.masterMultiplier || 1,
+                        derivedIncomeBoostPercent: this.state.derivedIncomeBoostPercent || 0,
+                        activeMarbleSkinID: this.state.activeMarbleSkinID || 'default',
+                        ownedMarblesCount: this.state.ownedMarbles?.length || 1,
+                        kineticShards: this.state.kineticShards || 0,
+                        totalPlayTime: this.state.totalPlayTime || 0
+                    })
                 ]);
                 this.state.lastCloudSyncTime = Date.now();
                 this.lastLeaderboardSync = Date.now();
             } catch (err) {
-                console.error("Failed to sync to CrazyGames SDK:", err);
+                console.error("Failed to sync to Underdog SDK:", err);
             }
         }
     }

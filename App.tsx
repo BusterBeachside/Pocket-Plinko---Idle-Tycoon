@@ -13,7 +13,7 @@ import { DailyEventModal } from './components/modals/DailyEventModal';
 import { TitleScreen } from './components/TitleScreen';
 import { UnderdogAuth } from './components/UnderdogAuth';
 import { Toast } from './components/Toast';
-import { CrazyGamesService } from './services/crazyGamesService';
+import { UnderdogService } from './services/underdogService';
 import { TutorialOverlay, TutorialMenu } from './components/Tutorials';
 import { PrestigeOverlay } from './components/PrestigeOverlay';
 import { ShardShopModal } from './components/modals/ShardShopModal';
@@ -121,10 +121,10 @@ const App = () => {
     }, [gameState.inChallengeMode]);
 
     useEffect(() => {
-        CrazyGamesService.loadingStart();
+
         // Check for existing session or dynamically handle state updates from the portal
-        CrazyGamesService.addAuthListener(async (u) => {
-            console.log("[CrazyGames Auth] dynamic auth update received:", u);
+        UnderdogService.addAuthListener(async (u) => {
+            console.log("[Underdog Auth] dynamic auth update received:", u);
             if (u) {
                 setUser(u);
                 setProfile({
@@ -133,9 +133,9 @@ const App = () => {
                 });
                 setAuthModalOpen(false);
                 
-                // Sync progress with CrazyGames
+                // Sync progress with Underdog
                 engine.isSyncing = true;
-                const syncedState = await CrazyGamesService.syncData(engine.state);
+                const syncedState = await UnderdogService.syncData(engine.state);
                 if (syncedState) {
                     engine.state = { ...syncedState };
                     SaveSystem.calculateDerivedState(engine.state);
@@ -153,7 +153,7 @@ const App = () => {
             setIsAuthChecking(false);
         });
 
-        CrazyGamesService.getCurrentUser().then(async u => {
+        UnderdogService.getCurrentUser().then(async u => {
             if (u) {
                 setUser(u);
                 setProfile({
@@ -162,9 +162,9 @@ const App = () => {
                 });
                 setAuthModalOpen(false);
                 
-                // Sync progress with CrazyGames
+                // Sync progress with Underdog
                 engine.isSyncing = true;
-                const syncedState = await CrazyGamesService.syncData(engine.state);
+                const syncedState = await UnderdogService.syncData(engine.state);
                 if (syncedState) {
                     engine.state = { ...syncedState };
                     SaveSystem.calculateDerivedState(engine.state);
@@ -197,7 +197,7 @@ const App = () => {
         Promise.all([pImages, pAudio]).then(() => {
             setLoadProgress(1);
             setAssetsLoaded(true);
-            CrazyGamesService.loadingStop();
+
         });
         
         // Use Subscription for updates
@@ -214,7 +214,7 @@ const App = () => {
         window.addEventListener('request-tutorial', tutorialHandler);
 
         return () => { 
-            CrazyGamesService.removeAuthListener();
+            UnderdogService.removeAuthListener();
             unsub(); 
             window.removeEventListener('request-tutorial', tutorialHandler);
         };
@@ -251,7 +251,7 @@ const App = () => {
             const { msg } = e.detail;
             setToast({ msg, visible: true });
             engine.audio.play('goal_complete');
-            CrazyGamesService.happytime();
+
             setTimeout(() => {
                 setToast(prev => prev && prev.msg === msg ? { ...prev, visible: false } : prev);
             }, 4500);
@@ -260,7 +260,7 @@ const App = () => {
         return () => window.removeEventListener('challenge-notif', handleChallengeNotif);
     }, []);
 
-    // CrazyGames gameplay start/stop menu flow tracker
+    // Underdog gameplay start/stop menu flow tracker
     useEffect(() => {
         if (!started) return;
         const isMenuOpen = 
@@ -281,9 +281,9 @@ const App = () => {
             gameState.showChallengeSummary;
 
         if (isMenuOpen) {
-            CrazyGamesService.gameplayStop();
+
         } else {
-            CrazyGamesService.gameplayStart();
+
         }
     }, [
         started,
@@ -304,7 +304,7 @@ const App = () => {
         gameState.showChallengeSummary
     ]);
 
-    // CrazyGames achievement notification happytime celebrator
+    // Underdog achievement notification happytime celebrator
     const seenNotificationIds = React.useRef(new Set<string>());
     useEffect(() => {
         let hasNewAchievement = false;
@@ -317,7 +317,7 @@ const App = () => {
             }
         });
         if (hasNewAchievement) {
-            CrazyGamesService.happytime();
+
         }
     }, [notifications]);
 
@@ -365,7 +365,7 @@ const App = () => {
             });
             // Sync current local progress to cloud (as requested)
             engine.isSyncing = true;
-            const syncedState = await CrazyGamesService.syncData(engine.state);
+            const syncedState = await UnderdogService.syncData(engine.state);
             if (syncedState) {
                 engine.state = { ...syncedState };
                 SaveSystem.calculateDerivedState(engine.state);
@@ -449,7 +449,7 @@ const App = () => {
         if (pendingPrestige) { engine.resetForPrestige(pendingPrestige.shards, pendingPrestige.mult); }
         setPendingPrestige(null);
         setUiState(s => ({ ...s, prestigeAnim: false }));
-        CrazyGamesService.happytime();
+
     };
 
     const handleTutorialClose = () => {
