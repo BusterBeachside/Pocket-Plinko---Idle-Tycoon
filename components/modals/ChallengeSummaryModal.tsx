@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChallengeSummary } from '../../game/types';
 import { formatNumber } from '../../game/utils';
+import { CHALLENGES } from '../../game/challenges';
 
 interface ChallengeSummaryModalProps {
     summary: ChallengeSummary;
@@ -11,6 +12,11 @@ export const ChallengeSummaryModal = ({ summary, onClose }: ChallengeSummaryModa
     const isSandPeg = summary.challengeId === 'sand_peg';
     const metricLabel = isSandPeg ? 'Broken Pegs' : 'Challenge Cash';
     const formattedValue = isSandPeg ? formatNumber(summary.finalValue) : `$${formatNumber(summary.finalValue)}`;
+    const challengeInfo = CHALLENGES[summary.challengeId];
+    
+    const bronzeRewardLine = challengeInfo ? `Reward: ${challengeInfo.goals.bronze.rewardDescription}` : 'Reward: +$100K main Cash, +10 Shards';
+    const silverRewardLine = challengeInfo ? `Reward: ${challengeInfo.goals.silver.rewardDescription}` : 'Reward: +$5M Cash, +50 Shards, +1 Diamond Gem';
+    const goldRewardLine = challengeInfo ? `Reward: ${challengeInfo.goals.gold.rewardDescription}` : 'Reward: +$1B Cash, +200 Shards, +1 Emerald Gem';
 
     return (
         <div className="confirm-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -50,7 +56,7 @@ export const ChallengeSummaryModal = ({ summary, onClose }: ChallengeSummaryModa
                             </div>
                             <div className="flex flex-col min-w-0">
                                 <span className={`text-xs font-bold ${summary.medalsClaimed.bronze ? 'text-amber-400' : 'text-gray-500'}`}>Bronze Milestone</span>
-                                <span className="text-[10px] text-gray-300 font-mono truncate">Reward: +$100K main Cash, +10 Shards</span>
+                                <span className="text-[10px] text-gray-300 font-mono truncate">{bronzeRewardLine}</span>
                             </div>
                             <div className="ml-auto shrink-0">
                                 {summary.medalsClaimed.bronze ? (
@@ -76,7 +82,7 @@ export const ChallengeSummaryModal = ({ summary, onClose }: ChallengeSummaryModa
                             </div>
                             <div className="flex flex-col min-w-0">
                                 <span className={`text-xs font-bold ${summary.medalsClaimed.silver ? 'text-slate-300' : 'text-gray-500'}`}>Silver Milestone</span>
-                                <span className="text-[10px] text-gray-300 font-mono truncate">Reward: +$5M Cash, +50 Shards, +1 Crimson Rune</span>
+                                <span className="text-[10px] text-gray-300 font-mono truncate">{silverRewardLine}</span>
                             </div>
                             <div className="ml-auto shrink-0">
                                 {summary.medalsClaimed.silver ? (
@@ -102,7 +108,7 @@ export const ChallengeSummaryModal = ({ summary, onClose }: ChallengeSummaryModa
                             </div>
                             <div className="flex flex-col min-w-0">
                                 <span className={`text-xs font-bold ${summary.medalsClaimed.gold ? 'text-yellow-400' : 'text-gray-500'}`}>Gold Milestone</span>
-                                <span className="text-[10px] text-gray-300 font-mono truncate">Reward: +$1B Cash, +200 Shards, +1 Amber Rune</span>
+                                <span className="text-[10px] text-gray-300 font-mono truncate">{goldRewardLine}</span>
                             </div>
                             <div className="ml-auto shrink-0">
                                 {summary.medalsClaimed.gold ? (

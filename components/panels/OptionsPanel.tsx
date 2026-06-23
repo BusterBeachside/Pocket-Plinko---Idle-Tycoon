@@ -14,6 +14,7 @@ interface OptionsPanelProps {
     onOpenTutorials: () => void;
     onReset: () => void;
     onOpenChallenges: () => void;
+    onToggleChallenge?: () => void;
     forceUpdate: () => void;
     uiState: any;
     setUiState: (state: any) => void;
@@ -21,7 +22,7 @@ interface OptionsPanelProps {
     hasClaimableAchievements: boolean;
 }
 
-export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTutorials, onReset, onOpenChallenges, forceUpdate, uiState, setUiState, hasClaimableMissions, hasClaimableAchievements }: OptionsPanelProps) => {
+export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTutorials, onReset, onOpenChallenges, onToggleChallenge, forceUpdate, uiState, setUiState, hasClaimableMissions, hasClaimableAchievements }: OptionsPanelProps) => {
     const touchStart = useRef<{x: number, y: number} | null>(null);
     const isSwiping = useRef(false);
     const [timeLeftStr, setTimeLeftStr] = useState('');
@@ -102,20 +103,31 @@ export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTu
                 <button 
                     className={`btn-toggle ${!gameState.inChallengeMode ? 'glow-breathing' : ''} flex flex-col items-center justify-center p-3`} 
                     style={{ 
-                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', 
-                        border: '1px solid #fbbf24', 
-                        color: 'black',
+                        background: gameState.inChallengeMode 
+                            ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
+                            : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', 
+                        border: gameState.inChallengeMode ? '1px solid #f87171' : '1px solid #fbbf24', 
+                        color: gameState.inChallengeMode ? 'white' : 'black',
                         textTransform: 'uppercase',
                         fontWeight: '900',
                         fontSize: gameState.inChallengeMode ? '0.75rem' : '0.8rem',
                         letterSpacing: '0.05em',
-                        boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)',
+                        boxShadow: gameState.inChallengeMode 
+                            ? '0 4px 15px rgba(239, 68, 68, 0.4)' 
+                            : '0 4px 15px rgba(245, 158, 11, 0.4)',
                         marginBottom: '15px'
                     }} 
-                    onClick={onOpenChallenges}
+                    onClick={() => {
+                        if (gameState.inChallengeMode && onToggleChallenge) {
+                            onClose();
+                            onToggleChallenge();
+                        } else {
+                            onOpenChallenges();
+                        }
+                    }}
                 >
                     <span className="font-extrabold flex items-center justify-center gap-1.5 whitespace-nowrap flex-nowrap w-full">
-                        🏆 {gameState.inChallengeMode ? `Challenge (${timeLeftStr})` : 'Challenge Dome'}
+                        {gameState.inChallengeMode ? '🔙 Return to Main Board' : '🏆 Challenge Dome'}
                     </span>
                     <div className="flex gap-2 mt-2 justify-center">
                         <div className={`w-3.5 h-3.5 rounded-full border border-black/30 transition-all ${isBronzeAchieved ? 'bg-[#b45309]' : 'bg-transparent'}`} title={isBronzeAchieved ? "Bronze Complete" : "Bronze Incomplete"} />
@@ -123,6 +135,20 @@ export const OptionsPanel = ({ isOpen, onClose, gameState, onOpenStats, onOpenTu
                         <div className={`w-3.5 h-3.5 rounded-full border border-black/30 transition-all ${isGoldAchieved ? 'bg-[#fbbf24]' : 'bg-transparent'}`} title={isGoldAchieved ? "Gold Complete" : "Gold Incomplete"} />
                     </div>
                 </button>
+                
+                {!gameState.inChallengeMode && (
+                    <button 
+                        className={`btn-toggle ${engine.socketingActive ? 'glow-breathing !bg-[#0f2a3a] !border-cyan-400/60 !text-cyan-300' : ''}`} 
+                        onClick={() => {
+                            engine.socketingActive = !engine.socketingActive;
+                            engine.audio.play('upgrade');
+                            engine.notify();
+                            onClose();
+                        }}
+                    >
+                        💎 {engine.socketingActive ? 'Deactivate Socket Builder' : 'Peg Sockets Builder'}
+                    </button>
+                )}
                 
                 <button className="btn-toggle" onClick={onOpenStats}>
                     Stats

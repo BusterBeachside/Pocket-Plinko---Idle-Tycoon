@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { engine } from '../game/engine';
-import { Sparkles, Wand2, Trash2 } from 'lucide-react';
+import { Sparkles, Wand2, Trash2, Eye, EyeOff, Ban } from 'lucide-react';
+import { assets } from '../game/assets';
 
 export const GemSocketHud = ({ onUpdate }: { onUpdate: () => void }) => {
     const [selectedTool, setSelectedTool] = useState<'ruby' | 'emerald' | 'diamond' | 'unsocket'>('ruby');
@@ -59,84 +60,180 @@ export const GemSocketHud = ({ onUpdate }: { onUpdate: () => void }) => {
 
     const inventory = engine.state.gems || { crimson: 0, azure: 0, amber: 0 };
 
-    const tools = [
-        { type: 'ruby' as const, name: 'Ruby', count: inventory.crimson || 0, color: '#f43f5e', border: 'border-rose-500/40', bg: 'bg-rose-950/20', desc: 'Critical Hit on impact. Multiplies payout heavily!' },
-        { type: 'emerald' as const, name: 'Emerald', count: inventory.amber || 0, color: '#10b981', border: 'border-emerald-500/40', bg: 'bg-emerald-950/20', desc: 'Splits incoming marbles into two, doubling flow!' },
-        { type: 'diamond' as const, name: 'Diamond', count: inventory.azure || 0, color: '#06b6d4', border: 'border-cyan-500/40', bg: 'bg-cyan-950/20', desc: 'Explodes every 10 hits, cascade-bursting nearby pegs.' },
-        { type: 'unsocket' as const, name: 'Unsocket', count: null, color: '#a1a1aa', border: 'border-dashed border-gray-600', bg: 'bg-black/40', desc: 'Click any gemmed peg on the board to retrieve it.' }
+    const items = [
+        { 
+            type: 'ruby' as const, 
+            name: 'RUBY', 
+            count: inventory.crimson || 0, 
+            color: '#f43f5e', 
+            textColor: 'text-rose-400',
+            bg: 'bg-[#180e15]',
+            borderColor: 'border-rose-500/25',
+            glowColor: 'rgba(244,63,94,0.35)',
+            activeBorder: 'border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.5)] bg-[#280a13]',
+            imgKey: 'ruby_gem' as const,
+            desc: 'Critical Hit on impact. Multiplies payout heavily!'
+        },
+        { 
+            type: 'emerald' as const, 
+            name: 'EMERALD', 
+            count: inventory.amber || 0, 
+            color: '#10b981', 
+            textColor: 'text-emerald-400',
+            bg: 'bg-[#0d1612]',
+            borderColor: 'border-emerald-500/25',
+            glowColor: 'rgba(16,185,129,0.35)',
+            activeBorder: 'border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)] bg-[#052618]',
+            imgKey: 'emerald_gem' as const,
+            desc: 'Splits incoming marbles into two, doubling flow!'
+        },
+        { 
+            type: 'diamond' as const, 
+            name: 'DIAMOND', 
+            count: inventory.azure || 0, 
+            color: '#06b6d4', 
+            textColor: 'text-cyan-400',
+            bg: 'bg-[#0a161f]',
+            borderColor: 'border-cyan-500/25',
+            glowColor: 'rgba(6,182,212,0.35)',
+            activeBorder: 'border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.5)] bg-[#032338]',
+            imgKey: 'diamond_gem' as const,
+            desc: 'Explodes every 10 hits, cascade-bursting nearby pegs.'
+        }
     ];
 
-    const activeToolInfo = tools.find(t => t.type === selectedTool);
+    const currentSelectedDesc = selectedTool === 'unsocket' 
+        ? 'Click any gemmed peg on the board to retrieve it.' 
+        : items.find(i => i.type === selectedTool)?.desc;
 
     return (
         <div 
             id="gem-socket-hud" 
-            className="fixed select-none animate-fade-in flex flex-col gap-3 p-4 rounded-xl border border-cyan-500/35 bg-[#121324]/95 shadow-[0_15px_40px_rgba(0,0,0,0.85),_0_0_25px_rgba(6,182,212,0.15)] z-[95] w-[92%] max-w-[360px] bottom-[75px] left-1/2 -translate-x-1/2 md:bottom-auto md:right-4 md:top-1/2 md:-translate-y-1/2 md:left-auto md:translate-x-0 md:w-[280px]"
+            className="fixed select-none animate-fade-in flex flex-col gap-3.5 p-4 rounded-xl border border-white/20 bg-[#0d101d] shadow-[0_20px_50px_rgba(0,0,0,0.9)] z-[95] w-[92%] max-w-[390px] bottom-[75px] left-1/2 -translate-x-1/2 md:bottom-auto md:right-4 md:top-1/2 md:-translate-y-1/2 md:left-auto md:translate-x-0 md:w-[320px]"
         >
-            <div className="flex items-center justify-between border-b border-gray-800/60 pb-2">
-                <span className="text-xs font-black tracking-widest uppercase text-cyan-400 flex items-center gap-1.5 animate-pulse">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Peg Sockets Builder
+            {/* Header matching Picture */}
+            <div className="flex items-center justify-between pb-1">
+                <span className="text-[11px] font-black tracking-[0.12em] uppercase text-slate-200 flex items-center gap-2">
+                    <span className="w-3.5 h-3.5 flex items-center justify-center text-[#22d3ee]">💎</span>
+                    REWARD GEM SOCKETS
                 </span>
-                <span className="text-[10px] text-gray-400 italic">Eearned from Challenges</span>
+                <button 
+                    onClick={() => {
+                        engine.socketingActive = false;
+                        engine.hideMarbles = false;
+                        engine.audio.play('upgrade');
+                        forceUpdate();
+                    }}
+                    className="text-[9px] px-2.5 py-1 uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/40 text-[#10b981] hover:bg-emerald-500/20 rounded font-black transition-all cursor-pointer animate-pulse select-none"
+                    title="Sockets is active. Click to close."
+                >
+                    ACTIVE
+                </button>
             </div>
 
-            <p className="text-[10.5px] leading-relaxed text-slate-300 text-center bg-black/40 p-1.5 rounded-lg border border-white/5">
-                👉 Click any highlight peg socket on the board above to install or remove.
-            </p>
-
-            {/* Selection Grid */}
-            <div className="grid grid-cols-4 gap-1.5 font-sans">
-                {tools.map(t => {
+            {/* Three Grid Boxes styled exactly like the picture */}
+            <div className="grid grid-cols-3 gap-2 font-sans">
+                {items.map(t => {
                     const isSelected = selectedTool === t.type;
                     return (
-                        <button
+                        <div
                             key={t.type}
-                            className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all relative cursor-pointer ${
-                                isSelected 
-                                    ? `bg-cyan-950/40 border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.25)]` 
-                                    : `${t.bg} ${t.border} opacity-75 hover:opacity-100`
-                            }`}
                             onClick={() => {
                                 setSelectedTool(t.type);
                                 engine.audio.play('click');
+                                forceUpdate();
+                            }}
+                            className={`p-3 rounded-lg text-center flex flex-col items-center justify-center gap-1 cursor-pointer transition-all border relative select-none ${
+                                isSelected 
+                                    ? t.activeBorder 
+                                    : `${t.bg} ${t.borderColor} hover:border-[#ffffff40] hover:scale-[1.02]`
+                            }`}
+                            style={{
+                                boxShadow: isSelected ? `0 0 16px ${t.glowColor}` : 'none'
                             }}
                         >
-                            <span className="text-[10.5px] font-bold" style={{ color: t.color }}>{t.name}</span>
-                            {t.count !== null && (
-                                <span className="text-[8.5px] font-mono mt-0.5 bg-black/50 px-1 py-0.2 rounded-full border border-white/5 text-gray-300 select-none">
-                                    qty: {t.count}
-                                </span>
+                            <img 
+                                src={assets.getSrc(t.imgKey)} 
+                                alt={t.name} 
+                                className="w-6 h-6 object-contain my-1 select-none pointer-events-none drop-shadow-[0_0_6px_rgba(255,255,255,0.2)]" 
+                            />
+                            <div className="text-[9.5px] font-mono tracking-wider text-slate-300 font-extrabold mt-1">{t.name}</div>
+                            <div className={`text-base font-black ${t.textColor}`}>{t.count}</div>
+
+                            {isSelected && (
+                                <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-white animate-ping" />
                             )}
-                        </button>
+                        </div>
                     );
                 })}
             </div>
 
-            {/* Selected Tool Details */}
-            {activeToolInfo && (
-                <div className="p-2.5 bg-black/30 rounded-lg border border-white/5">
-                    <div className="text-[10.5px] font-bold" style={{ color: activeToolInfo.color }}>
-                        {activeToolInfo.name === 'Unsocket' ? '🧹 Remove Gem Tool' : `💎 ${activeToolInfo.name} Gem`}
-                    </div>
-                    <div className="text-[9.5px] text-gray-400 mt-0.5 leading-normal font-sans">
-                        {activeToolInfo.desc}
-                    </div>
-                </div>
-            )}
+            {/* Description Text matching Picture */}
+            <p className="text-[9.5px] font-medium text-slate-400 leading-normal text-left px-1">
+                Earn these powerful Gems by hitting Milestone Goals inside the rotating Challenges! Use them immediately as permanent Board Modifiers.
+            </p>
 
-            {/* Bottom Actions Menu */}
-            <div className="flex gap-2 items-center justify-between border-t border-gray-800/60 pt-2.5">
-                <div className="flex gap-1.5">
+            {/* Tool Instruction & Description Box */}
+            <div className="p-2.5 bg-black/40 rounded-lg border border-white/5 flex flex-col gap-0.5">
+                <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-300 flex items-center gap-1">
+                    {selectedTool === 'unsocket' ? '🧹 ACTIVE TOOL: UNSOCKET' : `🎯 ACTIVE SOCKET: ${selectedTool.toUpperCase()}`}
+                </div>
+                <div className="text-[9.5px] text-gray-400 mt-0.5 leading-normal">
+                    {currentSelectedDesc}
+                </div>
+                <div className="text-[9.2px] text-cyan-400 font-extrabold mt-1">
+                    👉 {selectedTool === 'unsocket' ? 'Click any gemmed peg on board to retrieve.' : 'Click highlight peg on board to install gem.'}
+                </div>
+            </div>
+
+            {/* Compact Auxiliary Tools & Actions Bar */}
+            <div className="flex flex-col gap-2 pt-1 border-t border-gray-800/60">
+                <div className="flex gap-1.5 justify-between">
+                    <button
+                        onClick={() => {
+                            setSelectedTool('unsocket');
+                            engine.audio.play('click');
+                            forceUpdate();
+                        }}
+                        className={`flex-1 flex items-center justify-center gap-1 text-[9px] font-extrabold uppercase px-2.5 py-1.5 rounded-lg border transition-all select-none cursor-pointer ${
+                            selectedTool === 'unsocket'
+                                ? 'bg-amber-500/20 text-amber-400 border-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.2)]'
+                                : 'bg-black/35 text-slate-300 border-white/5 hover:border-white/15'
+                        }`}
+                        title="Switch to Unsocket Eraser Tool"
+                    >
+                        <Ban className="w-3 h-3" />
+                        Unsocket
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            engine.hideMarbles = !engine.hideMarbles;
+                            engine.audio.play('click');
+                            forceUpdate();
+                        }}
+                        className={`flex-1 flex items-center justify-center gap-1 text-[9px] font-extrabold uppercase px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer select-none ${
+                            engine.hideMarbles 
+                                ? 'bg-[#3b0712] text-rose-400 border-rose-500' 
+                                : 'bg-[#0a2315] text-emerald-400 border-emerald-500/30 hover:border-emerald-500/60'
+                        }`}
+                        title="Toggles marble drawing to easily place sockets"
+                    >
+                        {engine.hideMarbles ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                        {engine.hideMarbles ? 'Hidden' : 'Showing'}
+                    </button>
+                </div>
+
+                <div className="flex gap-1.5 justify-between">
                     <button 
                         onClick={() => {
                             engine.autoAssignGems();
                             forceUpdate();
                         }}
-                        className="flex items-center gap-1 text-[9px] font-extrabold uppercase bg-emerald-950/30 text-emerald-400 border border-emerald-500/30 px-2 py-1.5 rounded-lg hover:bg-emerald-900/40 transition-all select-none cursor-pointer"
+                        className="flex-1 flex items-center justify-center gap-1 text-[9px] font-extrabold uppercase bg-emerald-950/30 text-[#34d399] border border-emerald-550/30 px-2.5 py-1.5 rounded-lg hover:bg-[#064e3b]/40 transition-all select-none cursor-pointer"
                         title="Auto-place empty gem slots on pegs"
                     >
-                        < Wand2 className="w-3 h-3" />
+                        <Wand2 className="w-3 h-3" />
                         Auto-Place
                     </button>
                     
@@ -145,20 +242,24 @@ export const GemSocketHud = ({ onUpdate }: { onUpdate: () => void }) => {
                             engine.clearAllGems();
                             forceUpdate();
                         }}
-                        className="flex items-center gap-1 text-[9px] font-extrabold uppercase bg-rose-950/30 text-rose-400 border border-rose-500/30 px-2 py-1.5 rounded-lg hover:bg-rose-900/40 transition-all select-none cursor-pointer"
+                        className="flex-1 flex items-center justify-center gap-1 text-[9px] font-extrabold uppercase bg-rose-950/30 text-[#f87171] border border-rose-550/30 px-2.5 py-1.5 rounded-lg hover:bg-rose-900/40 transition-all select-none cursor-pointer"
                     >
                         <Trash2 className="w-3 h-3" />
                         Retrieve All
                     </button>
                 </div>
+            </div>
 
+            {/* Bottom Actions Menu */}
+            <div className="flex gap-2 items-center justify-center pt-1.5 border-t border-gray-800/40">
                 <button 
                     onClick={() => {
                         engine.socketingActive = false;
+                        engine.hideMarbles = false;
                         engine.audio.play('upgrade');
                         forceUpdate();
                     }}
-                    className="bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-extrabold uppercase px-4 py-1.5 rounded-lg shadow-[0_0_10px_rgba(6,182,212,0.4)] transition-all select-none cursor-pointer"
+                    className="w-full bg-[#1b233a] hover:bg-[#232c4b] border border-white/10 text-slate-200 text-[10px] font-black uppercase tracking-wider py-2 rounded-lg transition-all select-none cursor-pointer text-center"
                 >
                     Close Builder
                 </button>

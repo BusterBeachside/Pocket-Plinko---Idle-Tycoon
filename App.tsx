@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { engine } from './game/engine';
+import { motion, AnimatePresence } from 'motion/react';
 import { assets } from './game/assets';
 import { SaveSystem } from './game/saveSystem';
 import './App.css';
@@ -379,10 +380,12 @@ const App = () => {
     const handleToggleChallengeMode = () => {
         setFadeActive(true);
         
-        // Immediately close the Challenge Dome panel
+        // Immediately close all drawer overlay panels
         setUiState(prev => ({
             ...prev,
-            challengesOpen: false
+            challengesOpen: false,
+            optionsOpen: false,
+            upgradesOpen: false
         }));
 
         // Smoothly fade out sound effects over 800ms
@@ -488,6 +491,14 @@ const App = () => {
         setSpecificTutorial(null);
     };
 
+    const draggingRef = React.useRef<{ [key: string]: boolean }>({});
+
+    const dismissNotification = (id: string) => {
+        engine.notifications = engine.notifications.filter(n => n.id !== id);
+        setNotifications([...engine.notifications]);
+        engine.notify();
+    };
+
     const isPurple = gameState.activeTheme === 'purple';
 
     const hasClaimableMissions = [...gameState.missions.activeDailies, ...gameState.missions.activeRepeatables].some(m => m.completed && !m.claimed);
@@ -566,18 +577,40 @@ const App = () => {
             }} />}
 
             <div className="notification-layer">
-                {notifications.map(n => (
-                    <div 
-                        key={n.id} 
-                        className={`notification-item ${n.type} ${n.fading ? 'fading' : ''}`}
-                        onClick={() => {
-                            if (n.type === 'mission') setUiState(s => ({ ...s, missionsOpen: true }));
-                            if (n.type === 'achievement') setUiState(s => ({ ...s, achievementsOpen: true }));
-                        }}
-                    >
-                        {n.message}
-                    </div>
-                ))}
+                <AnimatePresence mode="popLayout">
+                    {notifications.map(n => (
+                        <motion.div 
+                            key={n.id} 
+                            drag="x"
+                            dragConstraints={{ left: 0, right: 350 }}
+                            dragElastic={0.6}
+                            onDragStart={() => {
+                                draggingRef.current[n.id] = true;
+                            }}
+                            onDragEnd={(e, info) => {
+                                if (info.offset.x > 80) {
+                                    dismissNotification(n.id);
+                                } else {
+                                    setTimeout(() => {
+                                        draggingRef.current[n.id] = false;
+                                    }, 80);
+                                }
+                            }}
+                            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, x: 250, scale: 0.95, transition: { duration: 0.25 } }}
+                            className={`notification-item ${n.type} ${n.fading ? 'fading' : ''}`}
+                            onClick={() => {
+                                if (draggingRef.current[n.id]) return;
+                                if (n.type === 'mission') setUiState(s => ({ ...s, missionsOpen: true }));
+                                if (n.type === 'achievement') setUiState(s => ({ ...s, achievementsOpen: true }));
+                            }}
+                            style={{ x: 0 }}
+                        >
+                            {n.message}
+                        </motion.div>
+                    ))}
+                </AnimatePresence>
             </div>
 
             <Header 
@@ -591,21 +624,21 @@ const App = () => {
             <div className="main-content">
                 <UpgradesPanel 
                     isOpen={uiState.upgradesOpen} 
-                    onClose={() => togglePanel('upgrades')} 
+                    onClose={() => setUiState(prev => ({ ...prev, upgradesOpen: false }))} 
                     gameState={gameState} 
                     onBuy={handleBuy} 
                 />
 
                 <ChallengesPanel
                     isOpen={uiState.challengesOpen}
-                    onClose={() => togglePanel('challenges')}
+                    onClose={() => setUiState(prev => ({ ...prev, challengesOpen: false }))}
                     gameState={gameState}
                     forceUpdateState={() => setGameState({ ...engine.state })}
                     onToggleChallenge={handleToggleChallengeMode}
                 />
 
                 {/* Dismiss Backdrop: closes sidebar panels on click/touch-off */}
-                {(uiState.upgradesOpen || uiState.challengesOpen || uiState.optionsOpen) && (
+                {(uiState.upgradesOpen || uiState.challengesOpen || uiState.optionsOpen) && !engine.socketingActive && (
                     <div 
                         className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[90] cursor-pointer" 
                         onClick={() => {
@@ -640,10 +673,10 @@ const App = () => {
                             return (
                                 <button 
                                     className="mobile-btn flex flex-col items-center justify-center py-1" 
-                                    style={{ color: '#f59e0b' }} 
-                                    onClick={() => togglePanel('challenges')}
+                                    style={{ color: '#ef4444' }} 
+                                    onClick={handleToggleChallengeMode}
                                 >
-                                    <span className="text-[10px] font-extrabold leading-none uppercase">🏆 Challenge</span>
+                                    <span className="text-[10px] font-extrabold leading-none uppercase">🔙 MAIN BOARD</span>
                                     <span className="text-[8.5px] font-mono opacity-80 leading-none mt-0.5">{timeLeftStr}</span>
                                     <div className="flex gap-1 mt-1">
                                         <div className={`w-2 h-2 rounded-full border border-white/20 transition-all ${isBronzeAchieved ? 'bg-[#b45309]' : 'bg-transparent'}`} title="Bronze" />
@@ -659,13 +692,14 @@ const App = () => {
 
                 <OptionsPanel 
                     isOpen={uiState.optionsOpen} 
-                    onClose={() => togglePanel('options')} 
+                    onClose={() => setUiState(prev => ({ ...prev, optionsOpen: false }))} 
                     gameState={gameState}
                     forceUpdate={() => setGameState({...engine.state})}
                     onOpenStats={() => setUiState(s => ({...s, statsOpen: true, optionsOpen: false}))}
                     onOpenTutorials={() => { setTutorialMenuOpen(true); setUiState(s => ({...s, optionsOpen: false})); }}
                     onReset={() => { setResetStep(1); setUiState(s => ({...s, optionsOpen: false})); }}
                     onOpenChallenges={() => togglePanel('challenges')}
+                    onToggleChallenge={handleToggleChallengeMode}
                     uiState={uiState}
                     setUiState={setUiState}
                     hasClaimableMissions={hasClaimableMissions}

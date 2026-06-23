@@ -21,6 +21,7 @@ export class GameEngine {
     // Peg Socket Mode State
     socketingActive: boolean = false;
     selectedSocketIndex: number | null = null;
+    hideMarbles: boolean = false;
     
     // Physics State
     balls: Ball[] = [];
@@ -734,11 +735,11 @@ export class GameEngine {
             this.width, 
             this.height, 
             this.state, 
-            this.balls, 
+            this.hideMarbles ? [] : this.balls, 
             this.pegs, 
-            this.visualEffects, 
-            this.popups,
-            this.sandParticles,
+            this.hideMarbles ? [] : this.visualEffects, 
+            this.hideMarbles ? [] : this.popups,
+            this.hideMarbles ? [] : this.sandParticles,
             this.socketingActive
         );
     }

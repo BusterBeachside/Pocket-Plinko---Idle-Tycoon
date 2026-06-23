@@ -247,11 +247,28 @@ export class AudioController {
         try {
             const baseVol = this.sfxMuted ? 0 : this.sfxVolume;
             const targetVal = baseVol * targetVolScale;
-            const t = this.ctx.currentTime;
             
+            // Failsafe: if context is not running, set volume immediately without transitions
+            if (this.ctx.state !== 'running') {
+                this.sfxGain.gain.setValueAtTime(targetVal, this.ctx.currentTime);
+                return;
+            }
+
+            const t = this.ctx.currentTime;
             this.sfxGain.gain.cancelScheduledValues(t);
             this.sfxGain.gain.setValueAtTime(this.sfxGain.gain.value, t);
             this.sfxGain.gain.linearRampToValueAtTime(targetVal, t + (durationMs / 1000));
+
+            // Failsafe timeout to ensure the target volume is absolutely reached at the end of transition
+            setTimeout(() => {
+                if (this.ctx && this.sfxGain) {
+                    try {
+                        const currentBaseVol = this.sfxMuted ? 0 : this.sfxVolume;
+                        const currentTargetVal = currentBaseVol * targetVolScale;
+                        this.sfxGain.gain.setValueAtTime(currentTargetVal, this.ctx.currentTime);
+                    } catch (err) {}
+                }
+            }, durationMs + 50);
         } catch (e) {
             console.error("Audio fadeSfx failed:", e);
         }

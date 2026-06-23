@@ -181,64 +181,8 @@ export const ChallengesPanel: React.FC<ChallengesPanelProps> = ({ isOpen, onClos
                     <Sparkles className="w-4 h-4" />
                     {inChallenge ? 'Return To Main Board' : 'Enter Challenge Game'}
                 </button>
-                <p className="text-[10px] font-medium text-slate-500 text-center leading-normal">
-                    Your permanent main board upgrades are safe and untouched. You can toggle back and forth instantly at any time!
-                </p>
 
-                {/* Socket Rune/Gem Stash */}
-                <div className="p-4 bg-[#141829] border border-cyan-550/20 rounded-xl space-y-3 shadow-lg">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[10.5px] font-mono tracking-widest text-slate-300 uppercase font-black flex items-center gap-1">
-                            💎 Reward Gem Sockets
-                        </span>
-                        <span className="text-[8.5px] px-2 py-0.5 uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded font-black animate-pulse">
-                            Active
-                        </span>
-                    </div>
 
-                    <div className="grid grid-cols-3 gap-2">
-                        <div className="bg-black/40 border border-rose-500/25 p-3 rounded-lg text-center flex flex-col items-center justify-center gap-1.5">
-                            <img src={assets.getSrc('ruby_gem')} alt="Ruby" className="w-6 h-6 object-contain my-1 select-none pointer-events-none drop-shadow-[0_0_6px_rgba(244,63,94,0.6)]" />
-                            <div className="text-[10px] font-mono text-slate-300 uppercase font-extrabold mt-1">Ruby</div>
-                            <div className="text-base font-black text-rose-400">{gameState.gems?.crimson || 0}</div>
-                        </div>
-                        <div className="bg-black/40 border border-emerald-500/25 p-3 rounded-lg text-center flex flex-col items-center justify-center gap-1.5">
-                            <img src={assets.getSrc('emerald_gem')} alt="Emerald" className="w-6 h-6 object-contain my-1 select-none pointer-events-none drop-shadow-[0_0_6px_rgba(16,185,129,0.6)]" />
-                            <div className="text-[10px] font-mono text-slate-300 uppercase font-extrabold mt-1">Emerald</div>
-                            <div className="text-base font-black text-emerald-400">{gameState.gems?.amber || 0}</div>
-                        </div>
-                        <div className="bg-black/40 border border-cyan-500/25 p-3 rounded-lg text-center flex flex-col items-center justify-center gap-1.5">
-                            <img src={assets.getSrc('diamond_gem')} alt="Diamond" className="w-6 h-6 object-contain my-1 select-none pointer-events-none drop-shadow-[0_0_6px_rgba(6,182,212,0.6)]" />
-                            <div className="text-[10px] font-mono text-slate-300 uppercase font-extrabold mt-1">Diamond</div>
-                            <div className="text-base font-black text-cyan-400">{gameState.gems?.azure || 0}</div>
-                        </div>
-                    </div>
-
-                    <p className="text-[9.5px] font-medium text-slate-400 leading-normal">
-                        Earn these powerful Gems by hitting Milestone Goals inside the rotating Challenges! Use them immediately as permanent Board Modifiers.
-                    </p>
-
-                    {!inChallenge ? (
-                        <button 
-                            onClick={() => {
-                                engine.socketingActive = true;
-                                engine.audio.play('upgrade');
-                                engine.notify();
-                                onClose();
-                            }}
-                            className="w-full mt-1.5 py-2.5 px-3 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-black text-[10px] uppercase tracking-widest rounded-lg flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.3)] hover:shadow-[0_0_15px_rgba(6,182,212,0.5)] transition-all select-none"
-                        >
-                            🛠️ Open Peg Sockets Builder
-                        </button>
-                    ) : (
-                        <button 
-                            disabled
-                            className="w-full mt-1.5 py-2.5 px-3 bg-zinc-950/40 border border-zinc-800/60 text-zinc-500 font-extrabold text-[10px] uppercase tracking-wider rounded-lg flex items-center justify-center gap-2 select-none cursor-not-allowed"
-                        >
-                            🚫 Builder Blocked in Challenge Mode
-                        </button>
-                    )}
-                </div>
 
                 {/* Challenge Goals */}
                 <div className="space-y-3">

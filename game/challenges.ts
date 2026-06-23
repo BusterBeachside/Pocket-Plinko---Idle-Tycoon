@@ -30,8 +30,8 @@ export const CHALLENGES: { [id: string]: ChallengeDefinition } = {
         gimmickDescription: 'Gravity is cut by 80%. Baskets are replaced with bumpers that send marbles right back up. Marbles automatically respawn every so often.',
         goals: {
             bronze: { target: 50000000, metric: 'money', description: 'Earn $50,000,000 in total Challenge cash', rewardDescription: '+$100K Main Cash, +10 Shards', shardReward: 10, moneyReward: 100000 },
-            silver: { target: 2500000000, metric: 'money', description: 'Earn $2,500,000,000 in total Challenge cash', rewardDescription: '+$5M Main Cash, +50 Shards, +1 Azure Rune', shardReward: 50, moneyReward: 5000000, gemReward: 'azure' },
-            gold: { target: 150000000000, metric: 'money', description: 'Earn $150,000,000,000 in total Challenge cash', rewardDescription: '+$1B Main Cash, +200 Shards, +1 Amber Rune', shardReward: 200, moneyReward: 1000000000, gemReward: 'amber' }
+            silver: { target: 2500000000, metric: 'money', description: 'Earn $2,500,000,000 in total Challenge cash', rewardDescription: '+$5M Main Cash, +50 Shards, +1 Diamond Gem', shardReward: 50, moneyReward: 5000000, gemReward: 'azure' },
+            gold: { target: 150000000000, metric: 'money', description: 'Earn $150,000,000,000 in total Challenge cash', rewardDescription: '+$1B Main Cash, +200 Shards, +1 Emerald Gem', shardReward: 200, moneyReward: 1000000000, gemReward: 'amber' }
         }
     },
     sand_peg: {
@@ -41,8 +41,8 @@ export const CHALLENGES: { [id: string]: ChallengeDefinition } = {
         gimmickDescription: 'Pegs have 3 HP. After 3 hits they break into sand. They respawn after 5 seconds. Standard upgrades cost Pegs instead of Money.',
         goals: {
             bronze: { target: 10000, metric: 'pegsBroken', description: 'Break 10,000 pegs (strength-adjusted)', rewardDescription: '+$100K Main Cash, +10 Shards', shardReward: 10, moneyReward: 100000 },
-            silver: { target: 150000, metric: 'pegsBroken', description: 'Break 150,000 pegs (strength-adjusted)', rewardDescription: '+$5M Main Cash, +50 Shards, +1 Crimson Rune', shardReward: 50, moneyReward: 5000000, gemReward: 'crimson' },
-            gold: { target: 1000000, metric: 'pegsBroken', description: 'Break 1,000,000 pegs (strength-adjusted)', rewardDescription: '+$1B Main Cash, +200 Shards, +1 Amber Rune', shardReward: 200, moneyReward: 1000000000, gemReward: 'amber' }
+            silver: { target: 150000, metric: 'pegsBroken', description: 'Break 150,000 pegs (strength-adjusted)', rewardDescription: '+$5M Main Cash, +50 Shards, +1 Ruby Gem', shardReward: 50, moneyReward: 5000000, gemReward: 'crimson' },
+            gold: { target: 1000000, metric: 'pegsBroken', description: 'Break 1,000,000 pegs (strength-adjusted)', rewardDescription: '+$1B Main Cash, +200 Shards, +1 Emerald Gem', shardReward: 200, moneyReward: 1000000000, gemReward: 'amber' }
         }
     },
     micro_mania: {
@@ -52,8 +52,8 @@ export const CHALLENGES: { [id: string]: ChallengeDefinition } = {
         gimmickDescription: 'You cannot upgrade normal marble count. Only micro marbles can be dropped, but their payouts are buffed by 500% (5x value). Unique Autoclicker upgrade available.',
         goals: {
             bronze: { target: 30000000, metric: 'money', description: 'Earn $30,000,000 in total Challenge cash', rewardDescription: '+$100K Main Cash, +10 Shards', shardReward: 10, moneyReward: 100000 },
-            silver: { target: 1500000000, metric: 'money', description: 'Earn $1,500,000,000 in total Challenge cash', rewardDescription: '+$5M Main Cash, +50 Shards, +1 Azure Rune', shardReward: 50, moneyReward: 5000000, gemReward: 'azure' },
-            gold: { target: 100000000000, metric: 'money', description: 'Earn $100,000,000,000 in total Challenge cash', rewardDescription: '+$1B Main Cash, +200 Shards, +1 Amber Rune', shardReward: 200, moneyReward: 1000000000, gemReward: 'amber' }
+            silver: { target: 150000000, metric: 'money', description: 'Earn $1,500,000,000 in total Challenge cash', rewardDescription: '+$5M Main Cash, +50 Shards, +1 Diamond Gem', shardReward: 50, moneyReward: 5000000, gemReward: 'azure' },
+            gold: { target: 100000000000, metric: 'money', description: 'Earn $100,000,000,000 in total Challenge cash', rewardDescription: '+$1B Main Cash, +200 Shards, +1 Emerald Gem', shardReward: 200, moneyReward: 1000000000, gemReward: 'amber' }
         }
     },
     single_marble: {
@@ -63,8 +63,8 @@ export const CHALLENGES: { [id: string]: ChallengeDefinition } = {
         gimmickDescription: 'You only get 1 main Master marble. However, buying the Extra Marble upgrade adds +x5 to that marble\'s value multiplier each time (x5, x10, x15...).',
         goals: {
             bronze: { target: 50000000, metric: 'money', description: 'Earn $50,000,000 in total Challenge cash', rewardDescription: '+$100K Main Cash, +10 Shards', shardReward: 10, moneyReward: 100000 },
-            silver: { target: 3000000000, metric: 'money', description: 'Earn $3,000,000,000 in total Challenge cash', rewardDescription: '+$5M Main Cash, +50 Shards, +1 Crimson Rune', shardReward: 50, moneyReward: 5000000, gemReward: 'crimson' },
-            gold: { target: 200000000000, metric: 'money', description: 'Earn $200,000,000,000 in total Challenge cash', rewardDescription: '+$1B Main Cash, +200 Shards, +1 Amber Rune', shardReward: 200, moneyReward: 1000000000, gemReward: 'amber' }
+            silver: { target: 3000000000, metric: 'money', description: 'Earn $3,000,000,000 in total Challenge cash', rewardDescription: '+$5M Main Cash, +50 Shards, +1 Ruby Gem', shardReward: 50, moneyReward: 5000000, gemReward: 'crimson' },
+            gold: { target: 200000000000, metric: 'money', description: 'Earn $200,000,000,000 in total Challenge cash', rewardDescription: '+$1B Main Cash, +200 Shards, +1 Emerald Gem', shardReward: 200, moneyReward: 1000000000, gemReward: 'amber' }
         }
     },
     critical_meltdown: {
@@ -74,8 +74,8 @@ export const CHALLENGES: { [id: string]: ChallengeDefinition } = {
         gimmickDescription: 'Normal impacts yield absolutely nothing. Cash is earned purely from Critical Hits. Critical Chance cannot be upgraded, but base Critical Chance is set to a massive 50%, and Crits deal 10x damage!',
         goals: {
             bronze: { target: 100000000, metric: 'money', description: 'Earn $100,000,000 in total Challenge cash', rewardDescription: '+$100K Main Cash, +10 Shards', shardReward: 10, moneyReward: 100000 },
-            silver: { target: 5000000000, metric: 'money', description: 'Earn $5,000,000,000 in total Challenge cash', rewardDescription: '+$5M Main Cash, +50 Shards, +1 Azure Rune', shardReward: 50, moneyReward: 5000000, gemReward: 'azure' },
-            gold: { target: 350000000000, metric: 'money', description: 'Earn $350,000,000,000 in total Challenge cash', rewardDescription: '+$1B Main Cash, +200 Shards, +1 Amber Rune', shardReward: 200, moneyReward: 1000000000, gemReward: 'amber' }
+            silver: { target: 5000000000, metric: 'money', description: 'Earn $5,000,000,000 in total Challenge cash', rewardDescription: '+$5M Main Cash, +50 Shards, +1 Diamond Gem', shardReward: 50, moneyReward: 5000000, gemReward: 'azure' },
+            gold: { target: 350000000000, metric: 'money', description: 'Earn $350,000,000,000 in total Challenge cash', rewardDescription: '+$1B Main Cash, +200 Shards, +1 Emerald Gem', shardReward: 200, moneyReward: 1000000000, gemReward: 'amber' }
         }
     }
 };
@@ -358,7 +358,8 @@ export class ChallengesManager {
             state.gems[goal.gemReward] = (state.gems[goal.gemReward] || 0) + 1;
         }
         
-        const gemMsg = goal.gemReward ? `, +1 ${goal.gemReward.toUpperCase()} Rune` : '';
+        const friendlyGems: { [key: string]: string } = { crimson: 'Ruby Gem', azure: 'Diamond Gem', amber: 'Emerald Gem' };
+        const gemMsg = goal.gemReward ? `, +1 ${friendlyGems[goal.gemReward]}` : '';
         pushNotification(`Challenge Completed: ${tier} Goal! Reward: +${goal.shardReward} Shards, +$${goal.moneyReward.toLocaleString()}${gemMsg}`, 'achievement');
     }
 }

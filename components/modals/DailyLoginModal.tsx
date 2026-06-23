@@ -75,7 +75,11 @@ export const DailyLoginModal = ({ onClose, gameState, onUpdate }: DailyLoginModa
     };
 
     return (
-        <div className="modal-overlay select-none" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
+        <div 
+            className="modal-overlay select-none" 
+            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}
+        >
             <div 
                 className="bg-[#0b0c16] border border-cyan-500/30 text-white rounded-2xl w-[90vw] max-w-[500px] shadow-[0_20px_50px_rgba(0,0,0,0.9),_0_0_30px_rgba(6,182,212,0.1)] flex flex-col relative overflow-hidden"
                 style={{ maxHeight: '90vh' }}
