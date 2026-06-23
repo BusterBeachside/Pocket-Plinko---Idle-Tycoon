@@ -4,7 +4,7 @@ import { PERM_UPGRADES, MARBLE_SKINS } from '../../game/shardShopConfig';
 import { formatNumber } from '../../game/utils';
 
 // Helper component to handle independent fetch logic for each skin card
-const SkinCard = ({ skin, isOwned, isEquipped, canAfford, onBuy, onEquip }: any) => {
+const SkinCard = ({ skin, cost, isOwned, isEquipped, canAfford, onBuy, onEquip }: any) => {
     const [bgUrl, setBgUrl] = useState<string>('');
 
     useEffect(() => {
@@ -38,7 +38,7 @@ const SkinCard = ({ skin, isOwned, isEquipped, canAfford, onBuy, onEquip }: any)
                 </button>
             ) : (
                 <button className="skin-btn buy" disabled={!canAfford} onClick={() => onBuy(skin.id)}>
-                    Buy ({formatNumber(Math.round(skin.cost * (1 + engine.state.ownedMarbles.length * 0.25)))})
+                    Buy ({formatNumber(cost)})
                 </button>
             )}
         </div>
@@ -114,8 +114,11 @@ export const ShardShopModal = ({ onClose }: { onClose: () => void }) => {
                     {tab === 'skins' && (
                         <div className="skins-grid">
                             {MARBLE_SKINS.map(s => {
-                                const ownedCount = engine.state.ownedMarbles.length;
-                                const cost = Math.round(s.cost * (1 + ownedCount * 0.25));
+                                const ownedOfRarity = engine.state.ownedMarbles.filter(oId => {
+                                    const matchingSkin = MARBLE_SKINS.find(x => x.id === oId);
+                                    return matchingSkin && matchingSkin.rarity === s.rarity && matchingSkin.cost > 0;
+                                }).length;
+                                const cost = Math.round(s.cost * (1 + ownedOfRarity * 0.25));
                                 const isOwned = engine.state.ownedMarbles.includes(s.id);
                                 const isEquipped = engine.state.activeMarbleSkinID === s.id;
                                 const canAfford = shards >= cost;
@@ -124,6 +127,7 @@ export const ShardShopModal = ({ onClose }: { onClose: () => void }) => {
                                     <SkinCard 
                                         key={s.id}
                                         skin={s}
+                                        cost={cost}
                                         isOwned={isOwned}
                                         isEquipped={isEquipped}
                                         canAfford={canAfford}

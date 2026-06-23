@@ -70,8 +70,12 @@ export class ShopSystem {
         const skin = MARBLE_SKINS.find(s => s.id === id);
         if (!skin) return false;
         
-        const ownedCount = state.ownedMarbles.length;
-        const cost = Math.round(skin.cost * (1 + ownedCount * 0.25));
+        // Count owned skins of the same rarity where cost > 0
+        const ownedOfRarity = state.ownedMarbles.filter(oId => {
+            const s = MARBLE_SKINS.find(x => x.id === oId);
+            return s && s.rarity === skin.rarity && s.cost > 0;
+        }).length;
+        const cost = Math.round(skin.cost * (1 + ownedOfRarity * 0.25));
         
         if (state.kineticShards >= cost && !state.ownedMarbles.includes(id)) {
             state.kineticShards -= cost;

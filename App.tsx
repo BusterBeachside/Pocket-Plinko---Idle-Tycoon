@@ -81,13 +81,7 @@ const App = () => {
     const [resetStep, setResetStep] = useState<0 | 1 | 2>(0);
     const [notifications, setNotifications] = useState(engine.notifications);
 
-    const initialEventModalOpen = () => {
-        const currentEvent = DailyEventsManager.getCurrentEvent();
-        const tutorialSeen = !!(engine.state.tutorials['plinko_tutorial_v1'] || (typeof window !== 'undefined' && localStorage.getItem('plinko_tutorial_v1')));
-        if (!tutorialSeen) return false; // Onboarding has precedence, don't show daily event modal
-        return engine.state.lastSeenDailyEventId !== currentEvent.id;
-    };
-    const [dailyEventModalOpen, setDailyEventModalOpen] = useState(initialEventModalOpen());
+    const [dailyEventModalOpen, setDailyEventModalOpen] = useState(false);
     const [timeLeftStr, setTimeLeftStr] = useState('');
 
     useEffect(() => {

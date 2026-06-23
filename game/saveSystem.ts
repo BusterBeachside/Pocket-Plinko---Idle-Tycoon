@@ -196,6 +196,7 @@ export class SaveSystem {
         const keptRepeatableCompleted = currentState.repeatableCompleted;
         const keptLifetimeMissions = currentState.lifetimeMissionsCompleted;
         const keptAchievementsUnlocked = currentState.achievementsUnlocked;
+        const keptLastSeenDailyEventId = currentState.lastSeenDailyEventId || '';
 
         // Keep challenge data
         const keptGems = currentState.gems || { crimson: 0, azure: 0, amber: 0 };
@@ -268,6 +269,7 @@ export class SaveSystem {
             repeatableCompleted: keptRepeatableCompleted,
             lifetimeMissionsCompleted: keptLifetimeMissions,
             achievementsUnlocked: keptAchievementsUnlocked,
+            lastSeenDailyEventId: keptLastSeenDailyEventId,
             allTimeEarnings: keptAllTimeEarnings,
             lifetimePegHits: keptLifetimePegHits,
             lifetimeBaskets: keptLifetimeBaskets,

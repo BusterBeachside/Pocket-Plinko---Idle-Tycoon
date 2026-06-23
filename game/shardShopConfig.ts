@@ -62,16 +62,16 @@ const generateSkins = (): MarbleSkinConfig[] => {
         } else if (i === 3) {
             name = 'Stone'; texture = 'Stone.png';
         } else if (i <= 26) {
-            rarity = 'Common'; cost = 2;
+            rarity = 'Common'; cost = 8;
             texture = commonTextures[(i - 1) % commonTextures.length];
         } else if (i <= 41) {
-            rarity = 'Rare'; cost = 5;
+            rarity = 'Rare'; cost = 20;
             texture = rareTextures[(i - 27) % rareTextures.length];
         } else if (i <= 46) {
-            rarity = 'Epic'; cost = 10;
+            rarity = 'Epic'; cost = 50;
             texture = epicTextures[(i - 42) % epicTextures.length];
         } else {
-            rarity = 'Legendary'; cost = 25;
+            rarity = 'Legendary'; cost = 150;
             texture = legendaryTextures[(i - 47) % legendaryTextures.length];
         }
 
