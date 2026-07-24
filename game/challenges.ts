@@ -48,7 +48,7 @@ export const CHALLENGES: { [id: string]: ChallengeDefinition } = {
     micro_mania: {
         id: 'micro_mania',
         name: 'Micro Mania',
-        description: 'Normal marbles are banned! this challenge is all about clicking... Unless you can buy an autoclicker, that is!',
+        description: 'Normal marbles are banned! This challenge is all about clicking... Unless you can buy an autoclicker, that is!',
         gimmickDescription: 'You cannot upgrade normal marble count. Only micro marbles can be dropped, but their payouts are buffed by 500% (5x value). Unique Autoclicker upgrade available.',
         goals: {
             bronze: { target: 30000000, metric: 'money', description: 'Earn $30,000,000 in total Challenge cash', rewardDescription: '+$100K Main Cash, +10 Shards', shardReward: 10, moneyReward: 100000 },

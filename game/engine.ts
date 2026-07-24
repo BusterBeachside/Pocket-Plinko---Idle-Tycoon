@@ -61,7 +61,9 @@ export class GameEngine {
 
     microAutoclickerTimer: number = 0;
 
-    notifications: { id: string, message: string, type: 'achievement' | 'mission', fading?: boolean }[] = [];
+    notifications: { id: string, message: string, type: 'achievement' | 'mission' | 'multiple_achievements', achievements?: string[], expanded?: boolean, fading?: boolean }[] = [];
+    private notificationQueue: { message: string, type: 'achievement' | 'mission' }[] = [];
+    private notificationTimeout: any = null;
     
     isGameStarted: boolean = false;
     isResetting: boolean = false;
@@ -542,7 +544,7 @@ export class GameEngine {
                     ? (this.state.challengeState?.upgrades?.bonusValue || 0)
                     : (this.state.upgrades?.bonusValue || 0);
 
-                const bonusRate = 0.10 + (bonusLevel * 0.05); 
+                const bonusRate = 0.10 + (bonusLevel * 0.10); 
                 
                 let amount = 0;
                 if (isChallenge) {
@@ -867,25 +869,197 @@ export class GameEngine {
         this.sandParticles = this.sandParticles.filter(p => p.life < p.maxLife);
     }
 
-    pushNotification(message: string, type: 'achievement' | 'mission') {
+    private addNotificationToDisplay(message: string, type: 'achievement' | 'mission' | 'multiple_achievements', achievements?: string[]) {
         const id = Math.random().toString(36).substr(2, 9);
-        this.notifications.push({ id, message, type, fading: false });
+        this.notifications.push({ id, message, type, achievements, expanded: false, fading: false });
         this.notify();
         
-        // Start fade out after 3.5 seconds
+        const dismissTime = type === 'multiple_achievements' ? 12000 : 4000;
+        const fadeTime = dismissTime - 500;
+
+        // Start fade out after timeout
         setTimeout(() => {
             const n = this.notifications.find(x => x.id === id);
-            if (n) {
+            if (n && !(n.type === 'multiple_achievements' && n.expanded)) {
                 n.fading = true;
                 this.notify();
             }
-        }, 3500);
+        }, fadeTime);
 
-        // Remove after 4 seconds
+        // Remove after timeout
         setTimeout(() => {
-            this.notifications = this.notifications.filter(n => n.id !== id);
-            this.notify();
-        }, 4000);
+            const n = this.notifications.find(x => x.id === id);
+            if (n && !(n.type === 'multiple_achievements' && n.expanded)) {
+                this.notifications = this.notifications.filter(n => n.id !== id);
+                this.notify();
+            }
+        }, dismissTime);
+    }
+
+    private processNotificationQueue() {
+        if (this.notificationQueue.length === 0) return;
+        
+        const queue = [...this.notificationQueue];
+        this.notificationQueue = [];
+        this.notificationTimeout = null;
+
+        const groupedToAdd: { message: string, type: 'achievement' | 'mission' | 'multiple_achievements', achievements?: string[] }[] = [];
+
+        // Track matches to combine
+        const achievementUnlockedMatches: string[] = [];
+        let achievementClaimedCount = 0;
+        let achievementClaimedSum = 0;
+        const missionCompleteMatches: string[] = [];
+        let missionClaimedCount = 0;
+        let missionClaimedSum = 0;
+        let missionRerollCount = 0;
+
+        const otherCountMap: { [key: string]: { count: number, type: 'achievement' | 'mission' | 'multiple_achievements' } } = {};
+
+        for (const item of queue) {
+            const { message, type } = item;
+
+            const achUnlockedMatch = message.match(/^Achievement Unlocked: (.+)!$/);
+            const achClaimedMatch = message.match(/^Claimed (.+) reward: \+\$([0-9,]+) Career Cash!$/);
+            const misCompleteMatch = message.match(/^Mission Complete: (.+)!$/);
+            const isReroll = message.toLowerCase().includes('reroll') || message.toLowerCase().includes('re-roll');
+
+            if (type === 'achievement' && achUnlockedMatch) {
+                achievementUnlockedMatches.push(achUnlockedMatch[1]);
+            } else if (type === 'achievement' && achClaimedMatch) {
+                achievementClaimedCount++;
+                const amount = parseInt(achClaimedMatch[2].replace(/,/g, ''), 10);
+                achievementClaimedSum += isNaN(amount) ? 0 : amount;
+            } else if (type === 'mission' && misCompleteMatch) {
+                missionCompleteMatches.push(misCompleteMatch[1]);
+            } else if (type === 'mission' && achClaimedMatch) {
+                missionClaimedCount++;
+                const amount = parseInt(achClaimedMatch[2].replace(/,/g, ''), 10);
+                missionClaimedSum += isNaN(amount) ? 0 : amount;
+            } else if (isReroll) {
+                missionRerollCount++;
+            } else {
+                if (!otherCountMap[message]) {
+                    otherCountMap[message] = { count: 0, type };
+                }
+                otherCountMap[message].count++;
+            }
+        }
+
+        // 1. Grouped "Achievement Unlocked" - CONDENSE into multiple_achievements card if length > 1
+        if (achievementUnlockedMatches.length > 0) {
+            if (achievementUnlockedMatches.length === 1) {
+                groupedToAdd.push({
+                    message: `Achievement Unlocked: ${achievementUnlockedMatches[0]}!`,
+                    type: 'achievement'
+                });
+            } else {
+                groupedToAdd.push({
+                    message: `Multiple Achievements Unlocked!`,
+                    type: 'multiple_achievements',
+                    achievements: achievementUnlockedMatches
+                });
+            }
+        }
+
+        // 2. Grouped "Achievement Claimed"
+        if (achievementClaimedCount > 0) {
+            if (achievementClaimedCount === 1) {
+                const orig = queue.find(x => x.type === 'achievement' && x.message.startsWith('Claimed ') && x.message.includes(' reward:'));
+                if (orig) {
+                    groupedToAdd.push({ message: orig.message, type: 'achievement' });
+                } else {
+                    groupedToAdd.push({
+                        message: `Claimed Achievement reward: +$${achievementClaimedSum.toLocaleString()} Career Cash!`,
+                        type: 'achievement'
+                    });
+                }
+            } else {
+                groupedToAdd.push({
+                    message: `Claimed ${achievementClaimedCount} Achievement rewards: +$${achievementClaimedSum.toLocaleString()} Career Cash!`,
+                    type: 'achievement'
+                });
+            }
+        }
+
+        // 3. Grouped "Mission Complete"
+        if (missionCompleteMatches.length > 0) {
+            if (missionCompleteMatches.length === 1) {
+                groupedToAdd.push({
+                    message: `Mission Complete: ${missionCompleteMatches[0]}!`,
+                    type: 'mission'
+                });
+            } else if (missionCompleteMatches.length === 2) {
+                groupedToAdd.push({
+                    message: `Missions Complete: ${missionCompleteMatches[0]} & ${missionCompleteMatches[1]}!`,
+                    type: 'mission'
+                });
+            } else {
+                groupedToAdd.push({
+                    message: `Missions Complete: ${missionCompleteMatches[0]} (+${missionCompleteMatches.length - 1} more)!`,
+                    type: 'mission'
+                });
+            }
+        }
+
+        // 4. Grouped "Mission Claimed"
+        if (missionClaimedCount > 0) {
+            if (missionClaimedCount === 1) {
+                const orig = queue.find(x => x.type === 'mission' && x.message.startsWith('Claimed ') && x.message.includes(' reward:'));
+                if (orig) {
+                    groupedToAdd.push({ message: orig.message, type: 'mission' });
+                } else {
+                    groupedToAdd.push({
+                        message: `Claimed Mission reward: +$${missionClaimedSum.toLocaleString()} Career Cash!`,
+                        type: 'mission'
+                    });
+                }
+            } else {
+                groupedToAdd.push({
+                    message: `Claimed ${missionClaimedCount} Mission rewards: +$${missionClaimedSum.toLocaleString()} Career Cash!`,
+                    type: 'mission'
+                });
+            }
+        }
+
+        // 4.5. Grouped "Mission Rerolled"
+        if (missionRerollCount > 0) {
+            if (missionRerollCount === 1) {
+                groupedToAdd.push({
+                    message: `Mission Rerolled!`,
+                    type: 'mission'
+                });
+            } else {
+                groupedToAdd.push({
+                    message: `${missionRerollCount} Missions Rerolled!`,
+                    type: 'mission'
+                });
+            }
+        }
+
+        // 5. "Other" unique/identical messages
+        for (const [msg, info] of Object.entries(otherCountMap)) {
+            if (info.count === 1) {
+                groupedToAdd.push({ message: msg, type: info.type });
+            } else {
+                groupedToAdd.push({ message: `${msg} (x${info.count})`, type: info.type });
+            }
+        }
+
+        // Fire display notifications
+        for (const item of groupedToAdd) {
+            this.addNotificationToDisplay(item.message, item.type, item.achievements);
+        }
+    }
+
+    pushNotification(message: string, type: 'achievement' | 'mission') {
+        this.notificationQueue.push({ message, type });
+        if (this.notificationTimeout) {
+            clearTimeout(this.notificationTimeout);
+        }
+        this.notificationTimeout = setTimeout(() => {
+            this.processNotificationQueue();
+        }, 50);
     }
 
     checkAchievements() {
@@ -918,6 +1092,59 @@ export class GameEngine {
 
     claimAchievement(achievementId: string) {
         if (ProgressionManager.claimAchievement(this.state, achievementId, (a, c) => this.addMoney(a, c), (m, t) => this.pushNotification(m, t))) {
+            this.audio.play('upgrade');
+            this.notify();
+            this.saveState();
+            return true;
+        }
+        return false;
+    }
+
+    claimAllMissions() {
+        let anyClaimed = false;
+        // Dailies
+        if (this.state.missions?.activeDailies) {
+            const claimableDailies = this.state.missions.activeDailies.filter(m => m.completed && !m.claimed);
+            for (const m of claimableDailies) {
+                if (ProgressionManager.claimMission(this.state, m.instanceId, (a, c) => this.addMoney(a, c), (m, t) => this.pushNotification(m, t))) {
+                    anyClaimed = true;
+                }
+            }
+        }
+        // Repeatables (splice safety copy)
+        if (this.state.missions?.activeRepeatables) {
+            const claimableRepeatableIds = this.state.missions.activeRepeatables
+                .filter(m => m.completed && !m.claimed)
+                .map(m => m.instanceId);
+            for (const instanceId of claimableRepeatableIds) {
+                if (ProgressionManager.claimMission(this.state, instanceId, (a, c) => this.addMoney(a, c), (m, t) => this.pushNotification(m, t))) {
+                    anyClaimed = true;
+                }
+            }
+        }
+        if (anyClaimed) {
+            this.audio.play('upgrade');
+            this.notify();
+            this.saveState();
+            return true;
+        }
+        return false;
+    }
+
+    claimAllAchievements() {
+        let anyClaimed = false;
+        const achievementIds = Object.keys(this.state.achievements);
+        for (const id of achievementIds) {
+            const aState = this.state.achievements[id];
+            const isCompleted = aState === true || (aState && typeof aState === 'object' && aState.completed);
+            const isClaimed = aState && typeof aState === 'object' && aState.claimed;
+            if (isCompleted && !isClaimed) {
+                if (ProgressionManager.claimAchievement(this.state, id, (a, c) => this.addMoney(a, c), (m, t) => this.pushNotification(m, t))) {
+                    anyClaimed = true;
+                }
+            }
+        }
+        if (anyClaimed) {
             this.audio.play('upgrade');
             this.notify();
             this.saveState();

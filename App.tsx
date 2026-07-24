@@ -599,15 +599,59 @@ const App = () => {
                             initial={{ opacity: 0, y: -20, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, x: 250, scale: 0.95, transition: { duration: 0.25 } }}
-                            className={`notification-item ${n.type} ${n.fading ? 'fading' : ''}`}
+                            className={`notification-item ${n.type === 'multiple_achievements' ? 'achievement cursor-pointer' : n.type} ${n.fading ? 'fading' : ''}`}
                             onClick={() => {
                                 if (draggingRef.current[n.id]) return;
+                                if (n.type === 'multiple_achievements') {
+                                    n.expanded = !n.expanded;
+                                    setNotifications([...engine.notifications]);
+                                    engine.notify();
+                                    return;
+                                }
                                 if (n.type === 'mission') setUiState(s => ({ ...s, missionsOpen: true }));
                                 if (n.type === 'achievement') setUiState(s => ({ ...s, achievementsOpen: true }));
                             }}
                             style={{ x: 0 }}
                         >
-                            {n.message}
+                            {n.type === 'multiple_achievements' ? (
+                                <div className="flex flex-col gap-2 w-full text-left">
+                                    <div className="flex items-center justify-between font-extrabold text-amber-300">
+                                        <span className="flex items-center gap-1">🏆 Multiple Achievements Unlocked!</span>
+                                        <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-md">
+                                            {n.expanded ? 'Hide ▴' : `Show (${n.achievements?.length}) ▾`}
+                                        </span>
+                                    </div>
+                                    {n.expanded && (
+                                        <motion.div 
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: 'auto' }}
+                                            className="flex flex-col gap-1 text-[11px] font-medium text-slate-200 pl-2 border-l border-amber-500/30 mt-1"
+                                            onClick={(e) => {
+                                                // Prevent outer toggle on list click
+                                                e.stopPropagation();
+                                            }}
+                                        >
+                                            {n.achievements?.map((ach, idx) => (
+                                                <div key={idx} className="flex items-center gap-1.5 py-0.5">
+                                                    <span className="text-amber-400">✦</span> {ach}
+                                                </div>
+                                            ))}
+                                            <button 
+                                                className="mt-2 text-xs font-black text-black bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 px-3 py-1.5 rounded-lg active:scale-95 transition-all text-center uppercase tracking-wider"
+                                                onClick={(e) => {
+                                                    e.stopPropagation(); // Prevent toggling expand
+                                                    setUiState(s => ({ ...s, achievementsOpen: true }));
+                                                    dismissNotification(n.id);
+                                                }}
+                                            >
+                                                Claim All Rewards
+                                            </button>
+                                        </motion.div>
+                                    )}
+                                </div>
+                            ) : (
+                                n.message
+                            )}
                         </motion.div>
                     ))}
                 </AnimatePresence>

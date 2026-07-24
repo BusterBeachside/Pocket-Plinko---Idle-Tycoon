@@ -435,21 +435,9 @@ export class GameRenderer {
                 let img = this.textureCache.get(tex);
                 if (!img) {
                     img = new Image();
-                    // Set to cache immediately so we don't spam fetch
                     this.textureCache.set(tex, img);
-                    
-                    fetch(`images/${tex}`)
-                        .then(response => {
-                            if(response.ok) return response.blob();
-                            throw new Error('Network response was not ok.');
-                        })
-                        .then(blob => {
-                            const objectURL = URL.createObjectURL(blob);
-                            img!.src = objectURL;
-                        })
-                        .catch(e => {
-                            console.error('Texture load failed:', tex, e);
-                        });
+                    const cleanPath = tex.startsWith('/') ? tex : (tex.startsWith('images/') ? `/${tex}` : `/images/${tex}`);
+                    img.src = cleanPath;
                 }
                 
                 if (img.complete && img.naturalWidth) {

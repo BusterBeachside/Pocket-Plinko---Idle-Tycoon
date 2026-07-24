@@ -77,7 +77,7 @@ export class PhysicsManager {
         let multiplier = rarityMultiplier;
 
         if (ball.micro) {
-            const microValuePercentage = 1 + stats.microValuePercent + stats.permanentMicroBoostPercent;
+            const microValuePercentage = 1.5 + stats.microValuePercent + stats.permanentMicroBoostPercent;
             
             // Micro Mania Challenge: Micro Marbles have 500% of normal marble's base value (5x normal base)!
             if (state.inChallengeMode && state.challengeState.challengeId === 'micro_mania') {

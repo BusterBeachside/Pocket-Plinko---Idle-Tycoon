@@ -13,14 +13,14 @@ export class ShopSystem {
         if (!cfg) return false;
 
         const level = state.upgrades[id];
-        const rawCost = Math.floor(cfg.baseCost * Math.pow(cfg.costMultiplier, level));
-        const cost = Math.floor(rawCost * DailyEventsManager.getUpgradeCostMultiplier());
+        const cost = this.getUpgradeCost(state, id);
 
         if (cfg.unlocksAt && (state.upgrades.extraBall) < cfg.unlocksAt) return false;
         if (cfg.maxPercent) {
              const currentPercent = state[id + 'Percent' as keyof GameState] as number;
              if (currentPercent >= cfg.maxPercent) return false;
         }
+        if (cfg.maxLevel !== undefined && level >= cfg.maxLevel) return false;
 
         if (state.money >= cost) {
             state.money -= cost;
@@ -42,20 +42,42 @@ export class ShopSystem {
         return Math.floor(rawCost * DailyEventsManager.getUpgradeCostMultiplier());
     }
 
+    static getPermanentUpgradeCost(state: GameState, id: string): number {
+        const cfg = PERM_UPGRADES.find(u => u.id === id);
+        if (!cfg) return 0;
+        
+        const currentLevel = state.permUpgradesLevels[id] || 0;
+        if (id === 'perm_bonus_chance') {
+            // Logarithmic cost scaling for 'Bonus Chance' to remain relevant
+            return Math.floor(cfg.baseCost * (1 + Math.log2(currentLevel + 1) * 1.5));
+        }
+        
+        // Return standard cost stored in state, or calculate using standard multiplier scaling
+        return state.permUpgradeCosts[id] || cfg.baseCost;
+    }
+
     static buyPermanentUpgrade(state: GameState, id: string, audio: AudioController, saveCallback: () => void): boolean {
         const cfg = PERM_UPGRADES.find(u => u.id === id);
         if (!cfg) return false;
         
         const currentLevel = state.permUpgradesLevels[id] || 0;
-        const currentCost = state.permUpgradeCosts[id] || cfg.baseCost;
+        const currentCost = this.getPermanentUpgradeCost(state, id);
         
         if (state.kineticShards >= currentCost) {
             if (cfg.maxLevel !== undefined && cfg.maxLevel > 0 && currentLevel >= cfg.maxLevel) return false;
 
             state.kineticShards -= currentCost;
             state.permUpgradesLevels[id] = currentLevel + 1;
-            const multiplier = id === 'perm_extra_master' ? 3.0 : 1.4;
-            state.permUpgradeCosts[id] = Math.floor(currentCost * multiplier);
+            
+            // Calculate next cost and update state.permUpgradeCosts
+            const nextLevelState = {
+                ...state,
+                permUpgradesLevels: {
+                    ...state.permUpgradesLevels,
+                    [id]: currentLevel + 1
+                }
+            };
+            state.permUpgradeCosts[id] = this.getPermanentUpgradeCost(nextLevelState, id);
             
             SaveSystem.calculateDerivedState(state);
             

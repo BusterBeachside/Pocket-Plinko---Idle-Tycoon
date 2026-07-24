@@ -101,8 +101,29 @@ export const CoreModal = ({ onClose, onOpenShop, onActivate }: { onClose: () => 
                 <div className="confirm-modal prestige-modal">
                     <h3>Kinetic Core is Locked.</h3>
                     <p style={{marginBottom:'10px'}}>The energy required to activate the Core is immense.</p>
+                    
+                    <div style={{
+                        background: 'rgba(16, 185, 129, 0.12)',
+                        border: '1.5px solid rgba(16, 185, 129, 0.4)',
+                        borderRadius: '10px',
+                        padding: '14px',
+                        margin: '14px 0',
+                        textAlign: 'center',
+                        boxShadow: '0 0 15px rgba(16, 185, 129, 0.2)'
+                    }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#10b981', letterSpacing: '0.05em' }}>
+                            MONEY REQUIRED:
+                        </span>
+                        <span style={{ fontSize: '1.5rem', fontWeight: '950', color: '#10b981', marginLeft: '8px', verticalAlign: 'middle' }}>
+                            ${formatNumber(reqMoney)}
+                        </span>
+                        <div style={{ fontSize: '0.75rem', color: '#a7f3d0', marginTop: '6px', opacity: 0.85 }}>
+                            Your Money: ${formatNumber(money)}
+                        </div>
+                    </div>
+
                     <ul style={{textAlign:'left', marginBottom:'15px', color:'#ccc'}}>
-                        <li>Marbles: <span style={{color:'#ff6b6b'}}>{balls} / {reqBalls}</span></li>
+                        <li>Marbles: <span style={{color: balls >= reqBalls ? '#4caf50' : '#ff6b6b'}}>{balls} / {reqBalls}</span></li>
                         <li>Money: <span style={{color: hasMoney ? '#4caf50' : '#ff6b6b'}}>${formatNumber(money)} / ${formatNumber(reqMoney)}</span></li>
                         <li>Lifetime (This Run): <span style={{color:'#ffd700'}}>${formatNumber(lifetime)}</span></li>
                     </ul>
@@ -132,7 +153,28 @@ export const CoreModal = ({ onClose, onOpenShop, onActivate }: { onClose: () => 
                 <div className="prestige-body">
                     <p>The Kinetic Core allows you to <strong>melt down your marbles</strong> into a single, powerful <strong>Master Marble</strong> which provides a massive profit boost!</p>
                     <p>This process also creates <strong>KINETIC SHARDS</strong>, which can be used in the Shard Shop to buy powerful, permanent upgrades!</p>
-                    <p>Powering the Kinetic Core requires <strong>${formatNumber(reqMoney)}</strong> and will <strong>reset all of your stats and upgrades to ZERO!</strong></p>
+                    
+                    <div style={{
+                        background: 'rgba(16, 185, 129, 0.12)',
+                        border: '1.5px solid rgba(16, 185, 129, 0.4)',
+                        borderRadius: '10px',
+                        padding: '14px',
+                        margin: '14px 0',
+                        textAlign: 'center',
+                        boxShadow: '0 0 15px rgba(16, 185, 129, 0.2)'
+                    }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#10b981', letterSpacing: '0.05em' }}>
+                            MONEY REQUIRED:
+                        </span>
+                        <span style={{ fontSize: '1.5rem', fontWeight: '950', color: '#10b981', marginLeft: '8px', verticalAlign: 'middle' }}>
+                            ${formatNumber(reqMoney)}
+                        </span>
+                        <div style={{ fontSize: '0.75rem', color: '#a7f3d0', marginTop: '6px', opacity: 0.85 }}>
+                            Your Money: ${formatNumber(money)}
+                        </div>
+                    </div>
+
+                    <p>Powering the Kinetic Core will <strong>reset all of your stats and upgrades to ZERO!</strong></p>
                     
                     <div className="prestige-stats">
                         <div className="prestige-stat">

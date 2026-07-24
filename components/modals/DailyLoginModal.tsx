@@ -1,14 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { engine } from '../../game/engine';
 import { GameState } from '../../game/types';
 import { 
     DAILY_LOGIN_REWARDS_CONFIG, 
-    getRewardValues, 
     claimDailyLoginReward, 
     getDaysDifference, 
     getTodayDateString 
 } from '../../game/dailyLoginRewards';
-import { X, Check, Lock, Sparkles, Gift } from 'lucide-react';
+import { X, Check, Lock, Sparkles, Gift, Clock } from 'lucide-react';
 
 interface DailyLoginModalProps {
     onClose: () => void;
@@ -18,32 +17,47 @@ interface DailyLoginModalProps {
 
 export const DailyLoginModal = ({ onClose, gameState, onUpdate }: DailyLoginModalProps) => {
     const [animationState, setAnimationState] = useState<{ claimed: boolean; rewardText: string } | null>(null);
+    const [countdownText, setCountdownText] = useState<string>('');
 
     const today = getTodayDateString();
     const lastClaimed = gameState.dailyLogin.lastClaimedDate;
     const hasClaimedToday = lastClaimed === today;
     const streak = gameState.dailyLogin.streak || 0;
 
+    // Countdown timer calculation until next calendar day (midnight)
+    useEffect(() => {
+        const updateCountdown = () => {
+            const now = new Date();
+            const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
+            const diffMs = tomorrow.getTime() - now.getTime();
+            if (diffMs <= 0) {
+                setCountdownText('00:00:00');
+                return;
+            }
+            const hours = Math.floor(diffMs / (1000 * 60 * 60));
+            const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+            setCountdownText(
+                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+            );
+        };
+        updateCountdown();
+        const timer = setInterval(updateCountdown, 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    // Missing a day no longer resets streak; active day progresses sequentially (1 through 7)
     let activeDay = 1;
     if (hasClaimedToday) {
-        activeDay = -1; // No claimable day today
+        activeDay = -1; // No claimable day remaining today
     } else {
-        if (lastClaimed) {
-            const diff = getDaysDifference(lastClaimed, today);
-            if (diff === 1) {
-                activeDay = (streak % 7) + 1;
-            } else {
-                activeDay = 1; // Reset to 1 if missed
-            }
-        } else {
-            activeDay = 1; // First time
-        }
+        activeDay = (streak % 7) + 1;
     }
 
     const handleClaim = () => {
         if (hasClaimedToday) return;
 
-        // Perform standard claim
+        // Perform standard claim (rewards generated on the fly)
         const result = claimDailyLoginReward(
             engine.state,
             (amount, c) => engine.addMoney(amount, c),
@@ -101,8 +115,8 @@ export const DailyLoginModal = ({ onClose, gameState, onUpdate }: DailyLoginModa
                         <h2 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400 font-mono tracking-wider flex items-center justify-center gap-1.5 uppercase">
                             🎁 Daily Login Rewards
                         </h2>
-                        <p className="text-xs text-slate-400 mt-1.5 leading-relaxed max-w-[400px] mx-auto">
-                            Claim rewards daily! Missing a day resets the consecutive calendar back to <span className="text-rose-400 font-bold">Day 1</span>. Reach Day 7 for a Jackpot!
+                        <p className="text-xs text-slate-300 mt-1.5 leading-relaxed max-w-[420px] mx-auto">
+                            Claim rewards daily! Missing a day <span className="text-emerald-400 font-bold">will NOT reset your progress.</span> Reach Day 7 for a huge reward!
                         </p>
                     </div>
 
@@ -132,7 +146,7 @@ export const DailyLoginModal = ({ onClose, gameState, onUpdate }: DailyLoginModa
                             </div>
                             <h3 className="text-lg font-black text-emerald-400 uppercase tracking-widest font-mono">Claim Successful!</h3>
                             <p className="text-[11px] text-slate-300 mt-2 max-w-[320px]">
-                                Your Daily Login Calendar values have been applied successfully:
+                                Your Daily Login Reward values have been granted:
                             </p>
                             <div className="bg-black/40 border border-emerald-500/20 p-3 rounded-xl font-mono text-xs font-extrabold text-emerald-300 mt-3 max-w-[350px] leading-relaxed">
                                 {animationState.rewardText}
@@ -153,7 +167,6 @@ export const DailyLoginModal = ({ onClose, gameState, onUpdate }: DailyLoginModa
                             <div className="grid grid-cols-3 gap-2.5">
                                 {DAILY_LOGIN_REWARDS_CONFIG.slice(0, 6).map((r) => {
                                     const day = r.day;
-                                    const vals = getRewardValues(day, gameState);
                                     
                                     // Assess Day State
                                     let isClaimed = false;
@@ -161,8 +174,9 @@ export const DailyLoginModal = ({ onClose, gameState, onUpdate }: DailyLoginModa
                                     let isLocked = false;
 
                                     if (hasClaimedToday) {
-                                        isClaimed = day <= streak;
-                                        isLocked = day > streak;
+                                        const claimedInCycle = streak % 7 === 0 ? 7 : (streak % 7);
+                                        isClaimed = day <= claimedInCycle;
+                                        isLocked = day > claimedInCycle;
                                     } else {
                                         isClaimed = day < activeDay;
                                         isActive = day === activeDay;
@@ -177,13 +191,14 @@ export const DailyLoginModal = ({ onClose, gameState, onUpdate }: DailyLoginModa
                                         borderStyle = 'border-amber-400 bg-amber-950/20 text-amber-200 animate-pulse shadow-[0_0_15px_rgba(245,158,11,0.25)] scale-[1.02] transform';
                                     }
 
-                                    // Description calculation
+                                    // Static value label before claiming
                                     let valStr = '';
-                                    if (vals.cash > 0) valStr = `$${vals.cash >= 1000 ? (vals.cash / 1000) + 'k' : vals.cash}`;
-                                    if (vals.shards > 0) valStr = `+${vals.shards}⚡`;
-                                    if (vals.gems.crimson > 0) valStr = `+1 Ruby`;
-                                    if (vals.gems.amber > 0) valStr = `+1 Emerald`;
-                                    if (vals.gems.azure > 0) valStr = `+1 Diamond`;
+                                    if (r.day === 1) valStr = 'Wad of Cash';
+                                    else if (r.day === 2) valStr = 'Handful of Kinetic Shards';
+                                    else if (r.day === 3) valStr = 'Sack of Cash';
+                                    else if (r.day === 4) valStr = 'Random Gem';
+                                    else if (r.day === 5) valStr = 'Bag of Kinetic Shards';
+                                    else if (r.day === 6) valStr = 'Vault of Cash';
 
                                     return (
                                         <div 
@@ -193,7 +208,7 @@ export const DailyLoginModal = ({ onClose, gameState, onUpdate }: DailyLoginModa
                                             <div className="text-[9px] font-mono font-extrabold uppercase tracking-widest text-slate-500">Day {day}</div>
                                             <div className="text-2xl my-1 select-none">{r.icon}</div>
                                             <div className="text-xs font-black font-mono tracking-tight">{r.label}</div>
-                                            <div className="text-[10px] font-extrabold text-white mt-1 uppercase font-mono">{valStr}</div>
+                                            <div className="text-[10px] font-extrabold text-[#f59e0b] mt-1 uppercase font-mono">{valStr}</div>
                                             
                                             {/* Indicators Overlay */}
                                             {isClaimed && (
@@ -215,15 +230,15 @@ export const DailyLoginModal = ({ onClose, gameState, onUpdate }: DailyLoginModa
                             {(() => {
                                 const day = 7;
                                 const r = DAILY_LOGIN_REWARDS_CONFIG[6];
-                                const vals = getRewardValues(day, gameState);
                                 
                                 let isClaimed = false;
                                 let isActive = false;
                                 let isLocked = false;
 
                                 if (hasClaimedToday) {
-                                    isClaimed = day <= streak;
-                                    isLocked = day > streak;
+                                    const claimedInCycle = streak % 7 === 0 ? 7 : (streak % 7);
+                                    isClaimed = day <= claimedInCycle;
+                                    isLocked = day > claimedInCycle;
                                 } else {
                                     isClaimed = day < activeDay;
                                     isActive = day === activeDay;
@@ -252,8 +267,8 @@ export const DailyLoginModal = ({ onClose, gameState, onUpdate }: DailyLoginModa
                                                 <h4 className="text-sm font-black uppercase tracking-wide font-mono text-white flex items-center gap-1.5 mt-0.5">
                                                     {r.label}
                                                 </h4>
-                                                <p className="text-[9.5px] text-slate-400 tracking-wide mt-1 leading-normal pr-4">
-                                                    Receive a massive cache: <span className="font-bold text-amber-300">$500,000+ Cash</span>, <span className="font-bold text-cyan-300">35 Shards</span>, + <span className="font-bold text-rose-400">2 Random Gems</span>!
+                                                <p className="text-[9.5px] text-slate-300 tracking-wide mt-1 leading-normal pr-4">
+                                                    Receive a massive cache: <span className="font-bold text-amber-300">Scaled Cash</span>, <span className="font-bold text-cyan-300">Kinetic Shards</span>, + <span className="font-bold text-rose-400">2 Random Gems</span>!
                                                 </p>
                                             </div>
                                         </div>
@@ -280,7 +295,7 @@ export const DailyLoginModal = ({ onClose, gameState, onUpdate }: DailyLoginModa
                                 );
                             })()}
 
-                            {/* Main CTA button */}
+                            {/* Main CTA button & Countdown Timer */}
                             {!hasClaimedToday ? (
                                 <button
                                     onClick={handleClaim}
@@ -290,8 +305,15 @@ export const DailyLoginModal = ({ onClose, gameState, onUpdate }: DailyLoginModa
                                     Claim Day {activeDay} Reward
                                 </button>
                             ) : (
-                                <div className="p-3.5 bg-slate-900/40 border border-slate-800 text-slate-500 font-bold text-xs rounded-xl font-mono uppercase text-center flex items-center justify-center gap-1.5 grayscale">
-                                    ✓ Claimed Today! Come back tomorrow
+                                <div className="p-3.5 bg-slate-900/60 border border-slate-800 text-slate-300 font-bold text-xs rounded-xl font-mono uppercase text-center flex flex-col items-center justify-center gap-1.5 shadow-inner">
+                                    <div className="flex items-center gap-1.5 text-slate-300">
+                                        <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
+                                        <span>Reward Claimed Today!</span>
+                                    </div>
+                                    <div className="text-amber-400 text-xs font-black tracking-wider flex items-center gap-1.5 bg-black/40 px-3 py-1 rounded-lg border border-amber-500/20">
+                                        <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                                        Next Reward Available In: <span className="text-white">{countdownText}</span>
+                                    </div>
                                 </div>
                             )}
                         </>
@@ -301,3 +323,4 @@ export const DailyLoginModal = ({ onClose, gameState, onUpdate }: DailyLoginModa
         </div>
     );
 };
+

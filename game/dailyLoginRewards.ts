@@ -30,14 +30,14 @@ export const DAILY_LOGIN_REWARDS_CONFIG: RewardDetails[] = [
         day: 1,
         type: 'cash',
         label: 'Pocket Change',
-        description: 'A helpful boost of cash to purchase basic ball upgrades.',
+        description: 'A helpful boost of cash scaled to your income.',
         icon: '💵'
     },
     {
         day: 2,
         type: 'shards',
         label: 'Shard Cache',
-        description: '5 Kinetic Shards to purchase unique marble skins and permanent shop upgrades.',
+        description: 'A cache of Kinetic Shards scaled to your progression.',
         icon: '⚡'
     },
     {
@@ -51,14 +51,14 @@ export const DAILY_LOGIN_REWARDS_CONFIG: RewardDetails[] = [
         day: 4,
         type: 'gem',
         label: 'Rarity Gem',
-        description: '1 random socketable gem (Ruby, Emerald, or Diamond) for the Peg Builder.',
+        description: '1 Random socketable gem (Ruby, Emerald, or Diamond).',
         icon: '💎'
     },
     {
         day: 5,
         type: 'shards',
         label: 'Shard Deposit',
-        description: '15 Kinetic Shards to bolster your permanent shop inventory.',
+        description: 'A deposit of Kinetic Shards scaled to your progression.',
         icon: '🔮'
     },
     {
@@ -72,7 +72,7 @@ export const DAILY_LOGIN_REWARDS_CONFIG: RewardDetails[] = [
         day: 7,
         type: 'multi',
         label: 'Golden Fortune',
-        description: 'The Ultimate Reward! 35 Kinetic Shards, 2 Random Sockets Gems, and tons of cash!',
+        description: 'The Ultimate Reward! Scaled Kinetic Shards, 2 Random Gems, and tons of cash!',
         icon: '👑'
     }
 ];
@@ -83,6 +83,30 @@ export interface ClaimResult {
     gemsAwarded: { crimson: number; amber: number; azure: number };
     descText: string;
 }
+
+export const getScaledShards = (baseShards: number, state: GameState): number => {
+    const balls = state.upgrades?.extraBall || 0;
+    const lifetime = Math.max(state.allTimeEarnings || 0, state.lifetimeEarnings || 0);
+    const peak = Math.max(state.peakMps || 0, state.currentRunPeakMps || 0);
+    const rawShards = (balls / 10) + (lifetime / 2000000000) + (peak / 1000000);
+    const baseEstShards = Math.max(1, Math.floor(rawShards));
+    const shardMult = 1 + ((state.shardMultiplierPercent || 0) / 100);
+    const estPrestigeShards = Math.floor(baseEstShards * shardMult);
+    
+    const shardScale = Math.max(
+        1, 
+        estPrestigeShards, 
+        Math.floor((state.kineticShards || 0) * 0.2),
+        (state.timesPrestiged || 0) * 10
+    );
+
+    let factor = 0.15;
+    if (baseShards >= 35) factor = 0.75;
+    else if (baseShards >= 15) factor = 0.35;
+
+    const scaled = Math.floor(shardScale * factor);
+    return Math.max(baseShards, scaled);
+};
 
 export const getRewardValues = (dayNumber: number, state: GameState): { cash: number; shards: number; gems: { crimson: number; amber: number; azure: number } } => {
     const currentMps = state.currentMps || 0;
@@ -95,7 +119,7 @@ export const getRewardValues = (dayNumber: number, state: GameState): { cash: nu
             cash = Math.max(10000, Math.floor(currentMps * 120));
             break;
         case 2:
-            shards = 5;
+            shards = getScaledShards(5, state);
             break;
         case 3:
             cash = Math.max(35000, Math.floor(currentMps * 300));
@@ -107,14 +131,14 @@ export const getRewardValues = (dayNumber: number, state: GameState): { cash: nu
             gems[rand4] = 1;
             break;
         case 5:
-            shards = 15;
+            shards = getScaledShards(15, state);
             break;
         case 6:
             cash = Math.max(120000, Math.floor(currentMps * 600));
             break;
         case 7:
             cash = Math.max(500000, Math.floor(currentMps * 1800));
-            shards = 35;
+            shards = getScaledShards(35, state);
             // 2 random gems (can be the same or different)
             const types7 = ['crimson', 'amber', 'azure'] as const;
             gems[types7[Math.floor(Math.random() * types7.length)]]++;
@@ -140,14 +164,8 @@ export const claimDailyLoginReward = (
     let nextStreak = 1;
     const lastDate = state.dailyLogin.lastClaimedDate;
     if (lastDate) {
-        const diff = getDaysDifference(lastDate, today);
-        if (diff === 1) {
-            // Consecutive day! 1 -> 2, 2 -> 3, ..., 7 -> 1
-            nextStreak = (state.dailyLogin.streak % 7) + 1;
-        } else {
-            // Day missed or weirdly negative. Reset to day 1.
-            nextStreak = 1;
-        }
+        // Instead of resetting to day 1 when missing a day, we progress through the days sequentially, looping back to day 1 after day 7.
+        nextStreak = (state.dailyLogin.streak % 7) + 1;
     } else {
         // First claim ever
         nextStreak = 1;

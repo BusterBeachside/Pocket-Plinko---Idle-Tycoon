@@ -11,19 +11,19 @@ export const UPGRADES: UpgradeConfig[] = [
         unlocksAt: 1 
     },
     { 
-        id: 'pegValue', 
-        name: 'Peg Value +', 
-        baseCost: 100, 
-        costMultiplier: 1.64, 
-        description: 'Increases money earned per bounce.',
-        unlocksAt: 10
-    },
-    { 
         id: 'microValue', 
         name: 'Micro Value +', 
         baseCost: 200, 
         costMultiplier: 1.4, 
         description: 'Increases Micro marble value.',
+        unlocksAt: 10
+    },
+    { 
+        id: 'pegValue', 
+        name: 'Peg Value +', 
+        baseCost: 100, 
+        costMultiplier: 1.64, 
+        description: 'Increases money earned per bounce.',
         unlocksAt: 15
     },
     { 
@@ -36,11 +36,11 @@ export const UPGRADES: UpgradeConfig[] = [
         maxPercent: 20
     },
     { 
-        id: 'basketValue', 
-        name: 'Basket Value +', 
-        baseCost: 2000, 
-        costMultiplier: 1.48, 
-        description: 'Increases bottom basket rewards.',
+        id: 'bonusValue', 
+        name: 'Bonus Value +', 
+        baseCost: 7500, 
+        costMultiplier: 1.4, 
+        description: 'Improves Bonus Marble rewards.',
         unlocksAt: 30
     },
     { 
@@ -53,11 +53,11 @@ export const UPGRADES: UpgradeConfig[] = [
         maxPercent: 20
     },
     { 
-        id: 'bonusValue', 
-        name: 'Bonus Value +', 
-        baseCost: 7500, 
-        costMultiplier: 1.4, 
-        description: 'Improves Bonus Marble rewards.',
+        id: 'basketValue', 
+        name: 'Basket Value +', 
+        baseCost: 2000, 
+        costMultiplier: 1.48, 
+        description: 'Increases bottom basket rewards.',
         unlocksAt: 40
     },
     { 
@@ -75,7 +75,8 @@ export const UPGRADES: UpgradeConfig[] = [
         baseCost: 25000, 
         costMultiplier: 1.8, 
         description: 'Marbles move faster.',
-        unlocksAt: 55
+        unlocksAt: 55,
+        maxLevel: 20
     },
     { 
         id: 'legendaryChance', 

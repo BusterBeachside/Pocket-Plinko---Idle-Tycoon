@@ -331,6 +331,7 @@ export interface UpgradeConfig {
     description: string;
     unlocksAt?: number; // Requires N balls
     maxPercent?: number; // Max level cap based on percentage
+    maxLevel?: number; // Optional max level
 }
 
 // Entity Interfaces extracted from Engine

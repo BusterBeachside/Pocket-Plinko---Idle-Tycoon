@@ -5,9 +5,19 @@ import { formatNumber } from '../../game/utils';
 import { ActiveMission } from '../../game/types';
 
 export const MissionsModal = ({ onClose }: { onClose: () => void }) => {
+    const [gameState, setGameState] = useState(engine.state);
     const [timeToReset, setTimeToReset] = useState('');
     const touchStart = useRef<{x: number, y: number} | null>(null);
     const isSwiping = useRef(false);
+
+    useEffect(() => {
+        const unsub = engine.subscribe(() => {
+            setGameState({ ...engine.state });
+        });
+        return () => {
+            unsub();
+        };
+    }, []);
 
     const handleTouchStart = (e: React.TouchEvent) => {
         touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -52,8 +62,13 @@ export const MissionsModal = ({ onClose }: { onClose: () => void }) => {
         return () => clearInterval(interval);
     }, []);
 
-    const missionState = engine.state.missions;
-    const peakMps = engine.state.currentRunPeakMps || engine.state.currentMps || 10;
+    const missionState = gameState.missions;
+    const peakMps = gameState.currentRunPeakMps || gameState.currentMps || 10;
+
+    const hasClaimable = [
+        ...(missionState?.activeDailies || []),
+        ...(missionState?.activeRepeatables || [])
+    ].some(m => m.completed && !m.claimed);
 
     const renderMission = (active: ActiveMission) => {
         const missionDef = getMissionById(active.id);
@@ -117,7 +132,32 @@ export const MissionsModal = ({ onClose }: { onClose: () => void }) => {
         >
             <div className="confirm-modal missions-modal">
                 <div className="modal-header-row">
-                    <h3>Missions</h3>
+                    <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                        <h3 style={{margin:0}}>Missions</h3>
+                        {hasClaimable && (
+                            <button 
+                                className="claim-btn animate-bounce"
+                                onClick={() => engine.claimAllMissions()}
+                                style={{
+                                    margin: 0,
+                                    width: 'auto',
+                                    padding: '6px 14px',
+                                    background: '#3498db',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '20px',
+                                    cursor: 'pointer',
+                                    fontWeight: '900',
+                                    fontSize: '0.8rem',
+                                    boxShadow: '0 3px 0 #2980b9',
+                                    textTransform: 'uppercase',
+                                    transition: 'all 0.1s'
+                                }}
+                            >
+                                Claim All
+                            </button>
+                        )}
+                    </div>
                     <button className="close-core" onClick={onClose}>Close</button>
                 </div>
                 

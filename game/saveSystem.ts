@@ -136,11 +136,11 @@ export class SaveSystem {
         // Sync stats from upgrade levels to ensure consistency (fix for desync issues)
         const u = state.upgrades;
         state.pegValue = 1 + (u.pegValue * 2);
-        state.microValuePercent = u.microValue; // 1% per level
+        state.microValuePercent = u.microValue * 2; // 2% per level (balanced)
         state.uncommonChancePercent = Math.min(20, u.uncommonChance);
         state.basketValueBonus = u.basketValue * 10;
         state.criticalChancePercent = Math.min(20, u.criticalChance);
-        state.bonusValuePercent = u.bonusValue * 5;
+        state.bonusValuePercent = u.bonusValue * 10; // 10% per level (balanced)
         state.rareChancePercent = Math.min(20, u.rareChance);
         state.ballSpeed = Math.pow(1.05, u.ballSpeed);
         state.legendaryChancePercent = Math.min(20, u.legendaryChance);
@@ -164,7 +164,7 @@ export class SaveSystem {
             state.permanentIncomeBoostPercent = (p['perm_income_a'] || 0) * 5 + (state.timesPrestiged || 0) * 100;
             state.shardMultiplierPercent = (p['perm_shard_multi'] || 0) * 10;
             state.permanentMicroBoostPercent = (p['perm_micro_boost'] || 0) * 2;
-            state.bonusChance = Math.min(1, 0.5 + ((p['perm_bonus_chance'] || 0) * 0.01));
+            state.bonusChance = Math.min(1, 0.5 + ((p['perm_bonus_chance'] || 0) * 0.02));
         }
     }
 

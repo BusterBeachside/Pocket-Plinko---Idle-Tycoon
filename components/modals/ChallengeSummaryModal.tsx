@@ -123,7 +123,7 @@ export const ChallengeSummaryModal = ({ summary, onClose }: ChallengeSummaryModa
 
                 <div className="flex flex-col gap-4 items-center">
                     <p className="text-gray-300 text-[10.5px] leading-relaxed">
-                        Earned milestone rewards are already fully credited to your main career account. We will now return to Career mode so the system reset can finalize!
+                        Event ended! Thanks for playing!
                     </p>
                     <button 
                         style={{
@@ -141,7 +141,7 @@ export const ChallengeSummaryModal = ({ summary, onClose }: ChallengeSummaryModa
                         onClick={onClose} 
                         className="active-btn w-full hover:scale-[1.01] tracking-wide"
                     >
-                        OK - Go to Career Mode
+                        Return to Career Mode
                     </button>
                 </div>
             </div>

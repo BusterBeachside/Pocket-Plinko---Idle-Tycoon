@@ -11,7 +11,7 @@ export const PERM_UPGRADES: PermUpgradeConfig[] = [
     { id: 'perm_income_a', name: 'Permanent Income Boost', description: 'Increases all base income by 5%', baseCost: 3 },
     { id: 'perm_shard_multi', name: 'Shard Multiplier', description: 'Increases Shard gain from Prestiging by 10%', baseCost: 5 },
     { id: 'perm_micro_boost', name: 'Micro Marble Boost', description: 'Increases the base value of Micro Marbles by 2%', baseCost: 7 },
-    { id: 'perm_bonus_chance', name: 'Bonus Chance Boost', description: 'Increases chance for a Bonus Marble to appear by 1%', baseCost: 10, maxLevel: 50 },
+    { id: 'perm_bonus_chance', name: 'Bonus Chance Boost', description: 'Increases chance for a Bonus Marble to appear by 2%', baseCost: 10, maxLevel: 25 },
     { id: 'perm_micro_autoclicker', name: 'Micro Autoclicker', description: 'Automatically drops 0.1 Micro Marbles per second per level', baseCost: 5, maxLevel: 100 },
     { id: 'perm_extra_master', name: 'Extra Master Marble', description: 'Adds an additional Master Marble to the board', baseCost: 50 }
 ];
@@ -52,26 +52,28 @@ const generateSkins = (): MarbleSkinConfig[] => {
         }
         
         let rarity: MarbleSkinConfig['rarity'] = 'Common';
-        let cost = 2;
+        let cost = 15;
         let texture = '';
         let name = '';
 
         // Special Legacy Overrides
         if (i === 2) {
             name = 'Wooden'; texture = 'Wooden.png';
+            rarity = 'Common'; cost = 15;
         } else if (i === 3) {
             name = 'Stone'; texture = 'Stone.png';
+            rarity = 'Common'; cost = 25;
         } else if (i <= 26) {
-            rarity = 'Common'; cost = 8;
+            rarity = 'Common'; cost = 40;
             texture = commonTextures[(i - 1) % commonTextures.length];
         } else if (i <= 41) {
-            rarity = 'Rare'; cost = 20;
+            rarity = 'Rare'; cost = 100;
             texture = rareTextures[(i - 27) % rareTextures.length];
         } else if (i <= 46) {
-            rarity = 'Epic'; cost = 50;
+            rarity = 'Epic'; cost = 250;
             texture = epicTextures[(i - 42) % epicTextures.length];
         } else {
-            rarity = 'Legendary'; cost = 150;
+            rarity = 'Legendary'; cost = 750;
             texture = legendaryTextures[(i - 47) % legendaryTextures.length];
         }
 

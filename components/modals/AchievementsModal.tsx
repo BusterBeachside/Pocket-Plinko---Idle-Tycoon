@@ -10,6 +10,13 @@ export const AchievementsModal = ({ gameState, onClose }: { gameState: any, onCl
     const touchStart = useRef<{x: number, y: number} | null>(null);
     const isSwiping = useRef(false);
 
+    const hasClaimable = Object.keys(completedAchievements).some(id => {
+        const aState = completedAchievements[id];
+        const isCompleted = aState === true || (aState && typeof aState === 'object' && aState.completed);
+        const isClaimed = aState && typeof aState === 'object' && aState.claimed;
+        return isCompleted && !isClaimed;
+    });
+
     const handleTouchStart = (e: React.TouchEvent) => {
         touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         isSwiping.current = true;
@@ -43,7 +50,32 @@ export const AchievementsModal = ({ gameState, onClose }: { gameState: any, onCl
         >
             <div className="confirm-modal achievements-modal">
                 <div style={{display:'flex', alignItems:'center', gap:'12px', justifyContent:'space-between', marginBottom:'15px'}}>
-                    <h3>Achievements</h3>
+                    <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                        <h3 style={{margin:0}}>Achievements</h3>
+                        {hasClaimable && (
+                            <button 
+                                className="claim-btn animate-bounce"
+                                onClick={() => engine.claimAllAchievements()}
+                                style={{
+                                    margin: 0,
+                                    width: 'auto',
+                                    padding: '6px 14px',
+                                    background: '#ffd700',
+                                    color: '#000',
+                                    border: 'none',
+                                    borderRadius: '20px',
+                                    cursor: 'pointer',
+                                    fontWeight: '900',
+                                    fontSize: '0.8rem',
+                                    boxShadow: '0 3px 0 #b59900',
+                                    textTransform: 'uppercase',
+                                    transition: 'all 0.1s'
+                                }}
+                            >
+                                Claim All
+                            </button>
+                        )}
+                    </div>
                     <button className="close-core" onClick={onClose}>Close</button>
                 </div>
                 <div className="achievements-grid">

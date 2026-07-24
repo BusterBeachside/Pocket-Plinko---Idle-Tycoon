@@ -114,7 +114,7 @@ export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ avatarId, size = 3
         return (
             <div className={`avatar-display ${className}`} style={containerStyle}>
                 <img 
-                    src={`images/${avatar.texture}`} 
+                    src={`/images/${avatar.texture}`} 
                     alt={avatar.name} 
                     style={{ 
                         width: '100%', 
@@ -134,7 +134,7 @@ export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ avatarId, size = 3
                 {isMarble && <div style={trailStyle} />}
                 <div style={{ ...marbleStyle, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <img 
-                        src={`images/${avatar.texture}`} 
+                        src={`/images/${avatar.texture}`} 
                         alt={avatar.name} 
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         referrerPolicy="no-referrer"

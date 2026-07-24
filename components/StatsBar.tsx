@@ -42,10 +42,14 @@ export const StatsBar = () => {
             } else {
                 setMoney(engine.state.money);
                 setMps(engine.state.currentMps || 0);
-                setBalls(engine.state.upgrades.extraBall);
+                
+                const purchased = engine.state.upgrades.extraBall;
+                const hasMasterUnlock = engine.state.masterMultiplier > 0 || engine.state.timesPrestiged > 0;
+                const masterCount = hasMasterUnlock ? (1 + (engine.state.permUpgradesLevels?.['perm_extra_master'] || 0)) : 0;
+                setBalls(purchased + masterCount);
                 
                 const base = engine.state.pegValue;
-                const marbleMult = Math.max(1, (engine.state.upgrades.extraBall) * 0.75);
+                const marbleMult = Math.max(1, purchased * 0.75);
                 const totalIncomePercent = (engine.state.permanentIncomeBoostPercent || 0) + (engine.state.derivedIncomeBoostPercent || 0);
                 const incomeMult = 1 + (totalIncomePercent / 100);
                 
@@ -72,9 +76,20 @@ export const StatsBar = () => {
                     {isSandPeg ? formatNumber(mps) : `$${formatNumber(mps)}/s`}
                 </span>
             </div>
-            <div className="stat-item">
+            <div className="stat-item" title={
+                !isChallenge ? (
+                    (() => {
+                        const purchased = engine.state.upgrades.extraBall;
+                        const hasMasterUnlock = engine.state.masterMultiplier > 0 || engine.state.timesPrestiged > 0;
+                        const masterCount = hasMasterUnlock ? (1 + (engine.state.permUpgradesLevels?.['perm_extra_master'] || 0)) : 0;
+                        return masterCount > 0 ? `${purchased} Regular + ${masterCount} Master Marbles` : '';
+                    })()
+                ) : ''
+            }>
                 <span className="stat-label">{isChallenge && engine.state.challengeState?.challengeId === 'micro_mania' ? 'Micro Dropped' : 'Marbles'}</span>
-                <span className="stat-value text-amber-100">{balls}</span>
+                <span className="stat-value text-amber-100">
+                    {balls}
+                </span>
             </div>
             <div className="stat-item">
                 <span className="stat-label">{isSandPeg ? 'Peg Multiplier' : 'Peg Value'}</span>
