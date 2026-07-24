@@ -5,7 +5,7 @@ import { formatNumber } from '../../game/utils';
 
 const SkinCard = ({ skin, cost, isOwned, isEquipped, canAfford, onBuy, onEquip }: any) => {
     const displayStyle = skin.texture 
-        ? { backgroundImage: `url(/images/${skin.texture})` }
+        ? { backgroundImage: `url(images/${skin.texture})` }
         : { background: 'radial-gradient(circle at 30% 30%, #fff, #ffd700, #ff6b6b)' };
 
     return (

@@ -436,7 +436,7 @@ export class GameRenderer {
                 if (!img) {
                     img = new Image();
                     this.textureCache.set(tex, img);
-                    const cleanPath = tex.startsWith('/') ? tex : (tex.startsWith('images/') ? `/${tex}` : `/images/${tex}`);
+                    const cleanPath = tex.startsWith('images/') ? tex : `images/${tex}`;
                     img.src = cleanPath;
                 }
                 
