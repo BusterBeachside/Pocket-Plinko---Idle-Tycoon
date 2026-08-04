@@ -1,7 +1,7 @@
 
 import { GameState } from './types';
 import { UPGRADES } from './config';
-import { PERM_UPGRADES, MARBLE_SKINS } from './shardShopConfig';
+import { PERM_UPGRADES, MARBLE_SKINS, getPermanentUpgradeCost } from './shardShopConfig';
 import { AudioController } from './audio';
 import { SaveSystem } from './saveSystem';
 import { DailyEventsManager } from './dailyEvents';
@@ -43,17 +43,8 @@ export class ShopSystem {
     }
 
     static getPermanentUpgradeCost(state: GameState, id: string): number {
-        const cfg = PERM_UPGRADES.find(u => u.id === id);
-        if (!cfg) return 0;
-        
         const currentLevel = state.permUpgradesLevels[id] || 0;
-        if (id === 'perm_bonus_chance') {
-            // Logarithmic cost scaling for 'Bonus Chance' to remain relevant
-            return Math.floor(cfg.baseCost * (1 + Math.log2(currentLevel + 1) * 1.5));
-        }
-        
-        // Return standard cost stored in state, or calculate using standard multiplier scaling
-        return state.permUpgradeCosts[id] || cfg.baseCost;
+        return getPermanentUpgradeCost(currentLevel, id);
     }
 
     static buyPermanentUpgrade(state: GameState, id: string, audio: AudioController, saveCallback: () => void): boolean {
@@ -68,16 +59,7 @@ export class ShopSystem {
 
             state.kineticShards -= currentCost;
             state.permUpgradesLevels[id] = currentLevel + 1;
-            
-            // Calculate next cost and update state.permUpgradeCosts
-            const nextLevelState = {
-                ...state,
-                permUpgradesLevels: {
-                    ...state.permUpgradesLevels,
-                    [id]: currentLevel + 1
-                }
-            };
-            state.permUpgradeCosts[id] = this.getPermanentUpgradeCost(nextLevelState, id);
+            state.permUpgradeCosts[id] = this.getPermanentUpgradeCost(state, id);
             
             SaveSystem.calculateDerivedState(state);
             

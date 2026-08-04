@@ -1,6 +1,6 @@
 
 import { GameState, INITIAL_STATE } from './types';
-import { MARBLE_SKINS, PERM_UPGRADES } from './shardShopConfig';
+import { MARBLE_SKINS, PERM_UPGRADES, getPermanentUpgradeCost } from './shardShopConfig';
 import { ChallengesManager } from './challenges';
 
 export class SaveSystem {
@@ -40,19 +40,7 @@ export class SaveSystem {
             // Sync/recalculate upgrade costs for all existing permanent upgrades to avoid any desync or lock issues from older saves/cached configs
             PERM_UPGRADES.forEach(u => {
                 const lvl = loaded.permUpgradesLevels[u.id] || 0;
-                if (lvl > 0) {
-                    let expectedCost = u.baseCost;
-                    const mult = u.id === 'perm_extra_master' ? 3.0 : 1.4;
-                    for (let i = 0; i < lvl; i++) {
-                        expectedCost = Math.floor(expectedCost * mult);
-                    }
-                    const currentCost = loaded.permUpgradeCosts[u.id];
-                    if (currentCost === undefined || currentCost < expectedCost) {
-                        loaded.permUpgradeCosts[u.id] = expectedCost;
-                    }
-                } else if (loaded.permUpgradeCosts[u.id] === undefined) {
-                    loaded.permUpgradeCosts[u.id] = u.baseCost;
-                }
+                loaded.permUpgradeCosts[u.id] = getPermanentUpgradeCost(lvl, u.id);
             });
             
             // Migrate old localStorage tutorial keys

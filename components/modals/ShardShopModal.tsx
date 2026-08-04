@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { engine } from '../../game/engine';
-import { PERM_UPGRADES, MARBLE_SKINS } from '../../game/shardShopConfig';
+import { PERM_UPGRADES, MARBLE_SKINS, getPermanentUpgradeCost } from '../../game/shardShopConfig';
 import { formatNumber } from '../../game/utils';
 
 const SkinCard = ({ skin, cost, isOwned, isEquipped, canAfford, onBuy, onEquip }: any) => {
@@ -70,7 +70,7 @@ export const ShardShopModal = ({ onClose }: { onClose: () => void }) => {
                         <div className="perm-upgrades-list">
                             {PERM_UPGRADES.map(u => {
                                 const level = engine.state.permUpgradesLevels[u.id] || 0;
-                                const cost = engine.state.permUpgradeCosts[u.id] || u.baseCost;
+                                const cost = getPermanentUpgradeCost(level, u.id);
                                 const isMax = u.maxLevel !== undefined && u.maxLevel > 0 && level >= u.maxLevel;
                                 const canAfford = shards >= cost;
                                 return (

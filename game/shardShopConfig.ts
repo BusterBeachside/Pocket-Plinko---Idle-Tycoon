@@ -16,6 +16,22 @@ export const PERM_UPGRADES: PermUpgradeConfig[] = [
     { id: 'perm_extra_master', name: 'Extra Master Marble', description: 'Adds an additional Master Marble to the board', baseCost: 50 }
 ];
 
+export const getPermanentUpgradeCost = (level: number, id: string): number => {
+    const cfg = PERM_UPGRADES.find(u => u.id === id);
+    if (!cfg) return 0;
+    
+    if (id === 'perm_bonus_chance') {
+        return Math.floor(cfg.baseCost * (1 + Math.log2(level + 1) * 1.5));
+    }
+    
+    const mult = id === 'perm_extra_master' ? 3.0 : 1.4;
+    let cost = cfg.baseCost;
+    for (let i = 0; i < level; i++) {
+        cost = Math.floor(cost * mult);
+    }
+    return cost;
+};
+
 export interface MarbleSkinConfig {
     id: string;
     name: string;

@@ -17,12 +17,25 @@ export const GameCanvas = ({ inChallengeMode }: { inChallengeMode?: boolean }) =
 
         const handleInputAt = (clientX: number, clientY: number) => {
             const rect = canvas.getBoundingClientRect();
-            const x = (clientX - rect.left) * (engine.width / rect.width);
-            const y = (clientY - rect.top) * (engine.height / rect.height);
+            const cw = engine.width || 400;
+            const ch = engine.height || 600;
+
+            if (rect.width === 0 || rect.height === 0) return false;
+
+            // Compute actual scale factor and letterboxing offsets when canvas uses object-fit: contain
+            const scale = Math.min(rect.width / cw, rect.height / ch);
+            const displayedW = cw * scale;
+            const displayedH = ch * scale;
+            const offsetX = (rect.width - displayedW) / 2;
+            const offsetY = (rect.height - displayedH) / 2;
+
+            const x = (clientX - rect.left - offsetX) / scale;
+            const y = (clientY - rect.top - offsetY) / scale;
             
             // Check Peg Socket Interaction first
             if (engine.socketingActive) {
-                const pegIdx = engine.findClosestPegIndex(x, y, 22);
+                // Increased touch radius to 35 for precise and forgiving touch targeting on mobile
+                const pegIdx = engine.findClosestPegIndex(x, y, 35);
                 if (pegIdx !== null) {
                     window.dispatchEvent(new CustomEvent('peg-socket-selected', { detail: { index: pegIdx } }));
                     return true; // Block ball spawn

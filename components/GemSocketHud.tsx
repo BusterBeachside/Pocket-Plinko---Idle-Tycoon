@@ -1,15 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { engine } from '../game/engine';
-import { Sparkles, Wand2, Trash2, Eye, EyeOff, Ban } from 'lucide-react';
+import { Sparkles, Wand2, Trash2, Eye, EyeOff, Ban, ArrowUp, ArrowDown, Minimize2, Maximize2, X } from 'lucide-react';
 import { assets } from '../game/assets';
 
 export const GemSocketHud = ({ onUpdate }: { onUpdate: () => void }) => {
     const [selectedTool, setSelectedTool] = useState<'ruby' | 'emerald' | 'diamond' | 'unsocket'>('ruby');
+    const [dockPosition, setDockPosition] = useState<'bottom' | 'top'>(() => {
+        return (localStorage.getItem('plinko_socket_hud_dock') as 'bottom' | 'top') || 'bottom';
+    });
+    const [isMinimized, setIsMinimized] = useState<boolean>(() => {
+        return localStorage.getItem('plinko_socket_hud_minimized') === 'true';
+    });
     const [updater, setUpdater] = useState(0);
 
     const forceUpdate = () => {
         setUpdater(prev => prev + 1);
         onUpdate();
+    };
+
+    const toggleDock = () => {
+        const next = dockPosition === 'bottom' ? 'top' : 'bottom';
+        setDockPosition(next);
+        localStorage.setItem('plinko_socket_hud_dock', next);
+        engine.audio.play('click');
+    };
+
+    const toggleMinimize = () => {
+        const next = !isMinimized;
+        setIsMinimized(next);
+        localStorage.setItem('plinko_socket_hud_minimized', String(next));
+        engine.audio.play('click');
     };
 
     useEffect(() => {
@@ -106,32 +126,146 @@ export const GemSocketHud = ({ onUpdate }: { onUpdate: () => void }) => {
         ? 'Click any gemmed peg on the board to retrieve it.' 
         : items.find(i => i.type === selectedTool)?.desc;
 
-    return (
-        <div 
-            id="gem-socket-hud" 
-            className="fixed select-none animate-fade-in flex flex-col gap-3.5 p-4 rounded-xl border border-white/20 bg-[#0d101d] shadow-[0_20px_50px_rgba(0,0,0,0.9)] z-[95] w-[92%] max-w-[390px] bottom-[75px] left-1/2 -translate-x-1/2 md:bottom-auto md:right-4 md:top-1/2 md:-translate-y-1/2 md:left-auto md:translate-x-0 md:w-[320px]"
-        >
-            {/* Header matching Picture */}
-            <div className="flex items-center justify-between pb-1">
-                <span className="text-[11px] font-black tracking-[0.12em] uppercase text-slate-200 flex items-center gap-2">
-                    <span className="w-3.5 h-3.5 flex items-center justify-center text-[#22d3ee]">💎</span>
-                    REWARD GEM SOCKETS
-                </span>
-                <button 
+    // Dynamic position class based on dockPosition (Top vs Bottom)
+    const positionClass = dockPosition === 'top'
+        ? 'top-[70px] left-1/2 -translate-x-1/2 md:top-20 md:right-4 md:left-auto md:translate-x-0'
+        : 'bottom-[75px] left-1/2 -translate-x-1/2 md:bottom-auto md:right-4 md:top-1/2 md:-translate-y-1/2 md:left-auto md:translate-x-0';
+
+    if (isMinimized) {
+        return (
+            <div 
+                id="gem-socket-hud-compact"
+                className={`fixed select-none animate-fade-in flex items-center gap-1.5 p-2 rounded-xl border border-cyan-500/40 bg-[#0d101d]/95 backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.85)] z-[95] ${positionClass}`}
+            >
+                {/* Tool Selector Buttons */}
+                <div className="flex items-center gap-1">
+                    {items.map(t => {
+                        const isSelected = selectedTool === t.type;
+                        return (
+                            <button
+                                key={t.type}
+                                onClick={() => {
+                                    setSelectedTool(t.type);
+                                    engine.audio.play('click');
+                                    forceUpdate();
+                                }}
+                                className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold transition-all cursor-pointer ${
+                                    isSelected 
+                                        ? `${t.activeBorder}` 
+                                        : `${t.bg} ${t.borderColor} hover:border-white/30`
+                                }`}
+                                title={`${t.name} (${t.count})`}
+                            >
+                                <img src={assets.getSrc(t.imgKey)} alt={t.name} className="w-4 h-4 object-contain" />
+                                <span className={t.textColor}>{t.count}</span>
+                            </button>
+                        );
+                    })}
+
+                    {/* Unsocket Tool */}
+                    <button
+                        onClick={() => {
+                            setSelectedTool('unsocket');
+                            engine.audio.play('click');
+                            forceUpdate();
+                        }}
+                        className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold transition-all cursor-pointer ${
+                            selectedTool === 'unsocket'
+                                ? 'bg-amber-500/30 text-amber-300 border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.4)]'
+                                : 'bg-black/40 text-slate-300 border-white/10 hover:border-white/20'
+                        }`}
+                        title="Unsocket Eraser Tool"
+                    >
+                        <Ban className="w-3.5 h-3.5 text-amber-400" />
+                        <span className="hidden sm:inline">Unsocket</span>
+                    </button>
+                </div>
+
+                <div className="h-5 w-[1px] bg-white/15 mx-0.5" />
+
+                {/* Move Top / Bottom Toggle */}
+                <button
+                    onClick={toggleDock}
+                    className="p-1.5 rounded-lg bg-black/40 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                    title={dockPosition === 'bottom' ? 'Move HUD to Top' : 'Move HUD to Bottom'}
+                >
+                    {dockPosition === 'bottom' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
+                </button>
+
+                {/* Expand Panel */}
+                <button
+                    onClick={toggleMinimize}
+                    className="p-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30 transition-all cursor-pointer"
+                    title="Expand Full Gem Panel"
+                >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Close Builder */}
+                <button
                     onClick={() => {
                         engine.socketingActive = false;
                         engine.hideMarbles = false;
                         engine.audio.play('upgrade');
                         forceUpdate();
                     }}
-                    className="text-[9px] px-2.5 py-1 uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/40 text-[#10b981] hover:bg-emerald-500/20 rounded font-black transition-all cursor-pointer animate-pulse select-none"
-                    title="Sockets is active. Click to close."
+                    className="p-1.5 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 hover:bg-rose-500/30 transition-all cursor-pointer"
+                    title="Close Socket Builder"
                 >
-                    ACTIVE
+                    <X className="w-3.5 h-3.5" />
                 </button>
             </div>
+        );
+    }
 
-            {/* Three Grid Boxes styled exactly like the picture */}
+    return (
+        <div 
+            id="gem-socket-hud" 
+            className={`fixed select-none animate-fade-in flex flex-col gap-3.5 p-4 rounded-xl border border-white/20 bg-[#0d101d]/95 backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.9)] z-[95] w-[92%] max-w-[390px] ${positionClass} md:w-[320px]`}
+        >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-1">
+                <span className="text-[11px] font-black tracking-[0.12em] uppercase text-slate-200 flex items-center gap-2">
+                    <span className="w-3.5 h-3.5 flex items-center justify-center text-[#22d3ee]">💎</span>
+                    REWARD GEM SOCKETS
+                </span>
+
+                <div className="flex items-center gap-1.5">
+                    {/* Position Dock Toggle */}
+                    <button
+                        onClick={toggleDock}
+                        className="p-1 bg-black/40 border border-white/15 text-slate-300 hover:text-white hover:bg-white/10 rounded transition-all cursor-pointer flex items-center justify-center"
+                        title={dockPosition === 'bottom' ? 'Move panel to top' : 'Move panel to bottom'}
+                    >
+                        {dockPosition === 'bottom' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
+                    </button>
+
+                    {/* Minimize Toggle */}
+                    <button
+                        onClick={toggleMinimize}
+                        className="p-1 bg-black/40 border border-white/15 text-slate-300 hover:text-white hover:bg-white/10 rounded transition-all cursor-pointer flex items-center justify-center"
+                        title="Minimize panel to small bar"
+                    >
+                        <Minimize2 className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Close / Active indicator */}
+                    <button 
+                        onClick={() => {
+                            engine.socketingActive = false;
+                            engine.hideMarbles = false;
+                            engine.audio.play('upgrade');
+                            forceUpdate();
+                        }}
+                        className="text-[9px] px-2 py-1 uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/40 text-[#10b981] hover:bg-emerald-500/20 rounded font-black transition-all cursor-pointer select-none"
+                        title="Socket mode active. Click to close."
+                    >
+                        ACTIVE
+                    </button>
+                </div>
+            </div>
+
+            {/* Three Grid Boxes */}
             <div className="grid grid-cols-3 gap-2 font-sans">
                 {items.map(t => {
                     const isSelected = selectedTool === t.type;
@@ -168,7 +302,7 @@ export const GemSocketHud = ({ onUpdate }: { onUpdate: () => void }) => {
                 })}
             </div>
 
-            {/* Description Text matching Picture */}
+            {/* Description Text */}
             <p className="text-[9.5px] font-medium text-slate-400 leading-normal text-left px-1">
                 Earn these powerful Gems by hitting Milestone Goals inside the rotating Challenges! Use them immediately as permanent Board Modifiers.
             </p>
