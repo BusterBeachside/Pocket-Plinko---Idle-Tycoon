@@ -32,6 +32,7 @@ import { GemSocketHud } from './components/GemSocketHud';
 import { DailyLoginModal } from './components/modals/DailyLoginModal';
 import { getTodayDateString } from './game/dailyLoginRewards';
 import { ChallengeSummaryModal } from './components/modals/ChallengeSummaryModal';
+import { syncAndroidNotifications } from './game/androidNotifications';
 
 const FloatingTextLayer = () => {
     const [items, setItems] = useState<any[]>([]);
@@ -86,6 +87,7 @@ const App = () => {
     const [timeLeftStr, setTimeLeftStr] = useState('');
 
     useEffect(() => {
+        syncAndroidNotifications();
         const updateTimeLeft = () => {
             const rot = ChallengesManager.getRotationInfo();
             setTimeLeftStr(rot.timeLeftStr);
@@ -100,6 +102,7 @@ const App = () => {
             if (engine.state) {
                 const rotationChanged = ChallengesManager.checkAndSyncChallengeState(engine.state);
                 if (rotationChanged) {
+                    syncAndroidNotifications();
                     if (engine.state.showChallengeSummary) {
                         if (engine.state.inChallengeMode) {
                             engine.running = false; // Pause the plinko board physics loop

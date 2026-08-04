@@ -7,6 +7,7 @@ import {
     getDaysDifference, 
     getTodayDateString 
 } from '../../game/dailyLoginRewards';
+import { scheduleDailyRewardNotification } from '../../game/androidNotifications';
 import { X, Check, Lock, Sparkles, Gift, Clock } from 'lucide-react';
 
 interface DailyLoginModalProps {
@@ -85,6 +86,7 @@ export const DailyLoginModal = ({ onClose, gameState, onUpdate }: DailyLoginModa
 
             onUpdate();
             engine.saveState(false);
+            scheduleDailyRewardNotification();
         }
     };
 

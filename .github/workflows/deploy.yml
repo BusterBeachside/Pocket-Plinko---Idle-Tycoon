@@ -1,4 +1,4 @@
-name: Build for Itch.io
+name: Build and Deploy
 
 on:
   push:
@@ -10,6 +10,12 @@ env:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -17,23 +23,42 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "24"
-          
+
       - name: Install dependencies
         run: npm install
-        
+
       - name: Build
         run: npm run build
-        
+
       # GitHub Actions automatically zips the path provided in upload-artifact.
-      # Pointing to 'dist/' creates a zip with index.html at the root.
-      - name: Upload Artifact
+      # Pointing to 'dist/' creates a zip with index.html at the root for Itch.io.
+      - name: Upload Itch.io Artifact
         uses: actions/upload-artifact@v4
         with:
           name: pocket-plinko-build
           path: dist/
           retention-days: 5
+
+      - name: Upload GitHub Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
