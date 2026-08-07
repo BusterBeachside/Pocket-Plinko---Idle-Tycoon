@@ -84,6 +84,8 @@ export class GameEngine {
                 this.handleVisibilityChange();
             });
             (window as any).spawnGoldenBonus = () => this.spawnGoldenBonusMarble();
+            (window as any).spawnGoldenBonusMarble = () => this.spawnGoldenBonusMarble();
+            (window as any).engine = this;
         }
 
         this.startLoop();
@@ -592,6 +594,7 @@ export class GameEngine {
     }
 
     clickGoldenBonusMarble(x: number, y: number): boolean {
+        if (!UnderdogService.isWebsim() && !this.state.goldenBonusMarble?.active) return false;
         if (this.state.goldenBonusMarble && this.state.goldenBonusMarble.active) {
             const gx = this.state.goldenBonusMarble.x;
             const gy = this.state.goldenBonusMarble.y;
@@ -606,7 +609,8 @@ export class GameEngine {
         return false;
     }
 
-    spawnGoldenBonusMarble() {
+    spawnGoldenBonusMarble(force: boolean = false) {
+        if (!force && !UnderdogService.isWebsim()) return;
         if (!this.state.goldenBonusMarble) {
             this.state.goldenBonusMarble = { active: false, x: this.width / 2, y: 80, baseY: 80, t: 0, spawnTimer: 600 };
         }
@@ -686,23 +690,27 @@ export class GameEngine {
             }
         }
 
-        // Golden Bonus Marble update (spawns every 10 minutes = 600s, lingers near top of canvas)
-        if (!this.state.goldenBonusMarble) {
-            this.state.goldenBonusMarble = { active: false, x: this.width / 2, y: 80, baseY: 80, t: 0, spawnTimer: 600 };
-        }
-
-        const gbm = this.state.goldenBonusMarble;
-        if (!gbm.active) {
-            gbm.spawnTimer -= dt;
-            if (gbm.spawnTimer <= 0) {
-                this.spawnGoldenBonusMarble();
+        // Golden Bonus Marble update (spawns every 10 minutes = 600s, lingers near top of canvas - WEBSIM ONLY)
+        if (UnderdogService.isWebsim()) {
+            if (!this.state.goldenBonusMarble) {
+                this.state.goldenBonusMarble = { active: false, x: this.width / 2, y: 80, baseY: 80, t: 0, spawnTimer: 600 };
             }
-        } else {
-            // Floating motion near top of canvas
-            gbm.t += dt;
-            const halfW = Math.max(100, (this.width / 2) - 60);
-            gbm.x = (this.width / 2) + Math.sin(gbm.t * 0.7) * halfW;
-            gbm.y = gbm.baseY + Math.sin(gbm.t * 2.2) * 10;
+
+            const gbm = this.state.goldenBonusMarble;
+            if (!gbm.active) {
+                gbm.spawnTimer -= dt;
+                if (gbm.spawnTimer <= 0) {
+                    this.spawnGoldenBonusMarble();
+                }
+            } else {
+                // Floating motion near top of canvas
+                gbm.t += dt;
+                const halfW = Math.max(100, (this.width / 2) - 60);
+                gbm.x = (this.width / 2) + Math.sin(gbm.t * 0.7) * halfW;
+                gbm.y = gbm.baseY + Math.sin(gbm.t * 2.2) * 10;
+            }
+        } else if (this.state.goldenBonusMarble?.active) {
+            this.state.goldenBonusMarble.active = false;
         }
 
         this.balls = this.balls.filter(b => b.y < this.height + 100 && !b._remove);
@@ -1228,3 +1236,21 @@ export class GameEngine {
 
 // Export the singleton instance
 export const engine = new GameEngine();
+
+if (typeof window !== 'undefined') {
+    const spawnFn = () => {
+        console.log("[Pocket Plinko] Spawning Golden Bonus Marble...");
+        engine.spawnGoldenBonusMarble(true);
+        window.dispatchEvent(new CustomEvent('open-golden-bonus-modal'));
+    };
+    (window as any).engine = engine;
+    (window as any).spawnGoldenBonus = spawnFn;
+    (window as any).spawnGoldenBonusMarble = spawnFn;
+    try {
+        if (window.top && window.top !== window) {
+            (window.top as any).engine = engine;
+            (window.top as any).spawnGoldenBonus = spawnFn;
+            (window.top as any).spawnGoldenBonusMarble = spawnFn;
+        }
+    } catch (e) {}
+}

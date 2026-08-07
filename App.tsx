@@ -218,6 +218,24 @@ const App = () => {
         };
         window.addEventListener('open-golden-bonus-modal', goldenBonusHandler);
 
+        if (typeof window !== 'undefined') {
+            const spawnFn = () => {
+                console.log("[Pocket Plinko] Spawning Golden Bonus Marble...");
+                engine.spawnGoldenBonusMarble(true);
+                window.dispatchEvent(new CustomEvent('open-golden-bonus-modal'));
+            };
+            (window as any).engine = engine;
+            (window as any).spawnGoldenBonus = spawnFn;
+            (window as any).spawnGoldenBonusMarble = spawnFn;
+            try {
+                if (window.top && window.top !== window) {
+                    (window.top as any).engine = engine;
+                    (window.top as any).spawnGoldenBonus = spawnFn;
+                    (window.top as any).spawnGoldenBonusMarble = spawnFn;
+                }
+            } catch (e) {}
+        }
+
         return () => { 
             UnderdogService.removeAuthListener();
             unsub(); 

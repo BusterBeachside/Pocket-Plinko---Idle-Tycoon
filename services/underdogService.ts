@@ -10,6 +10,26 @@ export const supabase = createClient(
     supabaseKey || 'dummy_key'
 );
 
+let roomPromise: Promise<any> | null = null;
+async function getRoom() {
+    if (!roomPromise) {
+        roomPromise = (async () => {
+            try {
+                if (typeof window !== 'undefined' && (window as any).WebsimSocket) {
+                    return new (window as any).WebsimSocket();
+                }
+                // @ts-ignore
+                const { WebsimSocket } = await import(/* @vite-ignore */ 'https://esm.websim.com/@websim/websim-socket');
+                return new WebsimSocket();
+            } catch (e) {
+                console.error("Failed to load WebsimSocket:", e);
+                return null;
+            }
+        })();
+    }
+    return roomPromise;
+}
+
 // ============================================================================
 // DEBUG TOGGLE: Set to true to force Websim mode during testing/development!
 // You can also toggle this at runtime in the console via:
@@ -287,9 +307,57 @@ export class UnderdogService {
         }
     }
 
+    static toScore(value: any): number {
+        const n = Number(value);
+        return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+    }
+
+    static parseMetadata(record: any): any {
+        let meta = record?.metadata;
+        if (typeof meta === 'string') {
+            try {
+                meta = JSON.parse(meta);
+            } catch (e) {
+                meta = {};
+            }
+        }
+        return (meta && typeof meta === 'object') ? meta : {};
+    }
+
+    static parseStats(record: any): any {
+        const raw = record || {};
+        const meta = UnderdogService.parseMetadata(raw);
+        const num = (v: any, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };
+        const maxNum = (...vals: any[]) => Math.max(0, ...vals.map(v => num(v, 0)));
+        return {
+            timesPrestiged: maxNum(raw.timesPrestiged, meta.timesPrestiged),
+            masterMultiplier: Math.max(1, num(raw.masterMultiplier, 1), num(meta.masterMultiplier, 1)),
+            derivedIncomeBoostPercent: maxNum(raw.derivedIncomeBoostPercent, meta.derivedIncomeBoostPercent),
+            activeMarbleSkinID: raw.activeMarbleSkinID || meta.activeMarbleSkinID || 'default',
+            ownedMarblesCount: Math.max(1, num(raw.ownedMarblesCount, 1), num(meta.ownedMarblesCount, 1)),
+            kineticShards: maxNum(raw.kineticShards, meta.kineticShards),
+            totalPlayTime: maxNum(raw.totalPlayTime, meta.totalPlayTime)
+        };
+    }
+
+    static mergeStats(existingRecord: any, playerStats: any): any {
+        const prev = UnderdogService.parseStats(existingRecord);
+        const next = { ...prev };
+        for (const [key, value] of Object.entries(playerStats || {})) {
+            if (value === undefined || value === null) continue;
+            const n = Number(value);
+            if (Number.isFinite(n)) {
+                next[key] = Math.max(Number(next[key]) || 0, n);
+            } else {
+                next[key] = value;
+            }
+        }
+        return next;
+    }
+
     static async submitScore(score: number, leaderboardId: string = 'mps', playerStats?: any): Promise<void> {
         const user = await this.getCurrentUser();
-        if (!user) {
+        if (!user || user.userId === 'local') {
             const currentMockScore = parseFloat(localStorage.getItem(`underdog_mock_highscore_${leaderboardId}`) || '-1');
             if (score > currentMockScore) {
                 localStorage.setItem(`underdog_mock_highscore_${leaderboardId}`, score.toString());
@@ -298,10 +366,36 @@ export class UnderdogService {
         }
 
         if (this.isWebsim()) {
-            const ws = (window as any).websim;
-            const numericScore = Math.floor(score);
+            const numericScore = UnderdogService.toScore(score);
+            try {
+                const room = await getRoom();
+                if (room) {
+                    const id = `${user.userId}-${leaderboardId}`;
+                    const existingList = await room.collection('leaderboard').filter({ id }).getList();
+                    const existingRecord = existingList ? existingList[0] : null;
+                    const bestScore = Math.max(UnderdogService.toScore(existingRecord?.score), numericScore);
+                    const stats = UnderdogService.mergeStats(existingRecord, playerStats);
+                    await room.collection('leaderboard').upsert({
+                        id,
+                        score: bestScore,
+                        mode: leaderboardId,
+                        user_id: user.userId,
+                        username: user.username,
+                        ...stats,
+                        metadata: {
+                            ...stats,
+                            mode: leaderboardId,
+                            peakMps: bestScore
+                        }
+                    });
+                    localStorage.setItem(`underdog_last_submitted_score_${leaderboardId}`, bestScore.toString());
+                }
+            } catch (err) {
+                console.error("Error in Websim submitScore:", err);
+            }
 
-            // 1) Websim native submitScore if present
+            // Also call native ws.submitScore if present
+            const ws = (window as any).websim;
             if (typeof ws?.submitScore === 'function') {
                 try {
                     await ws.submitScore({
@@ -310,68 +404,6 @@ export class UnderdogService {
                         metadata: playerStats
                     });
                 } catch (e) {}
-            }
-
-            // 2) Websim database table if present
-            if (typeof ws?.database?.upsert === 'function') {
-                try {
-                    await ws.database.upsert('leaderboards', {
-                        leaderboard_id: leaderboardId,
-                        user_id: user.userId,
-                        username: user.username,
-                        score: numericScore,
-                        avatar_url: user.profilePictureUrl,
-                        metadata: playerStats,
-                        updated_at: new Date().toISOString()
-                    });
-                } catch (e) {}
-            }
-
-            // 3) Websim postLog
-            if (typeof ws?.postLog === 'function') {
-                try {
-                    await ws.postLog('leaderboard_score', {
-                        leaderboard: leaderboardId,
-                        userId: user.userId,
-                        username: user.username,
-                        score: numericScore,
-                        avatarUrl: user.profilePictureUrl,
-                        metadata: playerStats
-                    });
-                } catch (e) {}
-            }
-
-            // 4) LocalStorage & KV backup for Websim
-            const lbKey = `websim_leaderboard_${leaderboardId}`;
-            let lb: any[] = [];
-            try {
-                const raw = localStorage.getItem(lbKey);
-                if (raw) lb = JSON.parse(raw);
-            } catch (e) {}
-
-            const idx = lb.findIndex(x => x.username === user.username || x.userId === user.userId);
-            if (idx >= 0) {
-                if (numericScore > (lb[idx].score || 0)) {
-                    lb[idx].score = numericScore;
-                    lb[idx].metadata = { ...lb[idx].metadata, ...playerStats };
-                    lb[idx].avatarUrl = user.profilePictureUrl;
-                }
-            } else {
-                lb.push({
-                    userId: user.userId,
-                    username: user.username,
-                    score: numericScore,
-                    avatarUrl: user.profilePictureUrl,
-                    metadata: playerStats || {}
-                });
-            }
-
-            lb.sort((a, b) => b.score - a.score);
-            const sliced = lb.slice(0, 100);
-            localStorage.setItem(lbKey, JSON.stringify(sliced));
-
-            if (typeof ws?.setKV === 'function') {
-                try { await ws.setKV(lbKey, sliced); } catch (e) {}
             }
             return;
         }
@@ -438,10 +470,82 @@ export class UnderdogService {
 
     static async getLeaderboard(leaderboardId: string = 'mps', limit: number = 50): Promise<{username: string, score: number, metadata?: any, avatarUrl?: string}[]> {
         if (this.isWebsim()) {
-            const ws = (window as any).websim;
-            const lbKey = `websim_leaderboard_${leaderboardId}`;
+            try {
+                const room = await getRoom();
+                if (room) {
+                    let entries: any[] = [];
+                    try {
+                        entries = await new Promise((resolve) => {
+                            let resolved = false;
+                            const unsub = room.query(`
+                                SELECT l.id, l.score, l.metadata, l.mode, l.user_id, u.username
+                                FROM public.leaderboard l
+                                JOIN public.user u ON l.user_id = u.id
+                                WHERE l.mode = $1
+                                ORDER BY l.score DESC
+                            `, [leaderboardId]).subscribe((data: any) => {
+                                if (!resolved) {
+                                    resolved = true;
+                                    resolve(data || []);
+                                    if (typeof unsub === 'function') unsub();
+                                    else if (unsub && typeof unsub.unsubscribe === 'function') unsub.unsubscribe();
+                                }
+                            });
 
-            // 1) Websim native getLeaderboard
+                            setTimeout(() => {
+                                if (!resolved) {
+                                    resolved = true;
+                                    resolve([]);
+                                }
+                            }, 3000);
+                        });
+                    } catch (err) {
+                        console.error("Leaderboard query failed, falling back to collection list:", err);
+                        entries = await room.collection('leaderboard').getList();
+                    }
+
+                    if (!Array.isArray(entries) || entries.length === 0) {
+                        try {
+                            entries = await room.collection('leaderboard').getList();
+                        } catch (e) {
+                            entries = [];
+                        }
+                    }
+
+                    if (Array.isArray(entries) && entries.length > 0) {
+                        const highestScores: Record<string, any> = {};
+                        for (const entry of entries) {
+                            if (!entry) continue;
+                            if (entry.mode && entry.mode !== leaderboardId) continue;
+                            const username = entry.username || entry.user?.username || 'Unknown';
+                            const score = UnderdogService.toScore(entry.score);
+                            if (!highestScores[username] || highestScores[username].score < score) {
+                                const stats = UnderdogService.parseStats(entry);
+                                highestScores[username] = {
+                                    username,
+                                    score,
+                                    metadata: {
+                                        ...stats,
+                                        mode: leaderboardId,
+                                        peakMps: score
+                                    },
+                                    avatarUrl: stats.activeMarbleSkinID || 'marble_white'
+                                };
+                            }
+                        }
+                        const list = Object.values(highestScores)
+                            .sort((a: any, b: any) => b.score - a.score)
+                            .slice(0, limit);
+
+                        if (list.length > 0) return list;
+                    }
+                }
+            } catch (err) {
+                console.error("Error in Websim getLeaderboard:", err);
+            }
+
+            // Fallback 1: Websim native getLeaderboard
+            const ws = (window as any).websim;
             if (typeof ws?.getLeaderboard === 'function') {
                 try {
                     const res = await ws.getLeaderboard(leaderboardId);
@@ -456,49 +560,7 @@ export class UnderdogService {
                 } catch (e) {}
             }
 
-            // 2) Websim Database query
-            if (typeof ws?.database?.from === 'function') {
-                try {
-                    const { data } = await ws.database
-                        .from('leaderboards')
-                        .select('*')
-                        .eq('leaderboard_id', leaderboardId)
-                        .order('score', { ascending: false })
-                        .limit(limit);
-
-                    if (Array.isArray(data) && data.length > 0) {
-                        return data.map((d: any) => ({
-                            username: d.username || 'WebsimPlayer',
-                            score: d.score || 0,
-                            metadata: d.metadata || {},
-                            avatarUrl: d.avatar_url || d.avatarUrl || 'marble_white'
-                        }));
-                    }
-                } catch (e) {}
-            }
-
-            // 3) Websim KV query
-            if (typeof ws?.getKV === 'function') {
-                try {
-                    const kv = await ws.getKV(lbKey);
-                    if (Array.isArray(kv) && kv.length > 0) {
-                        return kv.slice(0, limit);
-                    }
-                } catch (e) {}
-            }
-
-            // 4) LocalStorage fallback
-            try {
-                const raw = localStorage.getItem(lbKey);
-                if (raw) {
-                    const parsed = JSON.parse(raw);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        return parsed.slice(0, limit);
-                    }
-                }
-            } catch (e) {}
-
-            // Default fallback entry for Websim if empty
+            // Fallback 2: Local user
             const currentUser = await this.getCurrentUser();
             if (currentUser) {
                 return [{
