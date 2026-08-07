@@ -4,6 +4,7 @@ import { UnderdogService } from '../../services/underdogService';
 import { engine } from '../../game/engine';
 import { formatNumber } from '../../game/utils';
 import { AvatarDisplay } from '../AvatarDisplay';
+import { WebsimAdBanner } from '../WebsimAdBanner';
 
 export const LeaderboardModal = ({ onClose }: { onClose: () => void }) => {
     const [currentUser, setCurrentUser] = useState<any>(null);
@@ -56,7 +57,9 @@ export const LeaderboardModal = ({ onClose }: { onClose: () => void }) => {
                             <h2 className="column-title daily" style={{ fontSize: '1.4rem', margin: 0, color: '#f97316' }}>
                                 Global Rankings
                             </h2>
-                            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-mono font-bold mt-0.5">Underdog Leaderboard</p>
+                            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-mono font-bold mt-0.5">
+                                {UnderdogService.isWebsim() ? 'Websim Global Leaderboard' : 'Underdog Leaderboard'}
+                            </p>
                         </div>
                     </div>
                     <button className="close-core" onClick={onClose}>Close</button>
@@ -198,13 +201,25 @@ export const LeaderboardModal = ({ onClose }: { onClose: () => void }) => {
                             <div className="p-2 bg-black/40 rounded-lg border border-white/5 flex flex-col justify-center">
                                 <span className="text-[8px] text-slate-500 font-mono uppercase">Income Boost</span>
                                 <span className="text-xs font-black text-emerald-400 mt-0.5">
-                                    📈 +{formatNumber(hoveredEntry.metadata?.derivedIncomeBoostPercent ?? 0)}%
+                                    📈 +{formatNumber((hoveredEntry.metadata?.permanentIncomeBoostPercent || 0) + (hoveredEntry.metadata?.derivedIncomeBoostPercent || 0))}%
                                 </span>
                             </div>
                             <div className="p-2 bg-black/40 rounded-lg border border-white/5 flex flex-col justify-center">
                                 <span className="text-[8px] text-slate-500 font-mono uppercase">Owned Skins</span>
                                 <span className="text-xs font-black text-blue-400 mt-0.5">
-                                    🎨 {hoveredEntry.metadata?.ownedMarblesCount ?? 1} / 16
+                                    🎨 {hoveredEntry.metadata?.ownedMarblesCount ?? 1} / 50
+                                </span>
+                            </div>
+                            <div className="p-2 bg-black/40 rounded-lg border border-white/5 flex flex-col justify-center">
+                                <span className="text-[8px] text-slate-500 font-mono uppercase">Peg Hits / Baskets</span>
+                                <span className="text-xs font-black text-amber-300 mt-0.5">
+                                    🎯 {formatNumber(hoveredEntry.metadata?.lifetimePegHits || 0)} / {formatNumber(hoveredEntry.metadata?.lifetimeBaskets || 0)}
+                                </span>
+                            </div>
+                            <div className="p-2 bg-black/40 rounded-lg border border-white/5 flex flex-col justify-center">
+                                <span className="text-[8px] text-slate-500 font-mono uppercase">Crits / Micro Drops</span>
+                                <span className="text-xs font-black text-red-400 mt-0.5">
+                                    ⚡ {formatNumber(hoveredEntry.metadata?.lifetimeCriticalHits || 0)} / {formatNumber(hoveredEntry.metadata?.lifetimeMicroMarbles || 0)}
                                 </span>
                             </div>
                             <div className="p-2 bg-black/40 rounded-lg border border-white/5 flex flex-col justify-center col-span-2">
@@ -233,6 +248,8 @@ export const LeaderboardModal = ({ onClose }: { onClose: () => void }) => {
                         )}
                     </div>
                 )}
+
+                <WebsimAdBanner id="websim-ad-leaderboard-modal" type="banner" style={{ marginTop: '12px' }} />
             </div>
         </div>
     );

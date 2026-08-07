@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { engine } from '../../game/engine';
-import { PERM_UPGRADES, MARBLE_SKINS, getPermanentUpgradeCost } from '../../game/shardShopConfig';
+import { PERM_UPGRADES, MARBLE_SKINS, SHARD_SHOP_GEMS, getPermanentUpgradeCost } from '../../game/shardShopConfig';
 import { formatNumber } from '../../game/utils';
+import { assets } from '../../game/assets';
 
 const SkinCard = ({ skin, cost, isOwned, isEquipped, canAfford, onBuy, onEquip }: any) => {
     const displayStyle = skin.texture 
@@ -28,7 +29,7 @@ const SkinCard = ({ skin, cost, isOwned, isEquipped, canAfford, onBuy, onEquip }
 };
 
 export const ShardShopModal = ({ onClose }: { onClose: () => void }) => {
-    const [tab, setTab] = useState<'upgrades' | 'skins'>('upgrades');
+    const [tab, setTab] = useState<'upgrades' | 'skins' | 'gems'>('upgrades');
     const [shards, setShards] = useState(engine.state.kineticShards);
     const [updateTick, setUpdateTick] = useState(0);
 
@@ -50,6 +51,7 @@ export const ShardShopModal = ({ onClose }: { onClose: () => void }) => {
     const handleBuyPerm = (id: string) => { engine.buyPermanentUpgrade(id); };
     const handleBuySkin = (id: string) => { engine.buySkin(id); };
     const handleEquipSkin = (id: string) => { engine.equipSkin(id); };
+    const handleBuyGem = (type: 'ruby' | 'emerald' | 'diamond') => { engine.buyGem(type); };
 
     return (
         <div className="confirm-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -63,6 +65,7 @@ export const ShardShopModal = ({ onClose }: { onClose: () => void }) => {
                 <div className="shop-tabs">
                     <button className={`tab-btn ${tab === 'upgrades' ? 'active' : ''}`} onClick={() => setTab('upgrades')}>Upgrades</button>
                     <button className={`tab-btn ${tab === 'skins' ? 'active' : ''}`} onClick={() => setTab('skins')}>Skins</button>
+                    <button className={`tab-btn ${tab === 'gems' ? 'active' : ''}`} onClick={() => setTab('gems')}>Gems 💎</button>
                 </div>
 
                 <div className="shop-content">
@@ -81,7 +84,7 @@ export const ShardShopModal = ({ onClose }: { onClose: () => void }) => {
                                             <div className="perm-level">Lvl {level} {isMax ? '(MAX)' : ''}</div>
                                         </div>
                                         <button 
-                                            className={`perm-buy ${canAfford ? 'can' : 'cant'}`} 
+                                            className={`perm-buy ${isMax ? 'maxed' : (canAfford ? 'can' : 'cant')}`} 
                                             disabled={isMax || !canAfford}
                                             onClick={() => handleBuyPerm(u.id)}
                                         >
@@ -116,6 +119,43 @@ export const ShardShopModal = ({ onClose }: { onClose: () => void }) => {
                                         onBuy={handleBuySkin}
                                         onEquip={handleEquipSkin}
                                     />
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {tab === 'gems' && (
+                        <div className="perm-upgrades-list">
+                            <div className="p-3 bg-cyan-950/40 border border-cyan-500/30 rounded-xl mb-3 text-xs text-cyan-200 leading-relaxed font-medium">
+                                💎 <span className="font-bold text-cyan-300">End-Game Gem Market:</span> Directly purchase socketable Gems with Kinetic Shards! Socket them onto pegs for permanent board-wide multiplier powers.
+                            </div>
+                            {SHARD_SHOP_GEMS.map(g => {
+                                const currentOwned = engine.state.gems?.[g.gemKey] || 0;
+                                const canAfford = shards >= g.cost;
+                                return (
+                                    <div className="perm-card flex items-center justify-between p-3.5 bg-black/40 border border-white/10 rounded-xl mb-2.5" key={g.type}>
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-black/50 border border-white/10 p-1.5 shrink-0">
+                                                <img src={assets.getSrc(g.imgKey as any)} alt={g.name} className="w-7 h-7 object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]" />
+                                            </div>
+                                            <div className="perm-info">
+                                                <div className="perm-name flex items-center gap-2 text-sm font-bold text-white">
+                                                    <span>{g.name}</span>
+                                                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-white/10 text-cyan-300 border border-white/10">
+                                                        Owned: {currentOwned}
+                                                    </span>
+                                                </div>
+                                                <div className="perm-desc text-xs text-slate-300 mt-0.5">{g.description}</div>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            className={`perm-buy shrink-0 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${canAfford ? 'can' : 'cant'}`} 
+                                            disabled={!canAfford}
+                                            onClick={() => handleBuyGem(g.type)}
+                                        >
+                                            Buy ({formatNumber(g.cost)})
+                                        </button>
+                                    </div>
                                 );
                             })}
                         </div>

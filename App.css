@@ -363,12 +363,14 @@ body {
 canvas {
     border-radius: 12px;
     box-shadow: 0 20px 50px rgba(0,0,0,0.6);
-    background: #000;
+    background: #0d0e15;
     /* Responsive Canvas Logic */
-    flex: 1 1 auto; /* Grow/Shrink */
+    flex: 0 1 auto; /* Maintain exact aspect ratio without stretching container */
     min-height: 0; /* Allow shrinking below content size */
     width: auto;
     max-width: 100%;
+    max-height: 100%;
+    aspect-ratio: 400 / 600; /* Strictly match Plinko board 2:3 aspect ratio */
     object-fit: contain; /* Maintain Aspect Ratio */
     cursor: pointer;
     transition: all 0.3s ease;
@@ -532,8 +534,11 @@ canvas.challenge-board {
 .perm-name { font-weight: bold; color: #ffd700; }
 .perm-desc { font-size: 0.8rem; color: #ccc; }
 .perm-level { font-size: 0.8rem; color: #888; margin-top: auto; }
-.perm-buy { background: #4caf50; border: none; padding: 6px; border-radius: 4px; color: #fff; font-weight: bold; cursor: pointer; }
-.perm-buy.cant { background: #333; color: #666; cursor: not-allowed; }
+.perm-buy { border: none; padding: 6px 12px; border-radius: 6px; color: #fff; font-weight: bold; cursor: pointer; transition: all 0.2s ease; }
+.perm-buy.can { background: #2ecc71; color: #fff; box-shadow: 0 2px 0 #27ae60; }
+.perm-buy.can:active { transform: translateY(2px); box-shadow: none; }
+.perm-buy.cant { background: #ff4757; color: #fff; opacity: 0.9; cursor: not-allowed; box-shadow: 0 2px 0 #e84118; }
+.perm-buy.maxed { background: #333; color: #666; cursor: not-allowed; box-shadow: none; }
 
 .skins-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
 .skin-card { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; text-align: center; display: flex; flex-direction: column; gap: 5px; }
@@ -542,11 +547,11 @@ canvas.challenge-board {
 .skin-preview { width: 60px; height: 60px; margin: 0 auto; border-radius: 50%; background-size: cover; background-position: center; border: 2px solid rgba(255,255,255,0.1); }
 .skin-name { font-size: 0.85rem; font-weight: bold; }
 .skin-rarity { font-size: 0.7rem; }
-.skin-btn { padding: 4px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold; margin-top: auto; }
-.skin-btn.buy { background: #3498db; color: #fff; }
-.skin-btn.buy:disabled { background: #333; color: #666; }
-.skin-btn.select { background: #2ecc71; color: #fff; }
-.skin-btn.select:disabled { background: #555; color: #aaa; cursor: default; }
+.skin-btn { padding: 6px 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: bold; margin-top: auto; transition: all 0.2s ease; }
+.skin-btn.buy.can { background: #2ecc71; color: #fff; box-shadow: 0 2px 0 #27ae60; }
+.skin-btn.buy.cant { background: #ff4757; color: #fff; opacity: 0.9; cursor: not-allowed; box-shadow: 0 2px 0 #e84118; }
+.skin-btn.select { background: #3498db; color: #fff; }
+.skin-btn.select:disabled { background: #2ecc71; color: #fff; cursor: default; }
 
 /* Prestige Modal */
 .prestige-modal { max-width: 560px; background: linear-gradient(180deg, rgba(12,14,18,0.92), rgba(22,24,28,0.96)); }

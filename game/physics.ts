@@ -38,11 +38,16 @@ export class PhysicsManager {
                 critChance = 50; // Locked to 50%
             }
             
+            let pegBaseVal = 1 + (u.pegValue * 2);
+            if (cid === 'anti_gravity') {
+                pegBaseVal *= 5; // 5x Anti-Gravity Peg Yield Boost!
+            }
+
             return {
                 upgrades: u,
                 criticalChancePercent: critChance,
-                pegValue: 1 + (u.pegValue * 2),
-                microValuePercent: u.microValue,
+                pegValue: pegBaseVal,
+                microValuePercent: u.microValue * 2,
                 uncommonChancePercent: Math.min(20, u.uncommonChance),
                 rareChancePercent: Math.min(20, u.rareChance),
                 legendaryChancePercent: Math.min(20, u.legendaryChance),
@@ -104,7 +109,7 @@ export class PhysicsManager {
             }
         }
 
-        let gain = baseValue * multiplier * marbleCountMult * permIncomeMult;
+        let gain = baseValue * multiplier * marbleCountMult * permIncomeMult * (ball.mergeCount || 1);
         if (isPeg) {
             gain *= DailyEventsManager.getPegIncomeMultiplier();
         }
@@ -136,6 +141,132 @@ export class PhysicsManager {
         return { gain, isCritical };
     }
 
+    static mergeBallsIfNeeded(
+        state: GameState,
+        balls: Ball[],
+        pushPopup?: (p: Popup) => void,
+        pushEffect?: (e: VisualEffect) => void
+    ) {
+        // 1. Un-merge marbles if merge mode is disabled
+        if (state.mergeModeEnabled === false) {
+            const merged = balls.filter(b => !b._remove && (b.mergeCount || 1) > 1);
+            if (merged.length > 0) {
+                for (const b of merged) {
+                    const count = b.mergeCount || 1;
+                    b.mergeCount = 1;
+                    for (let k = 1; k < count; k++) {
+                        const angle = (k / (count - 1)) * Math.PI * 2;
+                        const dist = 3 + Math.random() * 5;
+                        balls.push({
+                            ...b,
+                            x: b.x + Math.cos(angle) * dist,
+                            y: b.y + Math.sin(angle) * dist,
+                            vx: b.vx + (Math.random() - 0.5) * 60,
+                            vy: b.vy + (Math.random() - 0.5) * 60,
+                            mergeCount: 1,
+                            trail: [],
+                            id: Date.now() + Math.random()
+                        });
+                    }
+                }
+            }
+            return;
+        }
+
+        const activeBalls = balls.filter(b => !b._remove);
+
+        const aggression = state.mergeAggression || 'low';
+        let minThreshold = 45;
+        let maxMergeCap = 10;
+
+        if (aggression === 'high') {
+            minThreshold = 15;
+            maxMergeCap = 999;
+        } else if (aggression === 'medium') {
+            minThreshold = 28;
+            maxMergeCap = 25;
+        } else {
+            minThreshold = activeBalls.some(b => b.micro) ? 35 : 45;
+            maxMergeCap = 10;
+        }
+
+        if (activeBalls.length < minThreshold) return;
+
+        const groups: Map<string, Ball[]> = new Map();
+        for (const b of activeBalls) {
+            if ((b.mergeCount || 1) >= maxMergeCap) continue;
+            const key = `${b.master ? '1' : '0'}_${b.micro ? '1' : '0'}_${b.type}_${b.isSplit ? '1' : '0'}`;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push(b);
+        }
+
+        groups.forEach((group) => {
+            if (group.length < 2) return;
+
+            for (let i = 0; i < group.length; i++) {
+                const b1 = group[i];
+                if (b1._remove || (b1.mergeCount || 1) >= maxMergeCap) continue;
+
+                let mergeRadius = 0;
+                if (aggression === 'high') {
+                    const isCrowded = activeBalls.length > 30;
+                    mergeRadius = (b1.micro ? 18 : 28) * (isCrowded ? 1.5 : 1.0);
+                } else if (aggression === 'medium') {
+                    mergeRadius = b1.micro ? 14 : 20;
+                } else {
+                    // low aggression: contact distance
+                    mergeRadius = b1.radius + (group[0]?.micro ? 3 : 5);
+                }
+
+                for (let j = i + 1; j < group.length; j++) {
+                    const b2 = group[j];
+                    if (b2._remove || (b2.mergeCount || 1) >= maxMergeCap) continue;
+
+                    const dx = b2.x - b1.x;
+                    const dy = b2.y - b1.y;
+                    const distSq = dx * dx + dy * dy;
+
+                    if (distSq <= mergeRadius * mergeRadius) {
+                        const m1 = b1.mergeCount || 1;
+                        const m2 = b2.mergeCount || 1;
+                        const total = Math.min(maxMergeCap, m1 + m2);
+
+                        b1.x = (b1.x * m1 + b2.x * m2) / (m1 + m2);
+                        b1.y = (b1.y * m1 + b2.y * m2) / (m1 + m2);
+                        b1.vx = (b1.vx * m1 + b2.vx * m2) / (m1 + m2);
+                        b1.vy = (b1.vy * m1 + b2.vy * m2) / (m1 + m2);
+
+                        b1.mergeCount = total;
+                        b2._remove = true;
+
+                        if (pushPopup && (total === 5 || total === 10 || total === 25 || total === 50 || total === 100)) {
+                            pushPopup({
+                                x: b1.x,
+                                y: b1.y,
+                                text: `MERGE x${total}`,
+                                t: performance.now(),
+                                critical: true,
+                                master: b1.master,
+                                micro: b1.micro
+                            });
+                        }
+
+                        if (pushEffect) {
+                            pushEffect({
+                                x: b1.x,
+                                y: b1.y,
+                                t: performance.now(),
+                                duration: 250,
+                                type: 'critical_hit'
+                            });
+                        }
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
     static updateBalls(
         dt: number,
         state: GameState,
@@ -153,6 +284,8 @@ export class PhysicsManager {
         audio: AudioController,
         onPegBreak?: (p: Peg) => void
     ) {
+        PhysicsManager.mergeBallsIfNeeded(state, balls, pushPopup, pushEffect);
+
         const stats = PhysicsManager.getEffectiveStats(state);
         const timeScale = stats.ballSpeed;
         
@@ -277,8 +410,9 @@ export class PhysicsManager {
                                 
                                 if (b._pegCooldown <= 0) {
                                     b._pegCooldown = 10;
-                                    state.lifetimePegHits = (state.lifetimePegHits || 0) + 1;
-                                    ProgressionManager.updateMissionProgress(state, 'pegs_hit', 1);
+                                    const countVal = b.mergeCount || 1;
+                                    state.lifetimePegHits = (state.lifetimePegHits || 0) + countVal;
+                                    ProgressionManager.updateMissionProgress(state, 'pegs_hit', countVal);
 
                                     const isSandPeg = state.inChallengeMode && state.challengeState.challengeId === 'sand_peg';
                                     if (isSandPeg) {
@@ -286,13 +420,13 @@ export class PhysicsManager {
                                         
                                         // 6. Critical hits in this mode should deal 2 damage to a peg when hit.
                                         let isCritical = false;
-                                        let damage = 1;
+                                        let damage = 1 * (b.mergeCount || 1);
                                         const statsOver = PhysicsManager.getEffectiveStats(state);
                                         const critSettings = DailyEventsManager.getCriticalSettings();
                                         const baseCrit = statsOver.criticalChancePercent + critSettings.flatBoost;
                                         if (Math.random() * 100 < (baseCrit * critSettings.chanceMult)) {
                                             isCritical = true;
-                                            damage = 2;
+                                            damage = 2 * (b.mergeCount || 1);
                                             state.lifetimeCriticalHits = (state.lifetimeCriticalHits || 0) + 1;
                                             pushEffect({
                                                 x: p.x, y: p.y, t: performance.now(), duration: 400, type: 'critical_hit'
@@ -325,7 +459,7 @@ export class PhysicsManager {
                                             else if (b.type === 'legendary') basePegs = 4;
                                             
                                             const multLevel = state.challengeState.upgrades.sandPegMultiplier || 0;
-                                            const pegReward = Math.round(basePegs * Math.pow(1.25, multLevel));
+                                            const pegReward = Math.round(basePegs * Math.pow(1.25, multLevel) * (b.mergeCount || 1));
                                             
                                             state.challengeState.pegsBrokenCurrency = (state.challengeState.pegsBrokenCurrency || 0) + pegReward;
                                             state.challengeState.lifetimePegsBroken = (state.challengeState.lifetimePegsBroken || 0) + pegReward;
@@ -394,29 +528,53 @@ export class PhysicsManager {
                                         }
 
                                         // Emerald split effect
-                                        if (p.gemType === 'emerald' && !b.isSplit && balls.length < 150) {
-                                            const angle = Math.random() * Math.PI * 2;
-                                            const splitBall: Ball = {
-                                                x: b.x + Math.cos(angle) * 3,
-                                                y: b.y + Math.sin(angle) * 3,
-                                                vx: -b.vx + (Math.random() - 0.5) * 60,
-                                                vy: b.vy + (Math.random() * 40 + 20),
-                                                radius: b.radius,
-                                                id: Date.now() + Math.random(),
-                                                master: b.master,
-                                                micro: b.micro,
-                                                type: b.type,
-                                                trail: [],
-                                                _pegCooldown: 12,
-                                                age: 0,
-                                                maxAge: b.maxAge,
-                                                isSplit: true
-                                            };
-                                            balls.push(splitBall);
-                                            pushPopup({
-                                                x: p.x, y: p.y - 14, text: "SPLIT!", t: performance.now(),
-                                                critical: false, master: b.master, micro: b.micro
-                                            });
+                                        if (p.gemType === 'emerald' && !b.isSplit && balls.length < 180) {
+                                            const mCount = b.mergeCount || 1;
+                                            if (mCount > 1) {
+                                                // Unmerge merged marble upon hitting Emerald Peg!
+                                                b.mergeCount = 1;
+                                                for (let k = 1; k < mCount; k++) {
+                                                    const angle = (k / (mCount - 1)) * Math.PI * 2;
+                                                    balls.push({
+                                                        ...b,
+                                                        x: b.x + Math.cos(angle) * 4,
+                                                        y: b.y + Math.sin(angle) * 4,
+                                                        vx: -b.vx + (Math.random() - 0.5) * 80,
+                                                        vy: b.vy + (Math.random() * 40 + 20),
+                                                        mergeCount: 1,
+                                                        isSplit: true,
+                                                        trail: [],
+                                                        id: Date.now() + Math.random()
+                                                    });
+                                                }
+                                                pushPopup({
+                                                    x: p.x, y: p.y - 14, text: `SPLIT x${mCount}!`, t: performance.now(),
+                                                    critical: true, master: b.master, micro: b.micro
+                                                });
+                                            } else {
+                                                const angle = Math.random() * Math.PI * 2;
+                                                const splitBall: Ball = {
+                                                    x: b.x + Math.cos(angle) * 3,
+                                                    y: b.y + Math.sin(angle) * 3,
+                                                    vx: -b.vx + (Math.random() - 0.5) * 60,
+                                                    vy: b.vy + (Math.random() * 40 + 20),
+                                                    radius: b.radius,
+                                                    id: Date.now() + Math.random(),
+                                                    master: b.master,
+                                                    micro: b.micro,
+                                                    type: b.type,
+                                                    trail: [],
+                                                    _pegCooldown: 12,
+                                                    age: 0,
+                                                    maxAge: b.maxAge,
+                                                    isSplit: true
+                                                };
+                                                balls.push(splitBall);
+                                                pushPopup({
+                                                    x: p.x, y: p.y - 14, text: "SPLIT!", t: performance.now(),
+                                                    critical: false, master: b.master, micro: b.micro
+                                                });
+                                            }
                                             pushEffect({
                                                 x: p.x, y: p.y, t: performance.now(), duration: 250, type: 'micro_spawn'
                                             });
@@ -424,7 +582,7 @@ export class PhysicsManager {
 
                                         // Diamond explosive effect
                                         if (p.gemType === 'diamond') {
-                                            p.diamondHits = (p.diamondHits || 0) + 1;
+                                            p.diamondHits = (p.diamondHits || 0) + (b.mergeCount || 1);
                                             if (p.diamondHits >= 10) {
                                                 p.diamondHits = 0; // Reset
                                                 audio.play('explode', 1, 0.25); 
@@ -469,6 +627,8 @@ export class PhysicsManager {
                                                             if (odist < range) {
                                                                 op.glow = 1.0;
                                                                 op.cooldown = 10;
+                                                                state.lifetimePegHits = (state.lifetimePegHits || 0) + 1;
+                                                                ProgressionManager.updateMissionProgress(state, 'pegs_hit', 1);
                                                                 
                                                                 const opIsSandPeg = state.inChallengeMode && state.challengeState?.challengeId === 'sand_peg';
                                                                 if (opIsSandPeg) {
@@ -534,6 +694,19 @@ export class PhysicsManager {
                     b.vx = (Math.random() - 0.5) * 200;
                     b.trail = [];
                     
+                    // Anti-Gravity Bumper Launch Payout (25x base peg value) & Basket Mission count
+                    const bumperGain = Math.round(stats.pegValue * 25 * Math.max(1, (stats.upgrades.extraBall || 1) * 0.75) * (b.mergeCount || 1));
+                    addMoney(bumperGain);
+                    state.lifetimeBaskets = (state.lifetimeBaskets || 0) + 1;
+                    ProgressionManager.updateMissionProgress(state, 'baskets', 1);
+
+                    if (!state.disableMoneyPopups && bumperGain > 0) {
+                        pushPopup({
+                            x: b.x, y: b.y, text: `+$${formatNumber(bumperGain)} LAUNCH!`, t: performance.now(),
+                            critical: true, master: b.master, micro: b.micro
+                        });
+                    }
+
                     audio.play('peg', 1.5, 0.4);
                     return;
                 }
@@ -556,10 +729,11 @@ export class PhysicsManager {
                 }
             }
 
-            if (!hitDivider && b.y > basketTop && b.y < basketBottom) {
+            if (!hitDivider && b.y > basketTop) {
                 if (b.vy > 0) {
-                    state.lifetimeBaskets = (state.lifetimeBaskets || 0) + 1;
-                    ProgressionManager.updateMissionProgress(state, 'baskets', 1);
+                    const basketCount = b.mergeCount || 1;
+                    state.lifetimeBaskets = (state.lifetimeBaskets || 0) + basketCount;
+                    ProgressionManager.updateMissionProgress(state, 'baskets', basketCount);
 
                     const idx = Math.floor(b.x / basketW);
                     const baseValues = [10, 5, 20, 5, 10];

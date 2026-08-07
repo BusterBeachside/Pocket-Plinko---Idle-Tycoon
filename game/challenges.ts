@@ -26,12 +26,12 @@ export const CHALLENGES: { [id: string]: ChallengeDefinition } = {
     anti_gravity: {
         id: 'anti_gravity',
         name: 'Anti-Gravity Chamber',
-        description: 'Plinko in outer space? Marbles don`t quite seem to obey the laws of gravity in this challenge! (Hint: This one`s all about peg hits!)',
-        gimmickDescription: 'Gravity is cut by 80%. Baskets are replaced with bumpers that send marbles right back up. Marbles automatically respawn every so often.',
+        description: 'Plinko in outer space? Marbles don`t quite seem to obey the laws of gravity in this challenge!',
+        gimmickDescription: 'Gravity is cut by 80%. Baskets are replaced with launch bumpers (25x payout). Peg hits yield 5x bonus money.',
         goals: {
-            bronze: { target: 50000000, metric: 'money', description: 'Earn $50,000,000 in total Challenge cash', rewardDescription: '+$100K Main Cash, +10 Shards', shardReward: 10, moneyReward: 100000 },
-            silver: { target: 2500000000, metric: 'money', description: 'Earn $2,500,000,000 in total Challenge cash', rewardDescription: '+$5M Main Cash, +50 Shards, +1 Diamond Gem', shardReward: 50, moneyReward: 5000000, gemReward: 'azure' },
-            gold: { target: 150000000000, metric: 'money', description: 'Earn $150,000,000,000 in total Challenge cash', rewardDescription: '+$1B Main Cash, +200 Shards, +1 Emerald Gem', shardReward: 200, moneyReward: 1000000000, gemReward: 'amber' }
+            bronze: { target: 25000000, metric: 'money', description: 'Earn $25,000,000 in total Challenge cash', rewardDescription: '+$100K Main Cash, +10 Shards', shardReward: 10, moneyReward: 100000 },
+            silver: { target: 1000000000, metric: 'money', description: 'Earn $1,000,000,000 in total Challenge cash', rewardDescription: '+$5M Main Cash, +50 Shards, +1 Diamond Gem', shardReward: 50, moneyReward: 5000000, gemReward: 'azure' },
+            gold: { target: 50000000000, metric: 'money', description: 'Earn $50,000,000,000 in total Challenge cash', rewardDescription: '+$1B Main Cash, +200 Shards, +1 Emerald Gem', shardReward: 200, moneyReward: 1000000000, gemReward: 'amber' }
         }
     },
     sand_peg: {

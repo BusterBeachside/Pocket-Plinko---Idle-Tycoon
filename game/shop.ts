@@ -1,7 +1,7 @@
 
 import { GameState } from './types';
 import { UPGRADES } from './config';
-import { PERM_UPGRADES, MARBLE_SKINS, getPermanentUpgradeCost } from './shardShopConfig';
+import { PERM_UPGRADES, MARBLE_SKINS, SHARD_SHOP_GEMS, getPermanentUpgradeCost } from './shardShopConfig';
 import { AudioController } from './audio';
 import { SaveSystem } from './saveSystem';
 import { DailyEventsManager } from './dailyEvents';
@@ -99,5 +99,25 @@ export class ShopSystem {
             state.activeMarbleTexture = skin && skin.texture ? skin.texture : null;
             saveCallback();
         }
+    }
+
+    static buyGem(state: GameState, gemType: 'ruby' | 'emerald' | 'diamond', audio: AudioController, saveCallback: () => void): boolean {
+        const cfg = SHARD_SHOP_GEMS.find(g => g.type === gemType);
+        if (!cfg) return false;
+
+        if (state.kineticShards >= cfg.cost) {
+            state.kineticShards -= cfg.cost;
+
+            if (!state.gems) state.gems = { crimson: 0, azure: 0, amber: 0 };
+            state.gems[cfg.gemKey] = (state.gems[cfg.gemKey] || 0) + 1;
+
+            if (!state.gemInventory) state.gemInventory = { ruby: 0, emerald: 0, diamond: 0 };
+            state.gemInventory[cfg.type] = (state.gemInventory[cfg.type] || 0) + 1;
+
+            audio.play('upgrade');
+            saveCallback();
+            return true;
+        }
+        return false;
     }
 }

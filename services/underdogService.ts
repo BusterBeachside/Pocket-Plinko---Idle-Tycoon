@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { engine } from "../game/engine";
 
 const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || '';
 const supabaseKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY || '';
@@ -9,16 +10,84 @@ export const supabase = createClient(
     supabaseKey || 'dummy_key'
 );
 
+// ============================================================================
+// DEBUG TOGGLE: Set to true to force Websim mode during testing/development!
+// You can also toggle this at runtime in the console via:
+// window.__FORCE_WEBSIM_MODE__ = true  OR localStorage.setItem('debug_force_websim', 'true')
+// ============================================================================
+export const FORCE_WEBSIM_MODE_DEBUG = false;
+
 export interface UnderdogUser {
     userId: string;
     username: string;
     profilePictureUrl: string;
+    isWebsim?: boolean;
 }
 
 export class UnderdogService {
     private static authListener: any = null;
 
+    /**
+     * Detects whether the application is currently executing inside Websim environment
+     * or if debug Websim mode is explicitly forced.
+     */
+    public static isWebsim(): boolean {
+        if (FORCE_WEBSIM_MODE_DEBUG) return true;
+        if (typeof window !== 'undefined') {
+            if ((window as any).__FORCE_WEBSIM_MODE__ === true) return true;
+            if (localStorage.getItem('debug_force_websim') === 'true') return true;
+            
+            if (!(window as any).toggleWebsimDebug) {
+                (window as any).toggleWebsimDebug = (enable?: boolean) => {
+                    const current = localStorage.getItem('debug_force_websim') === 'true';
+                    const next = enable !== undefined ? enable : !current;
+                    localStorage.setItem('debug_force_websim', next ? 'true' : 'false');
+                    console.log(`[Pocket Plinko] Websim Debug Mode set to: ${next}`);
+                    window.location.reload();
+                };
+            }
+        }
+        return typeof (window as any).websim !== 'undefined' && (window as any).websim !== null;
+    }
+
     static async getCurrentUser(): Promise<UnderdogUser | null> {
+        if (this.isWebsim()) {
+            try {
+                const ws = (window as any).websim;
+                let u = null;
+                if (typeof ws.getUser === 'function') {
+                    u = await ws.getUser();
+                } else if (ws.user) {
+                    u = ws.user;
+                } else if (typeof ws.getCreatedBy === 'function') {
+                    u = await ws.getCreatedBy();
+                }
+
+                if (u) {
+                    const userId = u.id || u.username || 'websim_user';
+                    const username = u.username || u.name || 'WebsimPlayer';
+                    const avatar = localStorage.getItem(`websim_avatar_${userId}`) || u.avatar_url || u.avatar || 'marble_white';
+                    return {
+                        userId: String(userId),
+                        username: String(username),
+                        profilePictureUrl: avatar,
+                        isWebsim: true
+                    };
+                }
+            } catch (e) {
+                console.error("Error fetching Websim user:", e);
+            }
+
+            const guestUsername = localStorage.getItem('websim_mock_username') || 'WebsimPlayer';
+            const guestAvatar = localStorage.getItem('websim_mock_avatar') || 'marble_white';
+            return {
+                userId: 'websim_player_id',
+                username: guestUsername,
+                profilePictureUrl: guestAvatar,
+                isWebsim: true
+            };
+        }
+
         if (!supabaseUrl) {
             const username = localStorage.getItem('underdog_mock_username');
             const avatar = localStorage.getItem('underdog_mock_avatar') || 'marble_white';
@@ -65,6 +134,11 @@ export class UnderdogService {
             return true;
         }
 
+        if (this.isWebsim()) {
+            localStorage.setItem(`websim_avatar_${user.userId}`, avatarId);
+            return true;
+        }
+
         if (supabaseUrl) {
             try {
                 // Update Auth user metadata
@@ -95,6 +169,10 @@ export class UnderdogService {
     }
 
     static async signIn(email: string, pass: string): Promise<UnderdogUser | null> {
+        if (this.isWebsim()) {
+            return this.getCurrentUser();
+        }
+
         if (!supabaseUrl) {
             console.error("Missing supabaseUrl or supabaseKey");
             throw new Error("Missing Supabase configuration");
@@ -113,6 +191,11 @@ export class UnderdogService {
     }
 
     static async signUp(email: string, pass: string, username: string): Promise<UnderdogUser | null> {
+        if (this.isWebsim()) {
+            localStorage.setItem('websim_mock_username', username);
+            return this.getCurrentUser();
+        }
+
         if (!supabaseUrl) {
             console.error("Missing supabaseUrl or supabaseKey");
             throw new Error("Missing Supabase configuration");
@@ -153,6 +236,12 @@ export class UnderdogService {
     }
 
     static async signOut(): Promise<void> {
+        if (this.isWebsim()) {
+            localStorage.removeItem('websim_mock_username');
+            localStorage.removeItem('websim_mock_avatar');
+            return;
+        }
+
         if (!supabaseUrl) {
             localStorage.removeItem('underdog_mock_username');
             return;
@@ -161,6 +250,20 @@ export class UnderdogService {
     }
 
     static addAuthListener(callback: (user: UnderdogUser | null) => void) {
+        if (this.isWebsim()) {
+            this.getCurrentUser().then(u => callback(u));
+            try {
+                const ws = (window as any).websim;
+                if (ws && typeof ws.addEventListener === 'function') {
+                    ws.addEventListener('userChange', async () => {
+                        const u = await this.getCurrentUser();
+                        callback(u);
+                    });
+                }
+            } catch (e) {}
+            return;
+        }
+
         if (!supabaseUrl) return;
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -190,6 +293,85 @@ export class UnderdogService {
             const currentMockScore = parseFloat(localStorage.getItem(`underdog_mock_highscore_${leaderboardId}`) || '-1');
             if (score > currentMockScore) {
                 localStorage.setItem(`underdog_mock_highscore_${leaderboardId}`, score.toString());
+            }
+            return;
+        }
+
+        if (this.isWebsim()) {
+            const ws = (window as any).websim;
+            const numericScore = Math.floor(score);
+
+            // 1) Websim native submitScore if present
+            if (typeof ws?.submitScore === 'function') {
+                try {
+                    await ws.submitScore({
+                        score: numericScore,
+                        leaderboard: leaderboardId,
+                        metadata: playerStats
+                    });
+                } catch (e) {}
+            }
+
+            // 2) Websim database table if present
+            if (typeof ws?.database?.upsert === 'function') {
+                try {
+                    await ws.database.upsert('leaderboards', {
+                        leaderboard_id: leaderboardId,
+                        user_id: user.userId,
+                        username: user.username,
+                        score: numericScore,
+                        avatar_url: user.profilePictureUrl,
+                        metadata: playerStats,
+                        updated_at: new Date().toISOString()
+                    });
+                } catch (e) {}
+            }
+
+            // 3) Websim postLog
+            if (typeof ws?.postLog === 'function') {
+                try {
+                    await ws.postLog('leaderboard_score', {
+                        leaderboard: leaderboardId,
+                        userId: user.userId,
+                        username: user.username,
+                        score: numericScore,
+                        avatarUrl: user.profilePictureUrl,
+                        metadata: playerStats
+                    });
+                } catch (e) {}
+            }
+
+            // 4) LocalStorage & KV backup for Websim
+            const lbKey = `websim_leaderboard_${leaderboardId}`;
+            let lb: any[] = [];
+            try {
+                const raw = localStorage.getItem(lbKey);
+                if (raw) lb = JSON.parse(raw);
+            } catch (e) {}
+
+            const idx = lb.findIndex(x => x.username === user.username || x.userId === user.userId);
+            if (idx >= 0) {
+                if (numericScore > (lb[idx].score || 0)) {
+                    lb[idx].score = numericScore;
+                    lb[idx].metadata = { ...lb[idx].metadata, ...playerStats };
+                    lb[idx].avatarUrl = user.profilePictureUrl;
+                }
+            } else {
+                lb.push({
+                    userId: user.userId,
+                    username: user.username,
+                    score: numericScore,
+                    avatarUrl: user.profilePictureUrl,
+                    metadata: playerStats || {}
+                });
+            }
+
+            lb.sort((a, b) => b.score - a.score);
+            const sliced = lb.slice(0, 100);
+            localStorage.setItem(lbKey, JSON.stringify(sliced));
+
+            if (typeof ws?.setKV === 'function') {
+                try { await ws.setKV(lbKey, sliced); } catch (e) {}
             }
             return;
         }
@@ -255,6 +437,81 @@ export class UnderdogService {
     }
 
     static async getLeaderboard(leaderboardId: string = 'mps', limit: number = 50): Promise<{username: string, score: number, metadata?: any, avatarUrl?: string}[]> {
+        if (this.isWebsim()) {
+            const ws = (window as any).websim;
+            const lbKey = `websim_leaderboard_${leaderboardId}`;
+
+            // 1) Websim native getLeaderboard
+            if (typeof ws?.getLeaderboard === 'function') {
+                try {
+                    const res = await ws.getLeaderboard(leaderboardId);
+                    if (Array.isArray(res) && res.length > 0) {
+                        return res.map((r: any) => ({
+                            username: r.username || r.user?.username || 'WebsimPlayer',
+                            score: r.score || 0,
+                            metadata: r.metadata || {},
+                            avatarUrl: r.avatar_url || r.avatarUrl || 'marble_white'
+                        })).slice(0, limit);
+                    }
+                } catch (e) {}
+            }
+
+            // 2) Websim Database query
+            if (typeof ws?.database?.from === 'function') {
+                try {
+                    const { data } = await ws.database
+                        .from('leaderboards')
+                        .select('*')
+                        .eq('leaderboard_id', leaderboardId)
+                        .order('score', { ascending: false })
+                        .limit(limit);
+
+                    if (Array.isArray(data) && data.length > 0) {
+                        return data.map((d: any) => ({
+                            username: d.username || 'WebsimPlayer',
+                            score: d.score || 0,
+                            metadata: d.metadata || {},
+                            avatarUrl: d.avatar_url || d.avatarUrl || 'marble_white'
+                        }));
+                    }
+                } catch (e) {}
+            }
+
+            // 3) Websim KV query
+            if (typeof ws?.getKV === 'function') {
+                try {
+                    const kv = await ws.getKV(lbKey);
+                    if (Array.isArray(kv) && kv.length > 0) {
+                        return kv.slice(0, limit);
+                    }
+                } catch (e) {}
+            }
+
+            // 4) LocalStorage fallback
+            try {
+                const raw = localStorage.getItem(lbKey);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        return parsed.slice(0, limit);
+                    }
+                }
+            } catch (e) {}
+
+            // Default fallback entry for Websim if empty
+            const currentUser = await this.getCurrentUser();
+            if (currentUser) {
+                return [{
+                    username: currentUser.username,
+                    score: Math.floor(engine?.state?.peakMps || 0),
+                    avatarUrl: currentUser.profilePictureUrl,
+                    metadata: { mode: leaderboardId }
+                }];
+            }
+
+            return [];
+        }
+
         if (!supabaseUrl) return [];
 
         const { data, error } = await supabase
@@ -319,6 +576,30 @@ export class UnderdogService {
             return;
         }
 
+        if (this.isWebsim()) {
+            const ws = (window as any).websim;
+            const userId = user.userId;
+            const payload = {
+                user_id: userId,
+                stats,
+                currency: Math.floor(currency),
+                settings,
+                updated_at: new Date().toISOString()
+            };
+
+            if (typeof ws?.setKV === 'function') {
+                try { await ws.setKV(`save_${userId}`, payload); } catch (e) {}
+            }
+            if (typeof ws?.database?.upsert === 'function') {
+                try { await ws.database.upsert('user_game_data', payload); } catch (e) {}
+            }
+
+            localStorage.setItem(`websim_save_currency_${userId}`, Math.floor(currency).toString());
+            localStorage.setItem(`websim_save_stats_${userId}`, JSON.stringify(stats));
+            localStorage.setItem(`websim_save_settings_${userId}`, JSON.stringify(settings));
+            return;
+        }
+
         if (supabaseUrl) {
             await supabase.from('user_game_data').upsert({
                 game_id: '7bb15041-7cb9-44cd-aed0-c7549ae19803',
@@ -343,6 +624,53 @@ export class UnderdogService {
                 stats: JSON.parse(statsStr),
                 settings: settingsStr ? JSON.parse(settingsStr) : {}
             };
+        }
+
+        if (this.isWebsim()) {
+            const ws = (window as any).websim;
+            const userId = user.userId;
+
+            if (typeof ws?.getKV === 'function') {
+                try {
+                    const kvData = await ws.getKV(`save_${userId}`);
+                    if (kvData && kvData.stats) {
+                        return {
+                            currency: kvData.currency || 0,
+                            stats: kvData.stats,
+                            settings: kvData.settings || {}
+                        };
+                    }
+                } catch (e) {}
+            }
+
+            if (typeof ws?.database?.from === 'function') {
+                try {
+                    const { data } = await ws.database
+                        .from('user_game_data')
+                        .select('*')
+                        .eq('user_id', userId)
+                        .single();
+                    if (data && data.stats) {
+                        return {
+                            currency: data.currency || 0,
+                            stats: data.stats,
+                            settings: data.settings || {}
+                        };
+                    }
+                } catch (e) {}
+            }
+
+            const currencyStr = localStorage.getItem(`websim_save_currency_${userId}`);
+            const statsStr = localStorage.getItem(`websim_save_stats_${userId}`);
+            const settingsStr = localStorage.getItem(`websim_save_settings_${userId}`);
+            if (statsStr) {
+                return {
+                    currency: parseInt(currencyStr || '0', 10),
+                    stats: JSON.parse(statsStr),
+                    settings: settingsStr ? JSON.parse(settingsStr) : {}
+                };
+            }
+            return null;
         }
 
         if (supabaseUrl) {

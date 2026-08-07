@@ -42,9 +42,17 @@ export const GameCanvas = ({ inChallengeMode }: { inChallengeMode?: boolean }) =
                 }
             }
             
-            // Check Bonus Marble Hit
+            // Check Golden Bonus Marble Hit first
             let bonusHit = false;
-            if (engine.state.bonusMarble?.active) {
+            if (engine.state.goldenBonusMarble?.active) {
+                if (engine.clickGoldenBonusMarble(x, y)) {
+                    bonusHit = true;
+                    window.dispatchEvent(new CustomEvent('open-golden-bonus-modal'));
+                }
+            }
+
+            // Check Regular Bonus Marble Hit
+            if (!bonusHit && engine.state.bonusMarble?.active) {
                 const amount = engine.clickBonusMarble(x, y);
                 if (amount > 0) {
                     bonusHit = true;

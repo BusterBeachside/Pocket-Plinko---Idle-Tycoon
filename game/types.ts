@@ -12,6 +12,15 @@ export interface BonusMarbleState {
     paused?: boolean;
 }
 
+export interface GoldenBonusMarbleState {
+    active: boolean;
+    x: number;
+    y: number;
+    baseY: number;
+    t: number;
+    spawnTimer: number; // Seconds until next spawn (10 mins = 600s)
+}
+
 export interface ChallengeState {
     challengeId: string;
     money: number;
@@ -104,6 +113,8 @@ export interface GameState {
     basketMuted: boolean;
     critMuted: boolean;
     disableMoneyPopups: boolean;
+    mergeModeEnabled?: boolean;
+    mergeAggression?: 'low' | 'medium' | 'high';
     hapticsDisabled?: boolean; // New: track haptic settings
     activeTheme: 'dark' | 'purple'; // New theme setting
 
@@ -143,6 +154,7 @@ export interface GameState {
 
     // Runtime (not always persisted fully, but good to have in type)
     bonusMarble?: BonusMarbleState;
+    goldenBonusMarble?: GoldenBonusMarbleState;
     achievements: { [key: string]: any };
     missions: {
         date: string;
@@ -238,6 +250,8 @@ export const INITIAL_STATE: GameState = {
     basketMuted: false,
     critMuted: false,
     disableMoneyPopups: false,
+    mergeModeEnabled: true,
+    mergeAggression: 'low',
     hapticsDisabled: false, // Default to enabled
     activeTheme: 'dark', // Default to dark
 
@@ -269,6 +283,7 @@ export const INITIAL_STATE: GameState = {
     tutorials: {},
     
     bonusMarble: { active: false, x: 0, y: 0, baseY: 0, t: 0 },
+    goldenBonusMarble: { active: false, x: 200, y: 80, baseY: 80, t: 0, spawnTimer: 600 },
     achievements: {},
     missions: {
         date: '',
@@ -347,6 +362,7 @@ export interface Ball {
     age?: number;
     maxAge?: number;
     isSplit?: boolean;
+    mergeCount?: number;
 }
 
 export interface Peg {

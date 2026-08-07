@@ -46,8 +46,17 @@ export const Header = ({
 
     useEffect(() => {
         const update = () => {
-            const balls = engine.state.upgrades.extraBall; // Removed 1+
-            setGlow(balls >= 50);
+            const balls = engine.state.upgrades.extraBall; // Level = Count
+            const money = engine.state.money || 0;
+            const timesPrestiged = engine.state.timesPrestiged || 0;
+
+            if (timesPrestiged > 0) {
+                const reqMoney = 100000000 * Math.pow(2.0, timesPrestiged);
+                setGlow(balls >= 50 && money >= reqMoney);
+            } else {
+                setGlow(balls >= 50);
+            }
+
             setCurrentEvent(DailyEventsManager.getCurrentEvent());
 
             const now = new Date();

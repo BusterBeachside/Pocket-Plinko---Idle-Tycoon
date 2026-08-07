@@ -476,6 +476,24 @@ export class GameRenderer {
                 ctx.fill();
                 ctx.shadowBlur = 0;
             }
+
+            if (b.mergeCount && b.mergeCount > 1) {
+                ctx.save();
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, visualRadius + 2.5, 0, Math.PI * 2);
+                ctx.stroke();
+
+                if (b.mergeCount >= 2 && !b.micro) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '900 8px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillText(`x${b.mergeCount}`, b.x, b.y - visualRadius - 2);
+                }
+                ctx.restore();
+            }
         });
         
         // Draw Fancy Baskets with strong neon glow
@@ -639,6 +657,67 @@ export class GameRenderer {
                 ctx.beginPath(); ctx.ellipse(-20, 0, 16, 8, 0, 0, Math.PI*2); ctx.fill();
                 ctx.beginPath(); ctx.ellipse(20, 0, 16, 8, 0, 0, Math.PI*2); ctx.fill();
             }
+            ctx.restore();
+        }
+
+        // Draw Golden Bonus Marble
+        if (state.goldenBonusMarble && state.goldenBonusMarble.active) {
+            const gbm = state.goldenBonusMarble;
+            ctx.save();
+            ctx.translate(gbm.x, gbm.y);
+
+            const bonusImage = assets.get('bonus');
+
+            // Golden Aura Pulse Effect
+            const pulse = 1 + Math.sin(gbm.t * 3.5) * 0.12;
+            const auraGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, 50 * pulse);
+            auraGrad.addColorStop(0, 'rgba(255, 223, 0, 0.75)');
+            auraGrad.addColorStop(0.5, 'rgba(255, 175, 0, 0.35)');
+            auraGrad.addColorStop(1, 'rgba(255, 140, 0, 0)');
+            
+            ctx.fillStyle = auraGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, 50 * pulse, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Sparkle Particles around the Golden Marble
+            for (let i = 0; i < 4; i++) {
+                const angle = gbm.t * 2 + (i * Math.PI / 2);
+                const r = 36 + Math.sin(gbm.t * 3 + i) * 8;
+                const sx = Math.cos(angle) * r;
+                const sy = Math.sin(angle) * r;
+                ctx.fillStyle = '#fff9c4';
+                ctx.beginPath();
+                ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            if (bonusImage && bonusImage.complete && bonusImage.naturalWidth > 0) {
+                const aspectRatio = bonusImage.naturalWidth / bonusImage.naturalHeight;
+                const drawW = 85 * pulse;
+                const drawH = drawW / aspectRatio;
+
+                ctx.shadowBlur = 28;
+                ctx.shadowColor = '#ffd700';
+
+                // Apply golden tint & brightness filter
+                ctx.filter = 'drop-shadow(0px 0px 8px #ffd700) sepia(100%) saturate(450%) hue-rotate(8deg) brightness(1.25)';
+                ctx.drawImage(bonusImage, -drawW/2, -drawH/2, drawW, drawH);
+                ctx.filter = 'none';
+                ctx.shadowBlur = 0;
+            } else {
+                ctx.fillStyle = '#ffd700';
+                ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill();
+            }
+
+            // Label "⭐ GOLDEN BONUS ⭐" below marble
+            ctx.font = '900 10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ffe082';
+            ctx.shadowColor = '#000000';
+            ctx.shadowBlur = 5;
+            ctx.fillText('⭐ GOLDEN BONUS ⭐', 0, 42);
+
             ctx.restore();
         }
 

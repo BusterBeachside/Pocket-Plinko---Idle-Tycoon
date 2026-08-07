@@ -57,7 +57,7 @@ export class Spawner {
             
             // Other challenges
             const targetCount = state.challengeState.upgrades.extraBall;
-            const currentNormalBalls = balls.filter(b => !b.micro && !b.isSplit).length;
+            const currentNormalBalls = balls.filter(b => !b.micro && !b.isSplit).reduce((sum, b) => sum + (b.mergeCount || 1), 0);
             if (currentNormalBalls < targetCount) {
                 spawnBall();
             }
@@ -65,10 +65,10 @@ export class Spawner {
         }
 
         const targetCount = state.upgrades.extraBall;
-        const currentNormalBalls = balls.filter(b => !b.micro && !b.isSplit).length;
+        const currentNormalBalls = balls.filter(b => !b.micro && !b.isSplit).reduce((sum, b) => sum + (b.mergeCount || 1), 0);
         const hasMasterUnlock = state.masterMultiplier > 0 || state.timesPrestiged > 0;
         const targetMasterCount = hasMasterUnlock ? (1 + (state.permUpgradesLevels?.['perm_extra_master'] || 0)) : 0;
-        const currentMasterCount = balls.filter(b => b.master && !b.isSplit).length;
+        const currentMasterCount = balls.filter(b => b.master && !b.isSplit).reduce((sum, b) => sum + (b.mergeCount || 1), 0);
 
         const maxAllowed = Math.max(targetCount, targetMasterCount);
 
@@ -107,6 +107,7 @@ export class Spawner {
             trail: [],
             _pegCooldown: 0,
             _remove: false,
+            mergeCount: 1,
             ...overrides
         };
     }

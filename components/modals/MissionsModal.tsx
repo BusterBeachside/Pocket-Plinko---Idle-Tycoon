@@ -3,6 +3,7 @@ import { getMissionById } from '../../game/missions';
 import { engine } from '../../game/engine';
 import { formatNumber } from '../../game/utils';
 import { ActiveMission } from '../../game/types';
+import { WebsimAdBanner } from '../WebsimAdBanner';
 
 export const MissionsModal = ({ onClose }: { onClose: () => void }) => {
     const [gameState, setGameState] = useState(engine.state);
@@ -181,6 +182,8 @@ export const MissionsModal = ({ onClose }: { onClose: () => void }) => {
                         </div>
                     </div>
                 </div>
+
+                <WebsimAdBanner id="websim-ad-missions-modal" type="banner" style={{ marginTop: '14px' }} />
             </div>
         </div>
     );

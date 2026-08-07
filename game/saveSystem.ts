@@ -82,6 +82,15 @@ export class SaveSystem {
 
             // Reset bonus marble to prevent frozen state on load
             loaded.bonusMarble = JSON.parse(JSON.stringify(INITIAL_STATE.bonusMarble));
+            const savedTimer = loaded.goldenBonusMarble?.spawnTimer;
+            loaded.goldenBonusMarble = {
+                active: false,
+                x: 200,
+                y: 80,
+                baseY: 80,
+                t: 0,
+                spawnTimer: typeof savedTimer === 'number' ? savedTimer : 600
+            };
             return loaded;
         }
         
@@ -113,6 +122,14 @@ export class SaveSystem {
         const stateToSave = { ...state };
         // Don't save bonus marble position/state
         stateToSave.bonusMarble = JSON.parse(JSON.stringify(INITIAL_STATE.bonusMarble));
+        stateToSave.goldenBonusMarble = {
+            active: false,
+            x: 200,
+            y: 80,
+            baseY: 80,
+            t: 0,
+            spawnTimer: state.goldenBonusMarble?.spawnTimer ?? 600
+        };
         localStorage.setItem('plinko_react_v1', JSON.stringify(stateToSave));
     }
 

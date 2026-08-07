@@ -7,6 +7,7 @@ import { GameState } from '../../game/types';
 import { ChallengesManager } from '../../game/challenges';
 import { formatNumber } from '../../game/utils';
 import { PhysicsManager } from '../../game/physics';
+import { WebsimAdBanner } from '../WebsimAdBanner';
 
 interface UpgradesPanelProps {
     isOpen: boolean;
@@ -149,10 +150,10 @@ export const UpgradesPanel = ({ isOpen, onClose, gameState, onBuy }: UpgradesPan
         } else if (activeChallengeId === 'sand_peg') {
             const list: { id: any; name: string; description: string; }[] = [];
             baseUpgrades.forEach(u => {
-                if (u.id === 'pegValue' || u.id === 'basketValue') {
+                if (u.id === 'basketValue' || u.id === 'microValue') {
                     return;
                 }
-                if (u.id === 'microValue') {
+                if (u.id === 'pegValue') {
                     list.push({
                         id: 'sandPegMultiplier',
                         name: 'Broken Peg Yield',
@@ -242,6 +243,8 @@ export const UpgradesPanel = ({ isOpen, onClose, gameState, onBuy }: UpgradesPan
                             );
                         })
                     )}
+
+                    <WebsimAdBanner id="websim-ad-upgrades-panel" type="banner" style={{ marginTop: '10px' }} />
                 </div>
             </div>
         </div>

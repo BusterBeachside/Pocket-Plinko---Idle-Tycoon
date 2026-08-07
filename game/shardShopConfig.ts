@@ -109,3 +109,40 @@ const generateSkins = (): MarbleSkinConfig[] => {
 };
 
 export const MARBLE_SKINS: MarbleSkinConfig[] = generateSkins();
+
+export interface GemShopConfig {
+    type: 'ruby' | 'emerald' | 'diamond';
+    gemKey: 'crimson' | 'amber' | 'azure';
+    name: string;
+    description: string;
+    cost: number;
+    imgKey: string;
+}
+
+export const SHARD_SHOP_GEMS: GemShopConfig[] = [
+    {
+        type: 'ruby',
+        gemKey: 'crimson',
+        name: 'Ruby Gem',
+        description: 'Critical Hit on peg impact. Heavily multiplies ball payout!',
+        cost: 50000,
+        imgKey: 'ruby_gem'
+    },
+    {
+        type: 'emerald',
+        gemKey: 'amber',
+        name: 'Emerald Gem',
+        description: 'Splits incoming marbles into two, doubling board flow!',
+        cost: 50000,
+        imgKey: 'emerald_gem'
+    },
+    {
+        type: 'diamond',
+        gemKey: 'azure',
+        name: 'Diamond Gem',
+        description: 'Explodes every 10 hits, cascade-bursting nearby pegs!',
+        cost: 75000,
+        imgKey: 'diamond_gem'
+    }
+];
+

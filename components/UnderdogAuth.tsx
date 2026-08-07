@@ -98,8 +98,10 @@ export const UnderdogAuth: React.FC<UnderdogAuthProps> = ({ onAuthComplete, onCl
         {/* Window Title Bar */}
         <div className="h-10 bg-[#25262b] border-b border-white/5 flex items-center justify-between px-4 select-none relative">
           <div className="flex items-center gap-2">
-            <Gamepad2 className="w-4 h-4 text-orange-500 animate-pulse" />
-            <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold">Underdog Engine Link</span>
+            <Gamepad2 className={`w-4 h-4 ${UnderdogService.isWebsim() ? 'text-cyan-400' : 'text-orange-500'} animate-pulse`} />
+            <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold">
+              {UnderdogService.isWebsim() ? 'Websim Engine Link' : 'Underdog Engine Link'}
+            </span>
           </div>
           {onClose && (
             <button
@@ -226,7 +228,7 @@ export const UnderdogAuth: React.FC<UnderdogAuthProps> = ({ onAuthComplete, onCl
                     {currentUser.username}
                   </h2>
                   <p className="text-[10px] text-slate-500 uppercase tracking-widest font-mono mt-0.5">
-                    Underdog Profile
+                    {currentUser.isWebsim ? 'Websim Account Profile' : 'Underdog Profile'}
                   </p>
                 </div>
 
@@ -292,8 +294,14 @@ export const UnderdogAuth: React.FC<UnderdogAuthProps> = ({ onAuthComplete, onCl
                 <div className="p-3 bg-orange-500/5 rounded-xl border border-orange-500/15 flex items-center gap-2 text-left">
                   <span className="text-lg">✅</span>
                   <div>
-                    <h4 className="text-[10px] text-orange-400 font-extrabold uppercase">Cloud Engine Sync Active</h4>
-                    <p className="text-[10px] text-slate-400 leading-normal">Cloud saves are synchronized dynamically to safety.</p>
+                    <h4 className="text-[10px] text-orange-400 font-extrabold uppercase">
+                      {currentUser.isWebsim ? 'Websim Cloud Sync Active' : 'Cloud Engine Sync Active'}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 leading-normal">
+                      {currentUser.isWebsim 
+                        ? 'Authenticated automatically via Websim. Game progress and scores are synced to Websim.' 
+                        : 'Cloud saves are synchronized dynamically to safety.'}
+                    </p>
                   </div>
                 </div>
 
@@ -304,7 +312,9 @@ export const UnderdogAuth: React.FC<UnderdogAuthProps> = ({ onAuthComplete, onCl
                   </div>
                   <div className="p-2.5 bg-black/40 rounded-xl border border-white/10 text-center">
                     <p className="text-slate-500 text-[9px] uppercase tracking-wider mb-0.5 font-mono">Engine</p>
-                    <p className="text-white font-semibold text-xs font-mono">Underdog v2</p>
+                    <p className="text-white font-semibold text-xs font-mono">
+                      {currentUser.isWebsim ? 'Websim API' : 'Underdog v2'}
+                    </p>
                   </div>
                 </div>
 

@@ -106,10 +106,10 @@ export const ChallengesPanel: React.FC<ChallengesPanelProps> = ({ isOpen, onClos
         } else if (activeId === 'sand_peg') {
             const list: { id: any; name: string; desc: string; }[] = [];
             baseUpgrades.forEach(u => {
-                if (u.id === 'pegValue' || u.id === 'basketValue') {
+                if (u.id === 'basketValue' || u.id === 'microValue') {
                     return;
                 }
-                if (u.id === 'microValue') {
+                if (u.id === 'pegValue') {
                     list.push({
                         id: 'sandPegMultiplier',
                         name: 'Broken Peg Yield',

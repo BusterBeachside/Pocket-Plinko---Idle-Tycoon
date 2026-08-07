@@ -30,6 +30,7 @@ import { ChallengesPanel } from './components/panels/ChallengesPanel';
 import { CHALLENGES, ChallengesManager } from './game/challenges';
 import { GemSocketHud } from './components/GemSocketHud';
 import { DailyLoginModal } from './components/modals/DailyLoginModal';
+import { GoldenBonusModal } from './components/modals/GoldenBonusModal';
 import { getTodayDateString } from './game/dailyLoginRewards';
 import { ChallengeSummaryModal } from './components/modals/ChallengeSummaryModal';
 import { syncAndroidNotifications } from './game/androidNotifications';
@@ -63,6 +64,7 @@ const FloatingTextLayer = () => {
 const App = () => {
     const [gameState, setGameState] = useState(engine.state);
     const [uiState, setUiState] = useState({ upgradesOpen: false, optionsOpen: false, statsOpen: false, shardShopOpen: false, coreModalOpen: false, prestigeAnim: false, achievementsOpen: false, missionsOpen: false, leaderboardOpen: false, challengesOpen: false, dailyRewardOpen: false });
+    const [goldenBonusModalOpen, setGoldenBonusModalOpen] = useState(false);
     const [started, setStarted] = useState(false);
     const [authModalOpen, setAuthModalOpen] = useState(true);
     const [isAuthChecking, setIsAuthChecking] = useState(true);
@@ -211,10 +213,16 @@ const App = () => {
         };
         window.addEventListener('request-tutorial', tutorialHandler);
 
+        const goldenBonusHandler = () => {
+            setGoldenBonusModalOpen(true);
+        };
+        window.addEventListener('open-golden-bonus-modal', goldenBonusHandler);
+
         return () => { 
             UnderdogService.removeAuthListener();
             unsub(); 
             window.removeEventListener('request-tutorial', tutorialHandler);
+            window.removeEventListener('open-golden-bonus-modal', goldenBonusHandler);
         };
     }, []);
 
@@ -550,6 +558,7 @@ const App = () => {
             {uiState.missionsOpen && <MissionsModal onClose={() => setUiState(s => ({...s, missionsOpen: false}))} />}
             {uiState.leaderboardOpen && <LeaderboardModal onClose={() => setUiState(s => ({...s, leaderboardOpen: false}))} />}
             {uiState.dailyRewardOpen && <DailyLoginModal gameState={gameState} onClose={() => setUiState(s => ({...s, dailyRewardOpen: false}))} onUpdate={() => setGameState({...engine.state})} />}
+            {goldenBonusModalOpen && <GoldenBonusModal onClose={() => setGoldenBonusModalOpen(false)} />}
             
             {gameState.showChallengeSummary && gameState.pendingChallengeSummary && (
                 <ChallengeSummaryModal 
@@ -706,7 +715,7 @@ const App = () => {
                     <GemSocketHud onUpdate={() => setGameState({ ...engine.state })} />
                     <div className="mobile-controls">
                         <button className="mobile-btn" onClick={() => togglePanel('upgrades')}>⚡ Upgrades</button>
-                        {gameState.inChallengeMode && (() => {
+                        {gameState.inChallengeMode ? (() => {
                             const activeRot = ChallengesManager.getRotationInfo();
                             const activeChall = CHALLENGES[activeRot.activeChallengeId];
                             const challengeState = gameState.challengeState || { money: 0, lifetimeEarnings: 0, lifetimePegsBroken: 0 };
@@ -730,6 +739,34 @@ const App = () => {
                                         <div className={`w-2 h-2 rounded-full border border-white/20 transition-all ${isSilverAchieved ? 'bg-[#94a3b8]' : 'bg-transparent'}`} title="Silver" />
                                         <div className={`w-2 h-2 rounded-full border border-white/20 transition-all ${isGoldAchieved ? 'bg-[#fbbf24]' : 'bg-transparent'}`} title="Gold" />
                                     </div>
+                                </button>
+                            );
+                        })() : (() => {
+                            const activeRot = ChallengesManager.getRotationInfo();
+                            const activeId = activeRot.activeChallengeId;
+                            const cState = gameState.challengeState;
+                            const hasProgress = !!(
+                                cState &&
+                                cState.challengeId === activeId &&
+                                ((cState.lifetimeEarnings || 0) > 0 ||
+                                 (cState.lifetimePegsBroken || 0) > 0 ||
+                                 (cState.money || 0) > 0 ||
+                                 (cState.pegsBrokenCurrency || 0) > 0 ||
+                                 Object.values(cState.upgrades || {}).some((v: any) => v > 0))
+                            );
+
+                            return (
+                                <button 
+                                    className={`mobile-btn flex flex-col items-center justify-center py-1 ${!hasProgress ? 'glow-breathing' : ''}`}
+                                    style={{ color: '#f59e0b' }}
+                                    onClick={() => togglePanel('challenges')}
+                                >
+                                    <span className="text-[10px] font-extrabold leading-none uppercase">🏆 Challenge Dome</span>
+                                    {hasProgress ? (
+                                        <span className="text-[8.5px] font-mono text-emerald-400 font-bold leading-none mt-0.5">In Progress ({timeLeftStr})</span>
+                                    ) : (
+                                        <span className="text-[8.5px] font-mono opacity-80 leading-none mt-0.5">{timeLeftStr}</span>
+                                    )}
                                 </button>
                             );
                         })()}

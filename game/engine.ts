@@ -83,6 +83,7 @@ export class GameEngine {
             document.addEventListener('visibilitychange', () => {
                 this.handleVisibilityChange();
             });
+            (window as any).spawnGoldenBonus = () => this.spawnGoldenBonusMarble();
         }
 
         this.startLoop();
@@ -200,6 +201,12 @@ export class GameEngine {
     
     buySkin(id: string) {
         if (ShopSystem.buySkin(this.state, id, this.audio, () => this.saveState())) {
+            this.notify();
+        }
+    }
+
+    buyGem(gemType: 'ruby' | 'emerald' | 'diamond') {
+        if (ShopSystem.buyGem(this.state, gemType, this.audio, () => this.saveState())) {
             this.notify();
         }
     }
@@ -507,7 +514,7 @@ export class GameEngine {
                     const roll = Math.random();
                     const tutorialSeen = this.state.tutorials['plinko_seen_bonus_tutorial_v1'] || (typeof window !== 'undefined' && localStorage.getItem('plinko_seen_bonus_tutorial_v1'));
                     
-                    const bonusChance = this.state.bonusChance || 0.08;
+                    const bonusChance = this.state.bonusChance ?? 0.5;
                     // Force first spawn if tutorial not seen
                     if (roll < bonusChance || !tutorialSeen) {
                         this.spawnBonusMarble();
@@ -584,6 +591,34 @@ export class GameEngine {
         return 0;
     }
 
+    clickGoldenBonusMarble(x: number, y: number): boolean {
+        if (this.state.goldenBonusMarble && this.state.goldenBonusMarble.active) {
+            const gx = this.state.goldenBonusMarble.x;
+            const gy = this.state.goldenBonusMarble.y;
+            const dist = Math.sqrt((x - gx) * (x - gx) + (y - gy) * (y - gy));
+            if (dist < 45) {
+                this.audio.play('bonus', 0, 0.4);
+                this.state.goldenBonusMarble.active = false;
+                this.notify();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    spawnGoldenBonusMarble() {
+        if (!this.state.goldenBonusMarble) {
+            this.state.goldenBonusMarble = { active: false, x: this.width / 2, y: 80, baseY: 80, t: 0, spawnTimer: 600 };
+        }
+        this.state.goldenBonusMarble.active = true;
+        this.state.goldenBonusMarble.spawnTimer = 600; // Reset 10m timer
+        this.state.goldenBonusMarble.baseY = 75 + Math.random() * 20;
+        this.state.goldenBonusMarble.y = this.state.goldenBonusMarble.baseY;
+        this.state.goldenBonusMarble.x = Math.random() * Math.max(100, this.width - 120) + 60;
+        this.state.goldenBonusMarble.t = 0;
+        this.notify();
+    }
+
     addMoney(amount: number, countTowardsIncome: boolean = true) {
         if (this.state.inChallengeMode && countTowardsIncome) {
             ChallengesManager.checkAndSyncChallengeState(this.state);
@@ -649,6 +684,25 @@ export class GameEngine {
                 bm.y = bm.baseY + Math.sin(bm.t * 2) * 30; 
                 if (bm.x < -50) bm.active = false;
             }
+        }
+
+        // Golden Bonus Marble update (spawns every 10 minutes = 600s, lingers near top of canvas)
+        if (!this.state.goldenBonusMarble) {
+            this.state.goldenBonusMarble = { active: false, x: this.width / 2, y: 80, baseY: 80, t: 0, spawnTimer: 600 };
+        }
+
+        const gbm = this.state.goldenBonusMarble;
+        if (!gbm.active) {
+            gbm.spawnTimer -= dt;
+            if (gbm.spawnTimer <= 0) {
+                this.spawnGoldenBonusMarble();
+            }
+        } else {
+            // Floating motion near top of canvas
+            gbm.t += dt;
+            const halfW = Math.max(100, (this.width / 2) - 60);
+            gbm.x = (this.width / 2) + Math.sin(gbm.t * 0.7) * halfW;
+            gbm.y = gbm.baseY + Math.sin(gbm.t * 2.2) * 10;
         }
 
         this.balls = this.balls.filter(b => b.y < this.height + 100 && !b._remove);
