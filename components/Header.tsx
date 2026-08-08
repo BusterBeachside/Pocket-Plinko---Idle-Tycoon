@@ -14,14 +14,20 @@ export function isAIStudioPreview(): boolean {
     if ((window as any).__FORCE_DEBUG_BUTTON__ === true) return true;
     if (UnderdogService.isWebsim()) return false;
     const hostname = window.location.hostname;
-    if (hostname.includes('websim')) return false;
+    if (
+        hostname.includes('websim') ||
+        hostname.includes('itch.io') ||
+        hostname.includes('itch.zone') ||
+        hostname.includes('hwcdn.net')
+    ) {
+        return false;
+    }
 
     return (
         hostname.includes('run.app') ||
         hostname.includes('ais-') ||
         hostname.includes('localhost') ||
-        hostname.includes('127.0.0.1') ||
-        window !== window.parent
+        hostname.includes('127.0.0.1')
     );
 }
 
