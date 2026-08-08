@@ -109,6 +109,9 @@ const App = () => {
                     setDebugUnlocked(true);
                     keyBuffer = '';
                     setToast({ msg: '🛠️ Debug Mode Button Unlocked!', visible: true });
+                    setTimeout(() => {
+                        setToast(prev => prev && prev.msg === '🛠️ Debug Mode Button Unlocked!' ? { ...prev, visible: false } : prev);
+                    }, 4000);
                 }
             }
         };

@@ -68,33 +68,35 @@ Thank you for playing Pocket Plinko!`
                 Pocket Plinko
             </h1>
 
-            <div className="start-prompt" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', width: '100%', maxWidth: '580px' }}>
-                {loading ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                        <div style={{
-                            width: '240px',
-                            height: '14px',
-                            background: '#222',
-                            borderRadius: '10px',
-                            border: '1px solid #444',
-                            overflow: 'hidden'
-                        }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', width: '100%', maxWidth: '580px' }}>
+                <div className="start-prompt">
+                    {loading ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                             <div style={{
-                                width: `${progress * 100}%`,
-                                height: '100%',
-                                background: 'linear-gradient(90deg, #ffd700, #ff9a00)',
-                                transition: 'width 0.2s ease-out'
-                            }} />
+                                width: '240px',
+                                height: '14px',
+                                background: '#222',
+                                borderRadius: '10px',
+                                border: '1px solid #444',
+                                overflow: 'hidden'
+                            }}>
+                                <div style={{
+                                    width: `${progress * 100}%`,
+                                    height: '100%',
+                                    background: 'linear-gradient(90deg, #ffd700, #ff9a00)',
+                                    transition: 'width 0.2s ease-out'
+                                }} />
+                            </div>
+                            <div style={{ fontSize: '0.9rem', color: '#aaa' }}>
+                                Loading Assets... {Math.round(progress * 100)}%
+                            </div>
                         </div>
-                        <div style={{ fontSize: '0.9rem', color: '#aaa' }}>
-                            Loading Assets... {Math.round(progress * 100)}%
+                    ) : (
+                        <div style={{ fontSize: '1.2rem', color: '#fff', fontWeight: 800, cursor: 'pointer', letterSpacing: '0.05em' }}>
+                            Click to Start
                         </div>
-                    </div>
-                ) : (
-                    <div style={{ fontSize: '1.2rem', color: '#fff', fontWeight: 800, cursor: 'pointer', letterSpacing: '0.05em' }}>
-                        Click to Start
-                    </div>
-                )}
+                    )}
+                </div>
 
                 {/* Websim-only Pin Ad (Persists into Title Screen after loading, full resolution) */}
                 {isWebsim && (

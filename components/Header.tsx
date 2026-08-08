@@ -4,20 +4,24 @@ import { engine } from '../game/engine';
 import { assets } from '../game/assets';
 import { DailyEventsManager } from '../game/dailyEvents';
 import { CHALLENGES, ChallengesManager } from '../game/challenges';
+import { UnderdogService } from '../services/underdogService';
 
 import { User, Bug } from 'lucide-react';
 import { AvatarDisplay } from './AvatarDisplay';
 
 export function isAIStudioPreview(): boolean {
     if (typeof window === 'undefined') return false;
+    if ((window as any).__FORCE_DEBUG_BUTTON__ === true) return true;
+    if (UnderdogService.isWebsim()) return false;
     const hostname = window.location.hostname;
+    if (hostname.includes('websim')) return false;
+
     return (
         hostname.includes('run.app') ||
         hostname.includes('ais-') ||
         hostname.includes('localhost') ||
         hostname.includes('127.0.0.1') ||
-        window !== window.parent ||
-        (window as any).__FORCE_DEBUG_BUTTON__ === true
+        window !== window.parent
     );
 }
 
