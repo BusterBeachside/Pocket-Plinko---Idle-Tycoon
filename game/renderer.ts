@@ -18,9 +18,23 @@ export class GameRenderer {
         visualEffects: VisualEffect[], 
         popups: Popup[],
         sandParticles?: SandParticle[],
-        socketingActive?: boolean
+        socketingActive?: boolean,
+        isPaused?: boolean,
+        fps?: number
     ) {
         ctx.clearRect(0, 0, width, height);
+        const quality = state.qualityMode || 'high';
+        const isLowQuality = quality === 'low';
+        const isMediumQuality = quality === 'medium';
+        const isHighQuality = quality === 'high';
+
+        const totalBalls = balls.length;
+        // Optimization: Shadow blur & canvas filters are bottlenecks during high ball counts.
+        // High Quality: Always allows full heavy shadows, multi-layered auras, filters & maximum trail length.
+        // Medium Quality: Dynamically throttles heavy shadows & trails during heavy cascades.
+        // Low Quality: Flat, maximum performance mode.
+        const allowHeavyShadows = isHighQuality || (isMediumQuality && totalBalls < 15);
+        const allowLightShadows = isHighQuality || (isMediumQuality && totalBalls < 30);
         
         // Faint Tech Grid Background
         ctx.save();
@@ -55,17 +69,24 @@ export class GameRenderer {
 
         // Enhanced Neon Side Glow/Walls
         ctx.save();
-        const wallGradLeft = ctx.createLinearGradient(0, 0, 40, 0);
-        wallGradLeft.addColorStop(0, 'rgba(50, 220, 255, 0.3)');
-        wallGradLeft.addColorStop(1, 'rgba(50, 220, 255, 0)');
-        ctx.fillStyle = wallGradLeft;
-        ctx.fillRect(0, 0, 40, height);
-        
-        const wallGradRight = ctx.createLinearGradient(width, 0, width - 40, 0);
-        wallGradRight.addColorStop(0, 'rgba(220, 50, 255, 0.3)');
-        wallGradRight.addColorStop(1, 'rgba(220, 50, 255, 0)');
-        ctx.fillStyle = wallGradRight;
-        ctx.fillRect(width - 40, 0, 40, height);
+        if (!isLowQuality) {
+            const wallGradLeft = ctx.createLinearGradient(0, 0, 40, 0);
+            wallGradLeft.addColorStop(0, 'rgba(50, 220, 255, 0.3)');
+            wallGradLeft.addColorStop(1, 'rgba(50, 220, 255, 0)');
+            ctx.fillStyle = wallGradLeft;
+            ctx.fillRect(0, 0, 40, height);
+            
+            const wallGradRight = ctx.createLinearGradient(width, 0, width - 40, 0);
+            wallGradRight.addColorStop(0, 'rgba(220, 50, 255, 0.3)');
+            wallGradRight.addColorStop(1, 'rgba(220, 50, 255, 0)');
+            ctx.fillStyle = wallGradRight;
+            ctx.fillRect(width - 40, 0, 40, height);
+        } else {
+            ctx.fillStyle = 'rgba(50, 220, 255, 0.06)';
+            ctx.fillRect(0, 0, 40, height);
+            ctx.fillStyle = 'rgba(220, 50, 255, 0.06)';
+            ctx.fillRect(width - 40, 0, 40, height);
+        }
         ctx.restore();
         
         // Draw Pegs with 3D spherical look + neon hit glow
@@ -110,8 +131,10 @@ export class GameRenderer {
                 }
 
                 if (p.glow > 0) {
-                    ctx.shadowBlur = 15;
-                    ctx.shadowColor = hpColor;
+                    if (allowLightShadows) {
+                        ctx.shadowBlur = 12;
+                        ctx.shadowColor = hpColor;
+                    }
                     grad.addColorStop(0, hpStart);
                     grad.addColorStop(0.2, hpMid);
                     grad.addColorStop(1, hpColor);
@@ -123,7 +146,6 @@ export class GameRenderer {
                 }
             } else if (p.glow > 0) {
                 // Active Glow based on hit type
-                ctx.shadowBlur = 15;
                 let glowColor = '#ffd700'; // Default gold
                 let startCol = '#fff';
                 let midCol = '#fff7cc';
@@ -157,7 +179,10 @@ export class GameRenderer {
                     endCol = '#00f5ff';
                 }
                 
-                ctx.shadowColor = glowColor;
+                if (allowLightShadows) {
+                    ctx.shadowBlur = 12;
+                    ctx.shadowColor = glowColor;
+                }
                 grad.addColorStop(0, startCol);
                 grad.addColorStop(0.2, midCol);
                 grad.addColorStop(1, endCol);
@@ -193,8 +218,10 @@ export class GameRenderer {
                 // Glowing outer ring
                 ctx.strokeStyle = p.gemType === 'ruby' ? '#f43f5e' : (p.gemType === 'emerald' ? '#10b981' : '#38bdf8');
                 ctx.lineWidth = 1.5;
-                ctx.shadowBlur = 8;
-                ctx.shadowColor = ctx.strokeStyle;
+                if (!isLowQuality) {
+                    ctx.shadowBlur = 8;
+                    ctx.shadowColor = ctx.strokeStyle;
+                }
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, this.pegRadius + 1.5, 0, Math.PI * 2);
                 ctx.stroke();
@@ -313,29 +340,35 @@ export class GameRenderer {
                 ctx.beginPath();
                 ctx.lineWidth = 4 + 10 * (1 - pct);
                 ctx.strokeStyle = `rgba(56, 189, 248, ${alpha})`;
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = 'rgba(56, 189, 248, 1)';
+                if (allowLightShadows) {
+                    ctx.shadowBlur = 12;
+                    ctx.shadowColor = 'rgba(56, 189, 248, 1)';
+                }
                 ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
                 ctx.stroke();
                 
-                // Secondary intense white/blue sharp expansion wave
-                ctx.beginPath();
-                ctx.lineWidth = 1.5 + 4 * (1 - pct);
-                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.95})`;
-                ctx.shadowBlur = 5;
-                ctx.shadowColor = '#ffffff';
-                ctx.arc(e.x, e.y, r * 0.9, 0, Math.PI * 2);
-                ctx.stroke();
+                if (!isLowQuality) {
+                    // Secondary intense white/blue sharp expansion wave
+                    ctx.beginPath();
+                    ctx.lineWidth = 1.5 + 4 * (1 - pct);
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.95})`;
+                    if (allowLightShadows) {
+                        ctx.shadowBlur = 5;
+                        ctx.shadowColor = '#ffffff';
+                    }
+                    ctx.arc(e.x, e.y, r * 0.9, 0, Math.PI * 2);
+                    ctx.stroke();
 
-                // Inner radial energy expanding core
-                ctx.beginPath();
-                const grad = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r * 0.75);
-                grad.addColorStop(0, `rgba(251, 113, 133, 0)`);
-                grad.addColorStop(0.3, `rgba(244, 63, 94, ${alpha * 0.35})`);
-                grad.addColorStop(1, `rgba(56, 189, 248, ${alpha * 0.15})`);
-                ctx.fillStyle = grad;
-                ctx.arc(e.x, e.y, r * 0.85, 0, Math.PI * 2);
-                ctx.fill();
+                    // Inner radial energy expanding core
+                    ctx.beginPath();
+                    const grad = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r * 0.75);
+                    grad.addColorStop(0, `rgba(251, 113, 133, 0)`);
+                    grad.addColorStop(0.3, `rgba(244, 63, 94, ${alpha * 0.35})`);
+                    grad.addColorStop(1, `rgba(56, 189, 248, ${alpha * 0.15})`);
+                    ctx.fillStyle = grad;
+                    ctx.arc(e.x, e.y, r * 0.85, 0, Math.PI * 2);
+                    ctx.fill();
+                }
                 
                 ctx.restore();
             } else if (e.type === 'critical_hit') {
@@ -343,7 +376,9 @@ export class GameRenderer {
                 
                 ctx.save();
                 ctx.translate(e.x, e.y);
-                ctx.rotate(pct * 2); // Rotate as it expands
+                if (!isLowQuality) {
+                    ctx.rotate(pct * 2); // Rotate as it expands
+                }
                 
                 // Draw Star
                 ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
@@ -368,44 +403,48 @@ export class GameRenderer {
             }
         }
 
-        // Draw Master Aura Pass (Before other balls to be in background but over board)
-        balls.forEach(b => {
-            if (b.master) {
-                const time = performance.now();
-                const hue = (time / 15) % 360; 
-                // Using hardcoded visual radius 8 for aura calculation
-                const visualRadius = 8;
-                const auraR = visualRadius * 10; 
-                
-                ctx.save();
-                ctx.globalCompositeOperation = 'lighter'; 
-                
-                const g = ctx.createRadialGradient(b.x, b.y, visualRadius, b.x, b.y, auraR);
-                g.addColorStop(0, `hsla(${hue}, 100%, 60%, 0.6)`);
-                g.addColorStop(0.4, `hsla(${(hue+60)%360}, 100%, 50%, 0.3)`);
-                g.addColorStop(1, 'rgba(0,0,0,0)');
-                
-                ctx.fillStyle = g;
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, auraR, 0, Math.PI*2);
-                ctx.fill();
-                
-                ctx.restore();
-            }
-        });
+        // Draw Master Aura Pass (Always in High Quality, throttled in Medium)
+        if (isHighQuality || (isMediumQuality && totalBalls < 20)) {
+            balls.forEach(b => {
+                if (b.master) {
+                    const time = performance.now();
+                    const hue = (time / 15) % 360; 
+                    const visualRadius = 8;
+                    const auraR = visualRadius * 10; 
+                    
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter'; 
+                    
+                    const g = ctx.createRadialGradient(b.x, b.y, visualRadius, b.x, b.y, auraR);
+                    g.addColorStop(0, `hsla(${hue}, 100%, 60%, 0.6)`);
+                    g.addColorStop(0.4, `hsla(${(hue+60)%360}, 100%, 50%, 0.3)`);
+                    g.addColorStop(1, 'rgba(0,0,0,0)');
+                    
+                    ctx.fillStyle = g;
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, auraR, 0, Math.PI*2);
+                    ctx.fill();
+                    
+                    ctx.restore();
+                }
+            });
+        }
 
-        // Draw Balls
+        // Draw Balls with dynamic trail & shadow throttling
+        const maxTrailPoints = isLowQuality ? 0 : (isMediumQuality ? 3 : 8);
+
         balls.forEach(b => {
-            // Visual size override for Master Marble (8) vs Physics size (6)
             const visualRadius = b.master ? 8 : b.radius;
 
-            // Draw Trails as fading circles (Legacy Style)
-            if (b.trail.length > 0) {
-                for(let i=0; i<b.trail.length; i++) {
+            // Draw Trails
+            if (!isLowQuality && maxTrailPoints > 0 && b.trail.length > 0) {
+                const startIdx = Math.max(0, b.trail.length - maxTrailPoints);
+                const count = b.trail.length - startIdx;
+                for(let i = startIdx; i < b.trail.length; i++) {
                     const pt = b.trail[i];
-                    // Alpha increases for newer points
-                    const tAlpha = (i / b.trail.length) * (b.master ? 0.75 : 0.45);
-                    const tRadius = Math.max(0.6, visualRadius * (i / b.trail.length));
+                    const relIdx = i - startIdx;
+                    const tAlpha = (relIdx / count) * (b.master ? 0.75 : 0.45);
+                    const tRadius = Math.max(0.6, visualRadius * (relIdx / count));
                     
                     let trailCol = 'rgba(255,255,255,1)';
                     if (b.master) {
@@ -457,10 +496,10 @@ export class GameRenderer {
                     ctx.lineWidth = 1;
                     ctx.stroke();
                 } else {
-                    this.drawMasterRainbow(ctx, b.x, b.y, visualRadius);
+                    this.drawMasterRainbow(ctx, b.x, b.y, visualRadius, allowHeavyShadows);
                 }
             } else if (b.master) {
-                this.drawMasterRainbow(ctx, b.x, b.y, visualRadius);
+                this.drawMasterRainbow(ctx, b.x, b.y, visualRadius, allowHeavyShadows);
             } else {
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, visualRadius, 0, Math.PI * 2);
@@ -471,10 +510,14 @@ export class GameRenderer {
                 else if (b.type === 'uncommon') color = '#00f5ff';
                 
                 ctx.fillStyle = color;
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 10;
-                ctx.fill();
-                ctx.shadowBlur = 0;
+                if (allowHeavyShadows && (b.type === 'legendary' || b.type === 'rare')) {
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 8;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                } else {
+                    ctx.fill();
+                }
             }
 
             if (b.mergeCount && b.mergeCount > 1) {
@@ -519,8 +562,10 @@ export class GameRenderer {
             
             if (isAntiGravity) {
                 // Strong Pink Neon Glow
-                ctx.shadowBlur = 40;
-                ctx.shadowColor = '#fd79a8';
+                if (!isLowQuality) {
+                    ctx.shadowBlur = 40;
+                    ctx.shadowColor = '#fd79a8';
+                }
                 
                 const cx = bx + basketW / 2;
                 const cy = by + basketH / 2;
@@ -557,13 +602,17 @@ export class GameRenderer {
                 ctx.font = '900 11px font-mono, "Segoe UI", Roboto, sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                ctx.shadowBlur = 4;
+                if (!isLowQuality) {
+                    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                    ctx.shadowBlur = 4;
+                }
                 ctx.fillText(`BOUNCE`, cx, cy + 1);
             } else {
                 // Strong Neon Glow
-                ctx.shadowBlur = 30; // Increased blur
-                ctx.shadowColor = col;
+                if (!isLowQuality) {
+                    ctx.shadowBlur = 30; // Increased blur
+                    ctx.shadowColor = col;
+                }
                 
                 // Background with Gradient
                 const bgGrad = ctx.createLinearGradient(bx, by, bx, height);
@@ -599,8 +648,10 @@ export class GameRenderer {
                     ctx.font = '800 13px "Segoe UI", Roboto, sans-serif';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                    ctx.shadowBlur = 4;
+                    if (!isLowQuality) {
+                        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                        ctx.shadowBlur = 4;
+                    }
                     
                     let txt = formatNumber(val);
                     ctx.fillText(`$${txt}`, bx + basketW/2, by + basketH/2 + 2);
@@ -646,8 +697,10 @@ export class GameRenderer {
                 const aspectRatio = bonusImage.naturalWidth / bonusImage.naturalHeight;
                 const drawW = 75; // Increased size
                 const drawH = drawW / aspectRatio;
-                ctx.shadowBlur = 20;
-                ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
+                if (!isLowQuality) {
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
+                }
                 ctx.drawImage(bonusImage, -drawW/2, -drawH/2, drawW, drawH);
                 ctx.shadowBlur = 0;
             } else {
@@ -667,29 +720,31 @@ export class GameRenderer {
             ctx.translate(gbm.x, gbm.y);
 
             const bonusImage = assets.get('bonus');
-
-            // Golden Aura Pulse Effect
             const pulse = 1 + Math.sin(gbm.t * 3.5) * 0.12;
-            const auraGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, 50 * pulse);
-            auraGrad.addColorStop(0, 'rgba(255, 223, 0, 0.75)');
-            auraGrad.addColorStop(0.5, 'rgba(255, 175, 0, 0.35)');
-            auraGrad.addColorStop(1, 'rgba(255, 140, 0, 0)');
-            
-            ctx.fillStyle = auraGrad;
-            ctx.beginPath();
-            ctx.arc(0, 0, 50 * pulse, 0, Math.PI * 2);
-            ctx.fill();
 
-            // Sparkle Particles around the Golden Marble
-            for (let i = 0; i < 4; i++) {
-                const angle = gbm.t * 2 + (i * Math.PI / 2);
-                const r = 36 + Math.sin(gbm.t * 3 + i) * 8;
-                const sx = Math.cos(angle) * r;
-                const sy = Math.sin(angle) * r;
-                ctx.fillStyle = '#fff9c4';
+            if (!isLowQuality) {
+                // Golden Aura Pulse Effect
+                const auraGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, 50 * pulse);
+                auraGrad.addColorStop(0, 'rgba(255, 223, 0, 0.75)');
+                auraGrad.addColorStop(0.5, 'rgba(255, 175, 0, 0.35)');
+                auraGrad.addColorStop(1, 'rgba(255, 140, 0, 0)');
+                
+                ctx.fillStyle = auraGrad;
                 ctx.beginPath();
-                ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
+                ctx.arc(0, 0, 50 * pulse, 0, Math.PI * 2);
                 ctx.fill();
+
+                // Sparkle Particles around the Golden Marble
+                for (let i = 0; i < 4; i++) {
+                    const angle = gbm.t * 2 + (i * Math.PI / 2);
+                    const r = 36 + Math.sin(gbm.t * 3 + i) * 8;
+                    const sx = Math.cos(angle) * r;
+                    const sy = Math.sin(angle) * r;
+                    ctx.fillStyle = '#fff9c4';
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
 
             if (bonusImage && bonusImage.complete && bonusImage.naturalWidth > 0) {
@@ -697,13 +752,18 @@ export class GameRenderer {
                 const drawW = 85 * pulse;
                 const drawH = drawW / aspectRatio;
 
-                ctx.shadowBlur = 28;
-                ctx.shadowColor = '#ffd700';
-
-                // Apply golden tint & brightness filter
-                ctx.filter = 'drop-shadow(0px 0px 8px #ffd700) sepia(100%) saturate(450%) hue-rotate(8deg) brightness(1.25)';
+                if (isHighQuality) {
+                    ctx.shadowBlur = 28;
+                    ctx.shadowColor = '#ffd700';
+                    ctx.filter = 'drop-shadow(0px 0px 8px #ffd700) sepia(100%) saturate(450%) hue-rotate(8deg) brightness(1.25)';
+                } else if (allowLightShadows) {
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#ffd700';
+                }
                 ctx.drawImage(bonusImage, -drawW/2, -drawH/2, drawW, drawH);
-                ctx.filter = 'none';
+                if (isHighQuality) {
+                    ctx.filter = 'none';
+                }
                 ctx.shadowBlur = 0;
             } else {
                 ctx.fillStyle = '#ffd700';
@@ -714,8 +774,10 @@ export class GameRenderer {
             ctx.font = '900 10px sans-serif';
             ctx.textAlign = 'center';
             ctx.fillStyle = '#ffe082';
-            ctx.shadowColor = '#000000';
-            ctx.shadowBlur = 5;
+            if (!isLowQuality) {
+                ctx.shadowColor = '#000000';
+                ctx.shadowBlur = 5;
+            }
             ctx.fillText('⭐ GOLDEN BONUS ⭐', 0, 42);
 
             ctx.restore();
@@ -733,17 +795,84 @@ export class GameRenderer {
             });
             ctx.restore();
         }
+
+        // Render Paused Badge Overlay
+        if (isPaused) {
+            ctx.save();
+            const badgeW = 140;
+            const badgeH = 30;
+            const bx = (width - badgeW) / 2;
+            const by = 16;
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.8)';
+            ctx.lineWidth = 1.5;
+            
+            ctx.beginPath();
+            if ((ctx as any).roundRect) {
+                (ctx as any).roundRect(bx, by, badgeW, badgeH, 15);
+            } else {
+                ctx.rect(bx, by, badgeW, badgeH);
+            }
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#f59e0b';
+            ctx.font = '800 11px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('⏸ PHYSICS PAUSED', width / 2, by + badgeH / 2);
+            ctx.restore();
+        }
+
+        // Render FPS Badge Overlay
+        if (state.showFps) {
+            ctx.save();
+            const fpsValue = fps ?? 60;
+            const text = `${fpsValue} FPS`;
+            const badgeW = 60;
+            const badgeH = 22;
+            const bx = width - badgeW - 10;
+            const by = 12;
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 1;
+
+            ctx.beginPath();
+            if ((ctx as any).roundRect) {
+                (ctx as any).roundRect(bx, by, badgeW, badgeH, 11);
+            } else {
+                ctx.rect(bx, by, badgeW, badgeH);
+            }
+            ctx.fill();
+            ctx.stroke();
+
+            // FPS Color: Green >= 55, Amber >= 30, Red < 30
+            let fpsColor = '#10b981';
+            if (fpsValue < 30) fpsColor = '#ef4444';
+            else if (fpsValue < 55) fpsColor = '#f59e0b';
+
+            ctx.fillStyle = fpsColor;
+            ctx.font = '800 11px monospace, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, bx + badgeW / 2, by + badgeH / 2 + 1);
+            ctx.restore();
+        }
     }
 
-    private drawMasterRainbow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+    private drawMasterRainbow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, allowShadow: boolean = false) {
         const hue = (performance.now() / 20) % 360;
         const grad = ctx.createRadialGradient(x - 2, y - 2, 0, x, y, r);
         grad.addColorStop(0, '#fff');
         grad.addColorStop(0.5, `hsl(${hue}, 100%, 50%)`);
         grad.addColorStop(1, `hsl(${(hue + 60) % 360}, 100%, 40%)`);
         ctx.fillStyle = grad;
-        ctx.shadowColor = `hsl(${hue}, 100%, 70%)`;
-        ctx.shadowBlur = 15;
+        if (allowShadow) {
+            ctx.shadowColor = `hsl(${hue}, 100%, 70%)`;
+            ctx.shadowBlur = 12;
+        }
         ctx.beginPath(); 
         ctx.arc(x, y, r, 0, Math.PI * 2); 
         ctx.fill();

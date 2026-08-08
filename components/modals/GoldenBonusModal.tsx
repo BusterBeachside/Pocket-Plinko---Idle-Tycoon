@@ -101,7 +101,8 @@ export const GoldenBonusModal: React.FC<GoldenBonusModalProps> = ({ onClose }) =
     });
 
     const handleCloseModal = () => {
-        // Ensure game engine and audio are restored when closing modal
+        // Stop any running media or ad overlays, and restore engine/audio state
+        WebsimAdsService.cleanupAdElements();
         engine.audio.resume();
         engine.running = true;
         onClose();

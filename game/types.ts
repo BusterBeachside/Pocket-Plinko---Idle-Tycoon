@@ -116,7 +116,10 @@ export interface GameState {
     mergeModeEnabled?: boolean;
     mergeAggression?: 'low' | 'medium' | 'high';
     hapticsDisabled?: boolean; // New: track haptic settings
+    qualityMode?: 'high' | 'medium' | 'low'; // Graphic quality preset
+    showFps?: boolean; // Display FPS overlay on canvas
     activeTheme: 'dark' | 'purple'; // New theme setting
+    debugMode?: boolean; // Debug mode flag to disable cloud sync
 
     // Stats
     peakMps: number;
@@ -253,7 +256,10 @@ export const INITIAL_STATE: GameState = {
     mergeModeEnabled: true,
     mergeAggression: 'low',
     hapticsDisabled: false, // Default to enabled
+    qualityMode: 'high', // Default to High
+    showFps: false, // Default to Off
     activeTheme: 'dark', // Default to dark
+    debugMode: false, // Default to off
 
     peakMps: 0,
     currentRunPeakMps: 0,

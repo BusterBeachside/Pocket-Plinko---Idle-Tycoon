@@ -356,6 +356,7 @@ export class UnderdogService {
     }
 
     static async submitScore(score: number, leaderboardId: string = 'mps', playerStats?: any): Promise<void> {
+        if ((window as any).__DEBUG_MODE__ || engine?.state?.debugMode) return;
         const user = await this.getCurrentUser();
         if (!user || user.userId === 'local') {
             const currentMockScore = parseFloat(localStorage.getItem(`underdog_mock_highscore_${leaderboardId}`) || '-1');
@@ -630,6 +631,7 @@ export class UnderdogService {
     }
 
     static async saveProgress(stats: any, currency: number = 0, settings: any = {}): Promise<void> {
+        if ((window as any).__DEBUG_MODE__ || engine?.state?.debugMode) return;
         const user = await this.getCurrentUser();
         if (!user) {
             localStorage.setItem('underdog_save_currency', Math.floor(currency).toString());

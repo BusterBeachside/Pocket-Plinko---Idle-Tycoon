@@ -20,6 +20,7 @@ export class SaveSystem {
             const loaded = { 
                 ...INITIAL_STATE, 
                 ...parsed,
+                debugMode: false, // Never restore debugMode from local storage
                 permUpgradesLevels: { ...INITIAL_STATE.permUpgradesLevels, ...parsed.permUpgradesLevels },
                 permUpgradeCosts: { ...INITIAL_STATE.permUpgradeCosts, ...parsed.permUpgradeCosts },
                 ownedMarbles: parsed.ownedMarbles || INITIAL_STATE.ownedMarbles,
@@ -113,6 +114,10 @@ export class SaveSystem {
     }
 
     static saveState(state: GameState) {
+        // Suspend all local storage saving while Debug Mode is active
+        if (state.debugMode || (typeof window !== 'undefined' && (window as any).__DEBUG_MODE__)) {
+            return;
+        }
         state.lastSaveTime = Date.now();
         if (state.inChallengeMode && state.challengeState) {
             state.challengeState.lastPlayTime = Date.now();
@@ -120,6 +125,7 @@ export class SaveSystem {
             state.lastMainPlayTime = Date.now();
         }
         const stateToSave = { ...state };
+        stateToSave.debugMode = false; // Never store Debug Mode state in local storage
         // Don't save bonus marble position/state
         stateToSave.bonusMarble = JSON.parse(JSON.stringify(INITIAL_STATE.bonusMarble));
         stateToSave.goldenBonusMarble = {
@@ -187,6 +193,8 @@ export class SaveSystem {
         const keptPermMicro = currentState.permanentMicroBoostPercent;
         const keptShardMulti = currentState.shardMultiplierPercent;
         const keptTheme = currentState.activeTheme;
+        const keptQualityMode = currentState.qualityMode || 'high';
+        const keptShowFps = currentState.showFps || false;
         const keptTotalPlayTime = currentState.totalPlayTime;
         const keptTutorials = { ...currentState.tutorials };
         const keptIsOffline = currentState.isOffline;
@@ -219,6 +227,7 @@ export class SaveSystem {
         const keptLifetimeBonusMarbles = currentState.lifetimeBonusMarbles;
         const keptLifetimeUpgradesBought = currentState.lifetimeUpgradesBought;
         const keptLifetimeCriticalHits = currentState.lifetimeCriticalHits;
+        const keptDebugMode = currentState.debugMode;
         
         // Deep copy INITIAL_STATE to avoid reference issues, then override mutable fields explicitly
         const baseState = JSON.parse(JSON.stringify(INITIAL_STATE));
@@ -260,6 +269,8 @@ export class SaveSystem {
             permanentMicroBoostPercent: keptPermMicro,
             shardMultiplierPercent: keptShardMulti,
             activeTheme: keptTheme,
+            qualityMode: keptQualityMode,
+            showFps: keptShowFps,
             totalPlayTime: keptTotalPlayTime,
             tutorials: keptTutorials,
             isOffline: keptIsOffline,
@@ -281,6 +292,7 @@ export class SaveSystem {
             lifetimeBonusMarbles: keptLifetimeBonusMarbles,
             lifetimeUpgradesBought: keptLifetimeUpgradesBought,
             lifetimeCriticalHits: keptLifetimeCriticalHits,
+            debugMode: keptDebugMode,
 
             // Restore challenge module status
             gems: keptGems,

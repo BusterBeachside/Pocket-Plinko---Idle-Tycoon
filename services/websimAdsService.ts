@@ -105,6 +105,44 @@ export class WebsimAdsService {
     }
 
     /**
+     * Statically stops all video/audio playback and cleans up ad overlay elements in DOM.
+     */
+    public static cleanupAdElements(): void {
+        if (typeof document === 'undefined') return;
+        try {
+            // Stop and unload all audio/video elements in document
+            const mediaEls = document.querySelectorAll('video, audio');
+            mediaEls.forEach((media: any) => {
+                try {
+                    media.pause();
+                    media.currentTime = 0;
+                    media.removeAttribute('src');
+                    media.load();
+                } catch (e) {
+                    // Ignore individual media element cleanup errors
+                }
+            });
+
+            // Remove any fullscreen ad container/iframe elements injected by ad networks
+            const adContainers = document.querySelectorAll(
+                '[class*="websim-ad-overlay"], [id*="websim-ad-overlay"], [class*="rewarded-ad"], [id*="rewarded-ad"], iframe[src*="websim"]'
+            );
+            adContainers.forEach((el: any) => {
+                try {
+                    // Remove if it's an overlay or iframe element
+                    if (el && el.parentNode && (el.style?.position === 'fixed' || el.style?.position === 'absolute' || el.tagName === 'IFRAME')) {
+                        el.parentNode.removeChild(el);
+                    }
+                } catch (e) {
+                    // Ignore removal error
+                }
+            });
+        } catch (err) {
+            console.error("[WebSimAds] Error cleaning up ad elements:", err);
+        }
+    }
+
+    /**
      * Shows a Rewarded Ad (30s) and handles reward/completion callbacks.
      */
     public static showRewarded(callbacks: {
@@ -112,11 +150,16 @@ export class WebsimAdsService {
         onReward?: () => void;
         onClose?: () => void;
     }): void {
+        const handleClose = () => {
+            WebsimAdsService.cleanupAdElements();
+            if (callbacks.onClose) callbacks.onClose();
+        };
+
         if (!UnderdogService.isWebsim()) {
             // Non-websim or fallback mode: execute reward and close directly for testing/local play
             if (callbacks.onStart) callbacks.onStart();
             if (callbacks.onReward) callbacks.onReward();
-            if (callbacks.onClose) callbacks.onClose();
+            handleClose();
             return;
         }
 
@@ -131,19 +174,19 @@ export class WebsimAdsService {
                         if (callbacks.onReward) callbacks.onReward();
                     },
                     onClose: () => {
-                        if (callbacks.onClose) callbacks.onClose();
+                        handleClose();
                     }
                 });
             } catch (err) {
                 console.error("[WebSimAds] Error calling showRewarded:", err);
                 if (callbacks.onStart) callbacks.onStart();
                 if (callbacks.onReward) callbacks.onReward();
-                if (callbacks.onClose) callbacks.onClose();
+                handleClose();
             }
         } else {
             if (callbacks.onStart) callbacks.onStart();
             if (callbacks.onReward) callbacks.onReward();
-            if (callbacks.onClose) callbacks.onClose();
+            handleClose();
         }
     }
 }

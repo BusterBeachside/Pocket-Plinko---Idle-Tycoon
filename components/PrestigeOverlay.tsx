@@ -25,8 +25,12 @@ export const PrestigeOverlay = ({ onComplete }: { onComplete: () => void }) => {
         const ctx = cvs.getContext('2d');
         if (!ctx) return;
 
-        cvs.width = window.innerWidth;
-        cvs.height = window.innerHeight;
+        const updateCanvasSize = () => {
+            cvs.width = window.innerWidth;
+            cvs.height = window.innerHeight;
+        };
+        updateCanvasSize();
+        window.addEventListener('resize', updateCanvasSize);
 
         // Pause Physics Engine & Mute Music
         const wasRunning = engine.running;
@@ -71,7 +75,8 @@ export const PrestigeOverlay = ({ onComplete }: { onComplete: () => void }) => {
             };
         });
         
-        let start = performance.now();
+        let overallStart = performance.now();
+        let phaseStart = performance.now();
         let phase = 'expand'; // expand -> hold -> vortex -> fade
         
         engine.audio.play('prestige1'); // Start sound
@@ -80,18 +85,21 @@ export const PrestigeOverlay = ({ onComplete }: { onComplete: () => void }) => {
 
         const loop = () => {
             const now = performance.now();
-            const dt = (now - start) / 1000;
+            const totalDt = (now - overallStart) / 1000;
+            const phaseDt = (now - phaseStart) / 1000;
             const globalTime = now * 0.002;
             
             // Clear
             ctx.clearRect(0, 0, cvs.width, cvs.height);
             
-            // Background Dim
-            ctx.fillStyle = `rgba(0,0,0,${Math.min(0.8, dt * 0.5)})`;
-            ctx.fillRect(0,0,cvs.width, cvs.height);
+            // Instantly fade background to solid black (within 120ms) so board underneath is hidden immediately
+            const bgDim = Math.min(1, totalDt / 0.12);
+
+            ctx.fillStyle = `rgba(0, 0, 0, ${bgDim})`;
+            ctx.fillRect(0, 0, cvs.width, cvs.height);
             
             if (phase === 'expand') {
-                const progress = Math.min(1, dt / 1.5);
+                const progress = Math.min(1, phaseDt / 1.5);
                 animBalls.forEach((b, i) => {
                     const angle = (i / animBalls.length) * Math.PI * 2;
                     // Spiraling out target with Wave Motion
@@ -107,7 +115,7 @@ export const PrestigeOverlay = ({ onComplete }: { onComplete: () => void }) => {
                 
                 if (progress >= 1) {
                     phase = 'hold';
-                    start = now;
+                    phaseStart = now;
                 }
             } else if (phase === 'hold') {
                 // Continuous Wave Float
@@ -120,14 +128,14 @@ export const PrestigeOverlay = ({ onComplete }: { onComplete: () => void }) => {
                     b.y = centerY + Math.sin(angle) * r;
                 });
 
-                if (dt > 1.0) { // Slightly longer hold to appreciate the wave
+                if (phaseDt > 1.0) { // Hold phase
                     phase = 'vortex';
-                    start = now;
+                    phaseStart = now;
                     engine.audio.play('prestige2'); // Vortex sound
                 }
             } else if (phase === 'vortex') {
-                const duration = 2.5; // Longer phase to allow staggered intake
-                const progress = Math.min(1, dt / duration);
+                const duration = 2.5;
+                const progress = Math.min(1, phaseDt / duration);
                 
                 // Draw vortex bg
                 const hue = (now / 20) % 360;
@@ -137,28 +145,23 @@ export const PrestigeOverlay = ({ onComplete }: { onComplete: () => void }) => {
                 grad.addColorStop(0.4, 'transparent');
                 ctx.globalCompositeOperation = 'lighter';
                 ctx.fillStyle = grad;
-                ctx.beginPath(); ctx.arc(centerX, centerY, 600 * (1-progress*0.5), 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(centerX, centerY, 600 * (1 - progress * 0.5), 0, Math.PI * 2); ctx.fill();
                 ctx.globalCompositeOperation = 'source-over';
 
                 animBalls.forEach((b, i) => {
                     // 1. Extreme Spin
-                    // Base rotation + Time-based acceleration + Random SpeedVar
-                    const spinSpeed = 2 + (dt * 8 * Math.abs(b.speedVar));
+                    const spinSpeed = 2 + (phaseDt * 8 * Math.abs(b.speedVar));
                     const angle = (i / animBalls.length) * Math.PI * 2 + (now * 0.001 * spinSpeed * Math.sign(b.speedVar));
 
                     // 2. Staggered Suction Logic
                     let r = 250;
                     
-                    if (dt > b.suctionDelay) {
-                        // Suction has started for this ball
-                        const suckT = (dt - b.suctionDelay) / b.suctionDuration;
+                    if (phaseDt > b.suctionDelay) {
+                        const suckT = (phaseDt - b.suctionDelay) / b.suctionDuration;
                         const suckProgress = Math.min(1, Math.max(0, suckT));
-                        
-                        // Cubic In easing for "SHOOP" effect
                         const suction = Math.pow(suckProgress, 3);
                         r = 250 * (1 - suction);
                     } else {
-                        // Waiting to be sucked in, keep waving
                         const waveOffset = Math.sin(globalTime * 10 + i * 0.5) * 10;
                         r = 250 + waveOffset;
                     }
@@ -169,13 +172,37 @@ export const PrestigeOverlay = ({ onComplete }: { onComplete: () => void }) => {
                 
                 if (progress >= 1) {
                     phase = 'fade';
-                    start = now;
+                    phaseStart = now;
                 }
-            } else if (phase === 'fade') {
-                const progress = Math.min(1, dt / 0.5);
-                ctx.fillStyle = `rgba(0,0,0,${progress})`;
-                ctx.fillRect(0,0,cvs.width, cvs.height);
-                if (progress >= 1) {
+            }
+
+            // Draw Balls with correct colors during expand, hold, and vortex phases
+            if (phase !== 'fade') {
+                animBalls.forEach(b => {
+                    if (b.color === 'rainbow') {
+                        const hue = (now / 5 + b.id * 10) % 360;
+                        ctx.fillStyle = `hsl(${hue}, 100%, 60%)`;
+                        ctx.shadowColor = `hsl(${hue}, 100%, 50%)`;
+                        ctx.shadowBlur = 15;
+                    } else {
+                        ctx.fillStyle = b.color;
+                        ctx.shadowColor = b.color;
+                        ctx.shadowBlur = 10;
+                    }
+                    
+                    ctx.beginPath(); 
+                    ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2); 
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                });
+            }
+
+            // Handle Fade Completion
+            if (phase === 'fade') {
+                const fadeDuration = 0.4; // 400ms to fade to solid black
+                const holdDuration = 0.4;  // Hold solid black for 400ms
+                
+                if (phaseDt >= (fadeDuration + holdDuration)) {
                     // Restore state before calling complete
                     engine.running = wasRunning; 
                     engine.audio.setMusicVolume(previousMusicVol);
@@ -185,31 +212,13 @@ export const PrestigeOverlay = ({ onComplete }: { onComplete: () => void }) => {
                 }
             }
 
-            // Draw Balls with correct colors
-            animBalls.forEach(b => {
-                if (b.color === 'rainbow') {
-                    const hue = (now / 5 + b.id * 10) % 360;
-                    ctx.fillStyle = `hsl(${hue}, 100%, 60%)`;
-                    ctx.shadowColor = `hsl(${hue}, 100%, 50%)`;
-                    ctx.shadowBlur = 15;
-                } else {
-                    ctx.fillStyle = b.color;
-                    ctx.shadowColor = b.color;
-                    ctx.shadowBlur = 10;
-                }
-                
-                ctx.beginPath(); 
-                ctx.arc(b.x, b.y, b.radius, 0, Math.PI*2); 
-                ctx.fill();
-                ctx.shadowBlur = 0;
-            });
-
             rAF = requestAnimationFrame(loop);
         };
         rAF = requestAnimationFrame(loop);
 
         return () => {
             cancelAnimationFrame(rAF);
+            window.removeEventListener('resize', updateCanvasSize);
             // Safety restore in case component unmounts unexpectedly
             engine.running = true; 
             engine.audio.setMusicVolume(previousMusicVol);
@@ -217,5 +226,21 @@ export const PrestigeOverlay = ({ onComplete }: { onComplete: () => void }) => {
         
     }, []);
 
-    return <canvas ref={canvasRef} style={{position:'fixed', inset:0, zIndex:10000}} />;
+    return (
+        <canvas 
+            ref={canvasRef} 
+            className="fixed inset-0 w-full h-full pointer-events-none z-[10000]"
+            style={{ 
+                position: 'fixed', 
+                top: 0, 
+                left: 0, 
+                width: '100vw', 
+                height: '100vh', 
+                zIndex: 10000, 
+                aspectRatio: 'unset', 
+                objectFit: 'fill',
+                background: 'transparent'
+            }} 
+        />
+    );
 };

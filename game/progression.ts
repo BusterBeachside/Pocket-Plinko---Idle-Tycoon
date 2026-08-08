@@ -63,6 +63,15 @@ export class ProgressionManager {
         return false;
     }
 
+    static resetDailyMissions(state: GameState) {
+        const now = new Date();
+        const today = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
+        if (!state.missions) {
+            state.missions = { date: today, activeDailies: [], activeRepeatables: [] };
+        }
+        state.missions.activeDailies = this.getRandomMissions(DAILY_MISSIONS, 3, 'daily');
+    }
+
     static checkMissions(state: GameState, pushNotification: (msg: string, type: 'achievement' | 'mission') => void) {
         const now = new Date();
         const today = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;

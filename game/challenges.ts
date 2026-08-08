@@ -81,7 +81,55 @@ export const CHALLENGES: { [id: string]: ChallengeDefinition } = {
 };
 
 export class ChallengesManager {
+    static debugOverrideChallengeId: string | null = null;
+
+    static forceNextChallenge(state: GameState): string {
+        const challengeIds = ['anti_gravity', 'sand_peg', 'micro_mania', 'single_marble', 'critical_meltdown'];
+        const currentId = ChallengesManager.getActiveChallengeId();
+        const currentIdx = challengeIds.indexOf(currentId);
+        const nextId = challengeIds[(currentIdx + 1) % challengeIds.length];
+        
+        ChallengesManager.debugOverrideChallengeId = nextId;
+        ChallengesManager.resetChallenge(state);
+        return nextId;
+    }
+
+    static resetChallenge(state: GameState) {
+        const activeId = ChallengesManager.getActiveChallengeId();
+        state.challengeState = {
+            challengeId: activeId,
+            money: 0,
+            lifetimeEarnings: 0,
+            pegsBrokenCurrency: 0,
+            lifetimePegsBroken: 0,
+            lifetimeMicroMarblesDropped: 0,
+            upgrades: {
+                extraBall: activeId === 'micro_mania' ? 0 : 1,
+                pegValue: 0,
+                ballSpeed: 0,
+                basketValue: 0,
+                uncommonChance: 0,
+                rareChance: 0,
+                legendaryChance: 0,
+                criticalChance: 0,
+                microValue: 0,
+                bonusValue: 0,
+                sandPegMultiplier: 0,
+                microAutoclicker: 0
+            },
+            currentMps: 0,
+            currentRunPeakMps: 0
+        };
+        if (!state.challengeGoalClaimed) {
+            state.challengeGoalClaimed = {};
+        }
+        state.challengeGoalClaimed[activeId] = { bronze: false, silver: false, gold: false };
+    }
+
     static getActiveChallengeId(): string {
+        if (ChallengesManager.debugOverrideChallengeId) {
+            return ChallengesManager.debugOverrideChallengeId;
+        }
         const msIn48Hours = 1000 * 60 * 60 * 24 * 2;
         const nowMs = Date.now();
         const cycleIndex = Math.floor(nowMs / msIn48Hours);

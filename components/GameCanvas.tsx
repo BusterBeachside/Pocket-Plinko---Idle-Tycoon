@@ -69,8 +69,8 @@ export const GameCanvas = ({ inChallengeMode }: { inChallengeMode?: boolean }) =
                 }
             }
             
-            // Only spawn micro marble if we didn't just click the bonus marble
-            if (!bonusHit) {
+            // Only spawn micro marble if physics are running and we didn't just click the bonus marble
+            if (!bonusHit && engine.running) {
                 engine.spawnMicroMarble(x, y);
 
                 // Short tactile haptic vibration feedback response for mobile/haptic-ready devices
@@ -116,13 +116,21 @@ export const GameCanvas = ({ inChallengeMode }: { inChallengeMode?: boolean }) =
     }, []);
 
     return (
-        <canvas 
-            id="game-canvas"
-            ref={canvasRef} 
-            width={400} 
-            height={600} 
-            className={inChallengeMode ? 'challenge-board' : ''}
-            style={{ touchAction: 'none' }}
-        />
+        <div className="relative flex flex-1 min-h-0 w-full justify-center items-center p-1 sm:p-2">
+            {engine.state.debugMode && (
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none bg-red-600/90 text-white font-black text-[9px] sm:text-[10px] tracking-widest px-3 py-1 rounded-full shadow-lg border border-red-400 flex items-center gap-1.5 z-20 animate-pulse uppercase">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                    DEBUG MODE
+                </div>
+            )}
+            <canvas 
+                id="game-canvas"
+                ref={canvasRef} 
+                width={400} 
+                height={600} 
+                className={inChallengeMode ? 'challenge-board' : ''}
+                style={{ touchAction: 'none' }}
+            />
+        </div>
     );
 };

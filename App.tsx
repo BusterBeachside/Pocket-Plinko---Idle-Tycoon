@@ -23,6 +23,7 @@ import { StatsModal } from './components/modals/StatsModal';
 import { ResetModal } from './components/modals/ResetModal';
 import { AchievementsModal } from './components/modals/AchievementsModal';
 import { MissionsModal } from './components/modals/MissionsModal';
+import { DebugModal } from './components/modals/DebugModal';
 import { LeaderboardModal } from './components/modals/LeaderboardModal';
 import { UpgradesPanel } from './components/panels/UpgradesPanel';
 import { OptionsPanel } from './components/panels/OptionsPanel';
@@ -86,7 +87,35 @@ const App = () => {
     const [notifications, setNotifications] = useState(engine.notifications);
 
     const [dailyEventModalOpen, setDailyEventModalOpen] = useState(false);
+    const [debugModalOpen, setDebugModalOpen] = useState(false);
     const [timeLeftStr, setTimeLeftStr] = useState('');
+    const [, setDebugUnlocked] = useState(false);
+
+    useEffect(() => {
+        let keyBuffer = '';
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const activeEl = document.activeElement;
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable)) {
+                return;
+            }
+
+            if (e.key && e.key.length === 1) {
+                keyBuffer += e.key.toLowerCase();
+                if (keyBuffer.length > 40) {
+                    keyBuffer = keyBuffer.slice(-30);
+                }
+                if (keyBuffer.includes('busterisawesome')) {
+                    (window as any).__FORCE_DEBUG_BUTTON__ = true;
+                    setDebugUnlocked(true);
+                    keyBuffer = '';
+                    setToast({ msg: '🛠️ Debug Mode Button Unlocked!', visible: true });
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     useEffect(() => {
         syncAndroidNotifications();
@@ -109,10 +138,10 @@ const App = () => {
                         if (engine.state.inChallengeMode) {
                             engine.running = false; // Pause the plinko board physics loop
                         }
-                        engine.saveState();
-                        setGameState({ ...engine.state });
-                        engine.notify();
                     }
+                    engine.saveState();
+                    setGameState({ ...engine.state });
+                    engine.notify();
                 }
             }
         };
@@ -693,6 +722,7 @@ const App = () => {
                 profile={profile}
                 onEventClick={() => setDailyEventModalOpen(true)}
                 onChallengeClick={() => togglePanel('challenges')}
+                onDebugClick={() => setDebugModalOpen(true)}
             />
             
             <div className="main-content">
@@ -770,7 +800,13 @@ const App = () => {
                                  (cState.lifetimePegsBroken || 0) > 0 ||
                                  (cState.money || 0) > 0 ||
                                  (cState.pegsBrokenCurrency || 0) > 0 ||
-                                 Object.values(cState.upgrades || {}).some((v: any) => v > 0))
+                                 (cState.lifetimeMicroMarblesDropped || 0) > 0 ||
+                                 Object.entries(cState.upgrades || {}).some(([k, v]: [string, any]) => {
+                                     if (k === 'extraBall') {
+                                         return activeId === 'micro_mania' ? v > 0 : v > 1;
+                                     }
+                                     return v > 0;
+                                 }))
                             );
 
                             return (
@@ -807,6 +843,14 @@ const App = () => {
                     hasClaimableMissions={hasClaimableMissions}
                     hasClaimableAchievements={hasClaimableAchievements}
                 />
+
+                {debugModalOpen && (
+                    <DebugModal 
+                        onClose={() => setDebugModalOpen(false)}
+                        onUpdate={() => setGameState({ ...engine.state })}
+                        onTestPrestige={() => handleActivatePrestige(10, 1.5)}
+                    />
+                )}
             </div>
         </div>
     );

@@ -3,7 +3,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { 
     RefreshCw, Volume2, Sliders, Gamepad2, Cloud, Trophy, 
     Gift, BarChart2, BookOpen, Award, Target, ChevronDown, 
-    Palette, Vibrate, Coins, Trash2, Zap, Gem, Sparkles
+    Palette, Vibrate, Coins, Trash2, Zap, Gem, Sparkles, Gauge, Activity
 } from 'lucide-react';
 import { engine } from '../../game/engine';
 import { GameState } from '../../game/types';
@@ -83,7 +83,7 @@ export const OptionsPanel = ({
     };
 
     const handleForceSync = async () => {
-        if (gameState.isOffline || syncing) return;
+        if (gameState.isOffline || gameState.debugMode || syncing) return;
         setSyncing(true);
         try {
             await engine.saveState();
@@ -117,7 +117,13 @@ export const OptionsPanel = ({
          (cState.lifetimePegsBroken || 0) > 0 ||
          (cState.money || 0) > 0 ||
          (cState.pegsBrokenCurrency || 0) > 0 ||
-         Object.values(cState.upgrades || {}).some((v: any) => v > 0))
+         (cState.lifetimeMicroMarblesDropped || 0) > 0 ||
+         Object.entries(cState.upgrades || {}).some(([k, v]: [string, any]) => {
+             if (k === 'extraBall') {
+                 return activeId === 'micro_mania' ? v > 0 : v > 1;
+             }
+             return v > 0;
+         }))
     );
 
     return (
@@ -375,12 +381,69 @@ export const OptionsPanel = ({
                         <div className="p-3 space-y-2.5">
                             <div className="option-row flex items-center justify-between">
                                 <span className="text-xs text-slate-300 flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-400" /> Physics Engine</span>
-                                <button className="btn-pill small !py-1 text-xs" onClick={() => {
+                                <button className="btn-pill small !py-1 text-xs cursor-pointer" onClick={() => {
                                     engine.running = !engine.running;
                                     forceUpdate();
                                 }}>
                                     {engine.running ? 'Pause' : 'Resume'}
                                 </button>
+                            </div>
+
+                            <div className="p-2.5 bg-black/40 border border-white/10 rounded-xl flex flex-col gap-2">
+                                <div className="flex flex-col gap-1.5 w-full">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5" title="Graphics quality setting for physics & canvas effects">
+                                            <Gauge className="w-3.5 h-3.5 text-cyan-400" /> Graphics Quality
+                                        </span>
+                                        <span className="text-[10.5px] font-semibold text-slate-400 capitalize">
+                                            {(!gameState.qualityMode || gameState.qualityMode === 'high') ? 'High' : (gameState.qualityMode === 'medium' ? 'Medium' : 'Low')}
+                                        </span>
+                                    </div>
+                                    <div className="bg-white/10 rounded-lg p-1 grid grid-cols-3 gap-1 w-full">
+                                        <button 
+                                            className={`text-[11px] font-bold py-1.5 px-1 rounded-md transition-all text-center flex items-center justify-center cursor-pointer ${
+                                                (!gameState.qualityMode || gameState.qualityMode === 'high')
+                                                    ? 'bg-white text-black font-black shadow-sm' 
+                                                    : 'text-slate-400 hover:text-white'
+                                            }`}
+                                            onClick={() => {
+                                                engine.state.qualityMode = 'high'; forceUpdate(); engine.saveState();
+                                            }}
+                                        >High</button>
+                                        <button 
+                                            className={`text-[11px] font-bold py-1.5 px-1 rounded-md transition-all text-center flex items-center justify-center cursor-pointer ${
+                                                gameState.qualityMode === 'medium'
+                                                    ? 'bg-white text-black font-black shadow-sm' 
+                                                    : 'text-slate-400 hover:text-white'
+                                            }`}
+                                            onClick={() => {
+                                                engine.state.qualityMode = 'medium'; forceUpdate(); engine.saveState();
+                                            }}
+                                        >Medium</button>
+                                        <button 
+                                            className={`text-[11px] font-bold py-1.5 px-1 rounded-md transition-all text-center flex items-center justify-center cursor-pointer ${
+                                                gameState.qualityMode === 'low'
+                                                    ? 'bg-white text-black font-black shadow-sm' 
+                                                    : 'text-slate-400 hover:text-white'
+                                            }`}
+                                            onClick={() => {
+                                                engine.state.qualityMode = 'low'; forceUpdate(); engine.saveState();
+                                            }}
+                                        >Low</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="option-row flex items-center justify-between">
+                                <span className="text-xs text-slate-300 flex items-center gap-1.5" title="Display live FPS on game screen"><Activity className="w-3.5 h-3.5 text-emerald-400" /> Display FPS</span>
+                                <div className="bg-white/10 rounded-xl p-0.5 flex">
+                                    <button className={`toggle-switch ${gameState.showFps ? 'active' : ''}`} onClick={() => {
+                                        engine.state.showFps = true; forceUpdate(); engine.saveState();
+                                    }}>On</button>
+                                    <button className={`toggle-switch ${!gameState.showFps ? 'active' : ''}`} onClick={() => {
+                                        engine.state.showFps = false; forceUpdate(); engine.saveState();
+                                    }}>Off</button>
+                                </div>
                             </div>
 
                             <div className="option-row flex items-center justify-between">
@@ -496,19 +559,19 @@ export const OptionsPanel = ({
                         <div className="p-3 space-y-3">
                             <div className="flex justify-between items-center text-xs">
                                 <span className="text-slate-400">Last Cloud Sync</span>
-                                <span className={`font-mono font-bold ${gameState.isOffline ? 'text-rose-400' : 'text-emerald-400'}`}>
-                                    {gameState.isOffline ? 'Offline' : lastSyncStr}
+                                <span className={`font-mono font-bold ${gameState.debugMode ? 'text-rose-400' : gameState.isOffline ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                    {gameState.debugMode ? 'DISABLED (Debug Mode)' : gameState.isOffline ? 'Offline' : lastSyncStr}
                                 </span>
                             </div>
 
                             {!gameState.isOffline && (
                                 <button 
-                                    className={`btn-pill small w-full flex items-center justify-center gap-2 !py-2 text-xs ${syncing ? 'loading' : ''}`}
+                                    className={`btn-pill small w-full flex items-center justify-center gap-2 !py-2 text-xs ${syncing ? 'loading' : ''} ${gameState.debugMode ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     onClick={handleForceSync}
-                                    disabled={syncing}
+                                    disabled={syncing || !!gameState.debugMode}
                                 >
                                     <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
-                                    {syncing ? 'Syncing Game State...' : 'Sync Now'}
+                                    {gameState.debugMode ? 'Sync Disabled (Debug Mode)' : syncing ? 'Syncing Game State...' : 'Sync Now'}
                                 </button>
                             )}
 

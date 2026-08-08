@@ -360,20 +360,20 @@ body {
 .stat-label { font-size: 0.75rem; color: #ddd; font-weight: 600; display: block; white-space: nowrap; }
 .stat-value { font-size: 1.1rem; font-weight: 800; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.5); white-space: nowrap; }
 
-canvas {
+#game-canvas {
     border-radius: 12px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 0, 0, 0.3);
     background: #0d0e15;
-    /* Responsive Canvas Logic */
-    flex: 0 1 auto; /* Maintain exact aspect ratio without stretching container */
-    min-height: 0; /* Allow shrinking below content size */
+    /* Responsive Canvas Logic - Fill available vertical space cleanly without horizontal letterboxing */
+    flex: 0 1 auto;
+    height: 100%;
     width: auto;
     max-width: 100%;
     max-height: 100%;
     aspect-ratio: 400 / 600; /* Strictly match Plinko board 2:3 aspect ratio */
-    object-fit: contain; /* Maintain Aspect Ratio */
+    object-fit: contain;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 @keyframes challengePulse {
@@ -391,7 +391,7 @@ canvas {
     }
 }
 
-canvas.challenge-board {
+#game-canvas.challenge-board {
     animation: challengePulse 3s ease-in-out infinite;
     border: 1px solid rgba(245, 158, 11, 0.4) !important;
 }
@@ -585,8 +585,17 @@ canvas.challenge-board {
 .close-btn { display: none; }
 
 @media (max-width: 800px) {
-    .app-container { height: 100dvh; /* use dynamic viewport height for mobile */ }
-    .main-content { position: relative; }
+    .app-container { 
+        height: 100vh;
+        height: 100dvh; /* use dynamic viewport height for mobile */ 
+        overflow: hidden;
+    }
+    .main-content { 
+        position: relative; 
+        flex: 1 1 0%;
+        min-height: 0;
+        overflow: hidden;
+    }
     
     .sidebar, .sidebar-right {
         position: absolute;
@@ -613,24 +622,26 @@ canvas.challenge-board {
     .mobile-controls {
         display: flex;
         justify-content: center;
-        gap: 8px;
-        padding: 8px;
-        background: rgba(0,0,0,0.5);
-        border-radius: 20px;
-        flex-shrink: 0; /* Prevent shrinking */
+        gap: 6px;
+        padding: 4px 6px;
+        background: rgba(0,0,0,0.6);
+        border-radius: 16px;
+        flex-shrink: 0; /* Prevent shrinking or pushing off-screen */
         width: 100%;
         max-width: 440px;
         box-sizing: border-box;
+        margin-top: auto;
     }
     .mobile-btn {
         background: #333; color: #fff; border: 1px solid #555;
-        padding: 10px 4px; border-radius: 20px; font-weight: 800;
+        padding: 6px 4px; border-radius: 14px; font-weight: 800;
         flex: 1; min-width: 0; text-align: center;
-        font-size: 0.78rem;
+        font-size: 0.75rem;
+        height: 38px;
         letter-spacing: -0.025em;
         text-overflow: clip;
         white-space: nowrap;
-        overflow: visible;
+        overflow: hidden;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -645,12 +656,13 @@ canvas.challenge-board {
     .stats-bar { 
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        padding: 4px;
-        margin-bottom: 5px;
-        height: 44px;
+        padding: 2px 4px;
+        margin-bottom: 0;
+        height: 38px;
         gap: 2px;
         flex-wrap: nowrap;
         justify-content: center;
+        flex-shrink: 0;
     }
     .stat-item { 
         padding: 0; 
@@ -660,20 +672,45 @@ canvas.challenge-board {
         align-items: center;
         min-width: 0;
     }
-    .stat-label { font-size: 0.6rem; }
-    .stat-value { font-size: 0.85rem; }
+    .stat-label { font-size: 0.58rem; }
+    .stat-value { font-size: 0.82rem; }
     
     .header {
         height: auto;
-        min-height: 50px;
-        padding: 6px 12px;
+        min-height: 48px;
+        padding: 4px 8px;
+        flex-shrink: 0;
     }
-    .header-title { font-size: 1.5rem; }
+    .header-title { font-size: 1.35rem; }
     
-    .game-area {
-        padding: 6px;
-        gap: 6px;
+    .kinetic-icon {
+        width: 38px;
+        height: 38px;
+        right: 10px;
     }
+    .kinetic-icon img {
+        width: 26px;
+        height: 26px;
+    }
+
+    .game-area {
+        padding: 4px 6px;
+        gap: 4px;
+        flex: 1 1 0%;
+        min-height: 0;
+        justify-content: space-between;
+    }
+
+    #game-canvas {
+        flex: 0 1 auto;
+        min-height: 0;
+        max-height: 100%;
+        max-width: 100%;
+        width: auto;
+        height: 100%;
+        aspect-ratio: 400 / 600;
+    }
+
     .desktop-only { display: none !important; }
 }
 

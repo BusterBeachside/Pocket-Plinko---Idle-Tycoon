@@ -5,8 +5,21 @@ import { assets } from '../game/assets';
 import { DailyEventsManager } from '../game/dailyEvents';
 import { CHALLENGES, ChallengesManager } from '../game/challenges';
 
-import { User } from 'lucide-react';
+import { User, Bug } from 'lucide-react';
 import { AvatarDisplay } from './AvatarDisplay';
+
+export function isAIStudioPreview(): boolean {
+    if (typeof window === 'undefined') return false;
+    const hostname = window.location.hostname;
+    return (
+        hostname.includes('run.app') ||
+        hostname.includes('ais-') ||
+        hostname.includes('localhost') ||
+        hostname.includes('127.0.0.1') ||
+        window !== window.parent ||
+        (window as any).__FORCE_DEBUG_BUTTON__ === true
+    );
+}
 
 const formatVal = (n: number) => {
     if (n >= 1e12) return (n / 1e12).toFixed(1) + 'T';
@@ -21,13 +34,15 @@ export const Header = ({
     onAuthClick, 
     profile, 
     onEventClick,
-    onChallengeClick
+    onChallengeClick,
+    onDebugClick
 }: { 
     onCoreClick: () => void, 
     onAuthClick: () => void, 
     profile?: any, 
     onEventClick: () => void,
-    onChallengeClick?: () => void
+    onChallengeClick?: () => void,
+    onDebugClick?: () => void
 }) => {
     const [glow, setGlow] = useState(false);
     const [currentEvent, setCurrentEvent] = useState(DailyEventsManager.getCurrentEvent());
@@ -127,27 +142,40 @@ export const Header = ({
     };
 
     return (
-        <div className="header" style={{ display: 'flex', flexDirection: 'row', position: 'relative' }}>
-            <div 
-                className="auth-trigger absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full px-2 py-1 transition-all cursor-pointer"
-                onClick={onAuthClick}
-            >
-                {profile ? (
-                    <AvatarDisplay avatarId={profile.avatar_url || 'marble_white'} size={20} ownedSkins={engine.state.ownedMarbles} />
-                ) : (
-                    <User className="w-3.5 h-3.5 text-emerald-500" />
+        <div className="header flex flex-row items-center justify-between relative w-full px-2 sm:px-4">
+            <div className="absolute left-2.5 sm:left-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
+                <div 
+                    className="auth-trigger flex items-center gap-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full px-2 py-1 transition-all cursor-pointer"
+                    onClick={onAuthClick}
+                >
+                    {profile ? (
+                        <AvatarDisplay avatarId={profile.avatar_url || 'marble_white'} size={18} ownedSkins={engine.state.ownedMarbles} />
+                    ) : (
+                        <User className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    )}
+                    <span className="hidden sm:inline text-[10px] font-bold text-white/60 uppercase tracking-wider pr-1">
+                        {profile?.username || 'Guest'}
+                    </span>
+                </div>
+
+                {isAIStudioPreview() && onDebugClick && (
+                    <button
+                        onClick={onDebugClick}
+                        className="hidden md:flex items-center gap-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider transition-all cursor-pointer shadow-md shrink-0"
+                        title="Open Debug Menu"
+                    >
+                        <Bug className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>Debug</span>
+                    </button>
                 )}
-                <span className="hidden sm:inline text-[10px] font-bold text-white/60 uppercase tracking-wider pr-2">
-                    {profile?.username || 'Guest'}
-                </span>
             </div>
             
-            <div className="flex flex-col items-center select-none" style={{ alignSelf: 'center' }}>
-                <h1 className="header-title" style={{ fontSize: '1.6rem', lineHeight: '1.1' }}>Pocket Plinko</h1>
+            <div className="flex flex-col items-center select-none w-full px-12 sm:px-32 overflow-hidden my-auto" style={{ alignSelf: 'center' }}>
+                <h1 className="header-title text-center" style={{ fontSize: '1.4rem', lineHeight: '1.1' }}>Pocket Plinko</h1>
                 {inChallenge ? (
                     <div 
                         onClick={onChallengeClick}
-                        className="flex flex-col gap-1 mt-1 px-3 py-1 bg-black/60 border border-white/5 cursor-pointer hover:bg-black/90 hover:border-white/15 transition-all w-48 sm:w-56 select-none shadow-md rounded-lg"
+                        className="flex flex-col gap-0.5 mt-0.5 px-2.5 py-0.5 bg-black/60 border border-white/5 cursor-pointer hover:bg-black/90 hover:border-white/15 transition-all w-40 xs:w-48 sm:w-56 select-none shadow-md rounded-lg max-w-full overflow-hidden"
                         title={challengeInfo.allCompleted ? "All Goals Completed! Click to view Challenges!" : `Progress toward ${challengeInfo.nextTier.toUpperCase()} Goal. Click to view Challenges!`}
                     >
                         <div className="flex items-center justify-between text-[8px] sm:text-[9px] font-extrabold tracking-wider uppercase leading-none">
@@ -172,17 +200,18 @@ export const Header = ({
                 ) : (
                     <div 
                         onClick={onEventClick}
-                        className="flex items-center gap-1.5 mt-1 px-3 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-widest bg-black/60 border border-white/5 cursor-pointer hover:bg-black/90 hover:border-white/15 transition-all text-slate-400 select-none shadow-md"
+                        className="flex items-center gap-1 mt-0.5 px-2.5 py-0.5 rounded-full text-[8.5px] sm:text-[9px] font-extrabold uppercase tracking-wider bg-black/60 border border-white/5 cursor-pointer hover:bg-black/90 hover:border-white/15 transition-all text-slate-400 select-none shadow-md max-w-full overflow-hidden"
                         title="Click to view today's active event details!"
-                        style={{ whiteSpace: 'nowrap' }}
                     >
-                        <span className="flex h-1.5 w-1.5 relative">
+                        <span className="flex h-1.5 w-1.5 relative shrink-0">
                             <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${getIndicatorColor()} opacity-75`} />
                             <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${getIndicatorColor()}`} />
                         </span>
-                        <span style={{ color: '#aaa' }}>Event:</span>
-                        <span className={`${currentEvent.color.split(' ')[0]} font-black`}>{currentEvent.name}</span>
-                        <span className="ml-1 pl-1.5 border-l border-white/10 text-[7.5px] font-mono text-slate-500 tabular-nums">
+                        <span style={{ color: '#aaa' }} className="shrink-0">Event:</span>
+                        <span className={`${currentEvent.color.split(' ')[0]} font-black truncate max-w-[95px] xs:max-w-[140px] sm:max-w-none`}>
+                            {currentEvent.name}
+                        </span>
+                        <span className="ml-0.5 pl-1 border-l border-white/10 text-[7.5px] font-mono text-slate-500 tabular-nums shrink-0">
                             {timeLeft}
                         </span>
                     </div>
@@ -190,7 +219,7 @@ export const Header = ({
             </div>
             
             <div 
-                className={`kinetic-icon ${glow && !inChallenge ? 'glow' : ''}`} 
+                className={`kinetic-icon absolute right-2.5 sm:right-4 top-1/2 -translate-y-1/2 z-10 ${glow && !inChallenge ? 'glow' : ''}`} 
                 onClick={inChallenge ? undefined : onCoreClick} 
                 style={{
                     cursor: inChallenge ? 'not-allowed' : 'pointer',

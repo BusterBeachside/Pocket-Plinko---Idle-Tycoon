@@ -37,6 +37,12 @@ export class GameEngine {
     
     lastTime: number = 0;
     running: boolean = false;
+    debugDoubleSpeed: boolean = false;
+    
+    // FPS Tracking
+    fps: number = 60;
+    fpsFrameCount: number = 0;
+    fpsLastTime: number = performance.now();
     
     // Spatial Grid
     grid: Peg[][][] = [];
@@ -137,6 +143,11 @@ export class GameEngine {
         
         // Always save to local storage as backup/offline mode
         SaveSystem.saveState(this.state);
+
+        // If debugMode is active, skip Cloud Sync to prevent cheating on official leaderboards
+        if (this.state.debugMode) {
+            return;
+        }
 
         // If online, sync to Underdog (Throttled to every 30 seconds)
         const now = Date.now();
@@ -437,6 +448,7 @@ export class GameEngine {
     }
 
     spawnMicroMarble(ignoredX: number, ignoredY: number) {
+        if (!this.running) return;
         Spawner.spawnMicroMarble(this.width, (o) => this.spawnBall(o), (e) => this.visualEffects.push(e));
         ProgressionManager.updateMissionProgress(this.state, 'micro_marbles', 1);
         if (this.state.inChallengeMode && this.state.challengeState) {
@@ -468,9 +480,20 @@ export class GameEngine {
 
     startLoop() {
         this.lastBonusSpawn = Date.now();
+        this.fpsLastTime = performance.now();
         
         const loop = (t: number) => {
-            const dt = Math.min((t - this.lastTime) / 1000, 0.1);
+            this.fpsFrameCount++;
+            if (t - this.fpsLastTime >= 500) {
+                this.fps = Math.round((this.fpsFrameCount * 1000) / Math.max(1, t - this.fpsLastTime));
+                this.fpsFrameCount = 0;
+                this.fpsLastTime = t;
+            }
+
+            let dt = Math.min((t - this.lastTime) / 1000, 0.1);
+            if (this.debugDoubleSpeed) {
+                dt *= 2.0;
+            }
             this.lastTime = t;
             this.update(dt);
             this.draw();
@@ -781,9 +804,13 @@ export class GameEngine {
 
         this.pegs.forEach(p => { if (p.glow > 0) p.glow -= dt * 3; });
         
-        if (this.popups.length > 50) {
+        const qModeEng = this.state.qualityMode || 'high';
+        const maxPopups = qModeEng === 'low' ? 10 : (qModeEng === 'medium' ? 20 : 50);
+        const popupLifespan = qModeEng === 'low' ? 600 : (qModeEng === 'medium' ? 1000 : 1500);
+        
+        if (this.popups.length > maxPopups) {
              const now = performance.now();
-             this.popups = this.popups.filter(p => now - p.t < 1500);
+             this.popups = this.popups.filter(p => now - p.t < popupLifespan);
         }
         if (this.visualEffects.length > 20) {
              const now = performance.now();
@@ -804,7 +831,9 @@ export class GameEngine {
             this.hideMarbles ? [] : this.visualEffects, 
             this.hideMarbles ? [] : this.popups,
             this.hideMarbles ? [] : this.sandParticles,
-            this.socketingActive
+            this.socketingActive,
+            !this.running,
+            this.fps
         );
     }
 

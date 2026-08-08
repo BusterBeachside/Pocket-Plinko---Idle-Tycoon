@@ -78,10 +78,26 @@ export const DAILY_EVENTS: DailyEvent[] = [
 ];
 
 export class DailyEventsManager {
+    static debugOverrideEventIndex: number | null = null;
+
     /**
-     * Gets the current daily event based on the user's local day of the week.
+     * Advances to the next event in rotation for debug testing.
+     */
+    static forceNextEvent(): DailyEvent {
+        const current = DailyEventsManager.getCurrentEvent();
+        const currentIdx = DAILY_EVENTS.findIndex(e => e.id === current.id);
+        const nextIdx = (currentIdx + 1) % DAILY_EVENTS.length;
+        DailyEventsManager.debugOverrideEventIndex = nextIdx;
+        return DAILY_EVENTS[nextIdx];
+    }
+
+    /**
+     * Gets the current daily event based on the user's local day of the week or debug override.
      */
     static getCurrentEvent(): DailyEvent {
+        if (DailyEventsManager.debugOverrideEventIndex !== null) {
+            return DAILY_EVENTS[DailyEventsManager.debugOverrideEventIndex];
+        }
         const day = new Date().getDay(); // 0 to 6
         const ev = DAILY_EVENTS.find(e => e.dayOfWeek === day);
         return ev || DAILY_EVENTS[0];

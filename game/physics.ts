@@ -516,7 +516,15 @@ export class PhysicsManager {
 
                                         addMoney(gain);
                                         
-                                        if(!state.disableMoneyPopups && gain > 0) {
+                                        const qMode = state.qualityMode || 'high';
+                                        let showMoneyPopup = !state.disableMoneyPopups && gain > 0;
+                                        if (showMoneyPopup && qMode === 'low') {
+                                            showMoneyPopup = isCritical || !!b.master;
+                                        } else if (showMoneyPopup && qMode === 'medium') {
+                                            if (b.micro && !isCritical) showMoneyPopup = false;
+                                        }
+
+                                        if (showMoneyPopup) {
                                             pushPopup({
                                                 x: p.x, y: p.y, text: `+$${formatNumber(gain)}`, t: performance.now(),
                                                 critical: isCritical, master: b.master, micro: b.micro
@@ -655,7 +663,14 @@ export class PhysicsManager {
                                                                     const opBase = stats.pegValue;
                                                                     const { gain: opGain } = PhysicsManager.calculateScore(state, b, opBase, 1, true);
                                                                     addMoney(opGain);
-                                                                    if (!state.disableMoneyPopups && opGain > 0) {
+                                                                    const qModeOp = state.qualityMode || 'high';
+                                                                    let showOpPopup = !state.disableMoneyPopups && opGain > 0;
+                                                                    if (showOpPopup && qModeOp === 'low') {
+                                                                        showOpPopup = !!b.master;
+                                                                    } else if (showOpPopup && qModeOp === 'medium') {
+                                                                        if (b.micro) showOpPopup = false;
+                                                                    }
+                                                                    if (showOpPopup) {
                                                                         pushPopup({
                                                                             x: op.x, y: op.y, text: `+$${formatNumber(opGain)}`, t: performance.now(),
                                                                             critical: false, master: false, micro: false
@@ -759,7 +774,12 @@ export class PhysicsManager {
                     }
                     
                     const isSandPeg = state.inChallengeMode && state.challengeState.challengeId === 'sand_peg';
-                    if(!state.disableMoneyPopups && gain > 0 && !isSandPeg) {
+                    const qModeBasket = state.qualityMode || 'high';
+                    let showBasketPopup = !state.disableMoneyPopups && gain > 0 && !isSandPeg;
+                    if (showBasketPopup && qModeBasket === 'low') {
+                        showBasketPopup = isCritical || !!b.master;
+                    }
+                    if (showBasketPopup) {
                         pushPopup({
                             x: b.x, y: b.y, text: `+$${formatNumber(gain)}`, t: performance.now(),
                             critical: isCritical, master: b.master, micro: b.micro

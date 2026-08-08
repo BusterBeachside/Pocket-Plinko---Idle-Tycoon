@@ -2,10 +2,27 @@ import React, { useState } from 'react';
 import { UnderdogService } from '../services/underdogService';
 
 export const TitleScreen = ({ onStart, loading, progress }: { onStart: () => void, loading: boolean, progress: number }) => {
-    const [expanded, setExpanded] = useState<string | null>('v3.1');
+    const [expanded, setExpanded] = useState<string | null>('v3.2 - The Performance Update');
     const isWebsim = UnderdogService.isWebsim();
 
     const updates = [
+        {
+            version: 'v3.2 - The Performance Update',
+            blurb: `Greetings Tycoons! Today brings an update for bug fixes and new performance features.
+
+- Fixed video ads lagging and/or continuing to play in the background after closed (Attempted fix; please continue reporting bugs!)
+- When pausing the game via the "Physics Engine" option, the game should now be less laggy than before
+- Fixed the board being smaller than intended on some screen sizes. This was caused by a previous fix to remove letterboxing. The board should now scale to fit your screen dynamically!
+- Fixed prestige animation being broken (Thanks for the report, CoponStackos!)
+- Fixed Challenges being shown as "In Progress" prior to actually being started under certain conditions
+- Micro marbles can no longer be spawned while physics are paused
+- Added Low and Medium quality options. Players with weaker devices can use this disable some special effects in exchange for better performance
+- Added an option to display FPS to help players find a performance setup that works for them. Appears at the top-right of the plinko board
+- Made various optimizations to help improve performance. If the game is still laggy, try some of the new Performance options such as Dynamic Merge, disabling Money Popups, or lowering the Quality
+- Added a robust Debug Mode. It's only visible to me, but it will greatly help in testing things going forward. Why am I telling you this? Well, because anybody can access it by typing a certain string of letters while playing. When Debug Mode is enabled, the game will no longer save. When disabling Debug Mode, the game will restore your last save. Therefore, it's just an Easter Egg for regular players. Good luck finding it!
+
+Thank you for playing Pocket Plinko!`
+        },
         {
             version: 'v3.1',
             blurb: `Today I've brought a semi-major update to you! It includes QoL updates, fixes, and a few new features!
