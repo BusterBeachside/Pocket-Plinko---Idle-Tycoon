@@ -327,17 +327,39 @@ export class UnderdogService {
 
     static parseStats(record: any): any {
         const raw = record || {};
-        const meta = UnderdogService.parseMetadata(raw);
-        const num = (v: any, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };
+        let meta = UnderdogService.parseMetadata(raw);
+
+        const userId = raw.user_id || raw.userId || meta.user_id || meta.userId || (typeof raw.id === 'string' ? raw.id.split('-')[0] : '');
+        const encStr = raw._encStats || meta._encStats || raw._enc || meta._enc;
+        let dec: any = null;
+        if (encStr && typeof encStr === 'string' && userId) {
+            dec = SecurityService.decryptData(encStr, userId);
+        }
+
+        const d = (dec && typeof dec === 'object') ? dec : {};
+
+        const num = (v: any, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
         const maxNum = (...vals: any[]) => Math.max(0, ...vals.map(v => num(v, 0)));
+
+        const rawSkin = d.activeMarbleSkinID || raw.activeMarbleSkinID || meta.activeMarbleSkinID || 'marble_white';
+        const normalizedSkin = (!rawSkin || rawSkin === 'default') ? 'marble_white' : rawSkin;
+
+        const avatarUrl = d.avatarUrl || d.profilePictureUrl || raw.avatarUrl || raw.avatar_url || meta.avatarUrl || meta.avatar_url || normalizedSkin;
+
         return {
-            timesPrestiged: maxNum(raw.timesPrestiged, meta.timesPrestiged),
-            masterMultiplier: Math.max(1, num(raw.masterMultiplier, 1), num(meta.masterMultiplier, 1)),
-            derivedIncomeBoostPercent: maxNum(raw.derivedIncomeBoostPercent, meta.derivedIncomeBoostPercent),
-            activeMarbleSkinID: raw.activeMarbleSkinID || meta.activeMarbleSkinID || 'default',
-            ownedMarblesCount: Math.max(1, num(raw.ownedMarblesCount, 1), num(meta.ownedMarblesCount, 1)),
-            kineticShards: maxNum(raw.kineticShards, meta.kineticShards),
-            totalPlayTime: maxNum(raw.totalPlayTime, meta.totalPlayTime)
+            timesPrestiged: maxNum(d.timesPrestiged, raw.timesPrestiged, meta.timesPrestiged),
+            masterMultiplier: Math.max(1, num(d.masterMultiplier, 1), num(raw.masterMultiplier, 1), num(meta.masterMultiplier, 1)),
+            derivedIncomeBoostPercent: maxNum(d.derivedIncomeBoostPercent, raw.derivedIncomeBoostPercent, meta.derivedIncomeBoostPercent),
+            permanentIncomeBoostPercent: maxNum(d.permanentIncomeBoostPercent, raw.permanentIncomeBoostPercent, meta.permanentIncomeBoostPercent),
+            activeMarbleSkinID: normalizedSkin,
+            ownedMarblesCount: Math.max(1, num(d.ownedMarblesCount, 1), num(raw.ownedMarblesCount, 1), num(meta.ownedMarblesCount, 1)),
+            kineticShards: maxNum(d.kineticShards, raw.kineticShards, meta.kineticShards),
+            totalPlayTime: maxNum(d.totalPlayTime, raw.totalPlayTime, meta.totalPlayTime),
+            lifetimePegHits: maxNum(d.lifetimePegHits, raw.lifetimePegHits, meta.lifetimePegHits),
+            lifetimeBaskets: maxNum(d.lifetimeBaskets, raw.lifetimeBaskets, meta.lifetimeBaskets),
+            lifetimeCriticalHits: maxNum(d.lifetimeCriticalHits, raw.lifetimeCriticalHits, meta.lifetimeCriticalHits),
+            lifetimeMicroMarbles: maxNum(d.lifetimeMicroMarbles, raw.lifetimeMicroMarbles, meta.lifetimeMicroMarbles),
+            avatarUrl
         };
     }
 
@@ -493,54 +515,54 @@ export class UnderdogService {
                 const room = await getRoom();
                 if (room) {
                     let entries: any[] = [];
+                    // Query room collection directly first (realtime source of truth)
                     try {
-                        entries = await new Promise((resolve) => {
-                            let resolved = false;
-                            const unsub = room.query(`
-                                SELECT l.*, u.username
-                                FROM public.leaderboard l
-                                JOIN public.user u ON l.user_id = u.id
-                                WHERE l.mode = $1
-                                ORDER BY l.score DESC
-                            `, [leaderboardId]).subscribe((data: any) => {
-                                if (!resolved) {
-                                    resolved = true;
-                                    resolve(data || []);
-                                    if (typeof unsub === 'function') unsub();
-                                    else if (unsub && typeof unsub.unsubscribe === 'function') unsub.unsubscribe();
-                                }
-                            });
-
-                            setTimeout(() => {
-                                if (!resolved) {
-                                    resolved = true;
-                                    resolve([]);
-                                }
-                            }, 3000);
-                        });
-                    } catch (err) {
-                        console.error("Leaderboard query failed, falling back to collection list:", err);
                         entries = await room.collection('leaderboard').getList();
+                    } catch (e) {
+                        entries = [];
                     }
 
                     if (!Array.isArray(entries) || entries.length === 0) {
                         try {
-                            entries = await room.collection('leaderboard').getList();
-                        } catch (e) {
+                            entries = await new Promise((resolve) => {
+                                let resolved = false;
+                                const unsub = room.query(`
+                                    SELECT l.*, u.username
+                                    FROM public.leaderboard l
+                                    JOIN public.user u ON l.user_id = u.id
+                                    WHERE l.mode = $1
+                                    ORDER BY l.score DESC
+                                `, [leaderboardId]).subscribe((data: any) => {
+                                    if (!resolved) {
+                                        resolved = true;
+                                        resolve(data || []);
+                                        if (typeof unsub === 'function') unsub();
+                                        else if (unsub && typeof unsub.unsubscribe === 'function') unsub.unsubscribe();
+                                    }
+                                });
+
+                                setTimeout(() => {
+                                    if (!resolved) {
+                                        resolved = true;
+                                        resolve([]);
+                                    }
+                                }, 2500);
+                            });
+                        } catch (err) {
                             entries = [];
                         }
                     }
 
-                    if (Array.isArray(entries) && entries.length > 0) {
+                    if (Array.isArray(entries)) {
                         const highestScores: Record<string, any> = {};
                         for (const entry of entries) {
                             if (!entry) continue;
                             if (entry.mode && entry.mode !== leaderboardId) continue;
 
-                            // Verify signature / checksum to detect manual database tampering
+                            // Verify signature / checksum to detect manual database tampering or cheated un-signed scores
                             const { valid } = SecurityService.verifyScoreChecksum(entry, leaderboardId);
                             if (!valid) {
-                                console.warn(`[Leaderboard] Tampered score rejected for user ${entry.username || entry.user_id}`);
+                                console.warn(`[Leaderboard] Tampered or unverified score rejected for user ${entry.username || entry.user_id}`);
                                 continue;
                             }
 
@@ -548,6 +570,9 @@ export class UnderdogService {
                             const score = UnderdogService.toScore(entry.score);
                             if (!highestScores[username] || highestScores[username].score < score) {
                                 const stats = UnderdogService.parseStats(entry);
+                                let avatarUrl = entry.avatar_url || entry.avatarUrl || entry.user?.avatar_url || stats.avatarUrl || stats.activeMarbleSkinID || 'marble_white';
+                                if (!avatarUrl || avatarUrl === 'default') avatarUrl = 'marble_white';
+
                                 highestScores[username] = {
                                     username,
                                     score,
@@ -556,7 +581,7 @@ export class UnderdogService {
                                         mode: leaderboardId,
                                         peakMps: score
                                     },
-                                    avatarUrl: stats.activeMarbleSkinID || 'marble_white'
+                                    avatarUrl
                                 };
                             }
                         }
@@ -564,25 +589,36 @@ export class UnderdogService {
                             .sort((a: any, b: any) => b.score - a.score)
                             .slice(0, limit);
 
-                        if (list.length > 0) return list;
+                        if (entries.length > 0) return list;
                     }
                 }
             } catch (err) {
                 console.error("Error in Websim getLeaderboard:", err);
             }
 
-            // Fallback 1: Websim native getLeaderboard
+            // Fallback 1: Websim native getLeaderboard (with signature verification)
             const ws = (window as any).websim;
             if (typeof ws?.getLeaderboard === 'function') {
                 try {
                     const res = await ws.getLeaderboard(leaderboardId);
                     if (Array.isArray(res) && res.length > 0) {
-                        return res.map((r: any) => ({
-                            username: r.username || r.user?.username || 'WebsimPlayer',
-                            score: r.score || 0,
-                            metadata: r.metadata || {},
-                            avatarUrl: r.avatar_url || r.avatarUrl || 'marble_white'
-                        })).slice(0, limit);
+                        return res.filter((r: any) => {
+                            const { valid } = SecurityService.verifyScoreChecksum(r, leaderboardId);
+                            return valid;
+                        }).map((r: any) => {
+                            const stats = UnderdogService.parseStats(r);
+                            let avatarUrl = r.avatar_url || r.avatarUrl || r.user?.avatar_url || stats.avatarUrl || 'marble_white';
+                            if (!avatarUrl || avatarUrl === 'default') avatarUrl = 'marble_white';
+                            return {
+                                username: r.username || r.user?.username || 'WebsimPlayer',
+                                score: r.score || 0,
+                                metadata: {
+                                    ...stats,
+                                    ...(r.metadata || {})
+                                },
+                                avatarUrl
+                            };
+                        }).slice(0, limit);
                     }
                 } catch (e) {}
             }
@@ -593,8 +629,22 @@ export class UnderdogService {
                 return [{
                     username: currentUser.username,
                     score: Math.floor(engine?.state?.peakMps || 0),
-                    avatarUrl: currentUser.profilePictureUrl,
-                    metadata: { mode: leaderboardId }
+                    avatarUrl: currentUser.profilePictureUrl || 'marble_white',
+                    metadata: {
+                        mode: leaderboardId,
+                        timesPrestiged: engine?.state?.timesPrestiged || 0,
+                        masterMultiplier: engine?.state?.masterMultiplier || 1,
+                        derivedIncomeBoostPercent: engine?.state?.derivedIncomeBoostPercent || 0,
+                        permanentIncomeBoostPercent: engine?.state?.permanentIncomeBoostPercent || 0,
+                        activeMarbleSkinID: engine?.state?.activeMarbleSkinID || 'marble_white',
+                        ownedMarblesCount: engine?.state?.ownedMarbles?.length || 1,
+                        kineticShards: engine?.state?.kineticShards || 0,
+                        totalPlayTime: engine?.state?.totalPlayTime || 0,
+                        lifetimePegHits: engine?.state?.stats?.lifetimePegHits || 0,
+                        lifetimeBaskets: engine?.state?.stats?.lifetimeBaskets || 0,
+                        lifetimeCriticalHits: engine?.state?.stats?.lifetimeCriticalHits || 0,
+                        lifetimeMicroMarbles: engine?.state?.stats?.lifetimeMicroMarblesDropped || engine?.state?.stats?.lifetimeMicroMarbles || 0
+                    }
                 }];
             }
 

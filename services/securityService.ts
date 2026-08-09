@@ -163,8 +163,18 @@ export class SecurityService {
      */
     static computeScoreChecksum(userId: string, leaderboardId: string, score: number, metadata?: any): string {
         const numScore = Math.floor(score);
-        const masterMult = Math.max(1, Number(metadata?.masterMultiplier) || 1);
-        const prestiged = Math.max(0, Number(metadata?.timesPrestiged) || 0);
+        let metaObj = metadata;
+        if (metaObj && typeof metaObj === 'object') {
+            const encStr = metaObj._encStats || metaObj._enc;
+            if (encStr && typeof encStr === 'string' && userId) {
+                const decrypted = SecurityService.decryptData(encStr, userId);
+                if (decrypted && typeof decrypted === 'object') {
+                    metaObj = { ...metaObj, ...decrypted };
+                }
+            }
+        }
+        const masterMult = Math.max(1, Number(metaObj?.masterMultiplier) || 1);
+        const prestiged = Math.max(0, Number(metaObj?.timesPrestiged) || 0);
         const payloadToHash = `${userId}:${leaderboardId}:${numScore}:${masterMult}:${prestiged}:${WEBSIM_SALT_2}`;
         return sha256(utf8ToAscii(payloadToHash));
     }
@@ -185,8 +195,11 @@ export class SecurityService {
         const sig = entry._sig || meta._sig || entry.checksum;
 
         if (!sig) {
-            // Legacy entry created before checksum protection
-            // Allow for backwards compatibility
+            // Reject un-signed scores if score is unnaturally high or unverified
+            if (score > 10000000) {
+                console.warn(`[SecurityService] Rejecting un-signed high score for user ${userId} (${score})`);
+                return { valid: false, isLegacy: true };
+            }
             return { valid: true, isLegacy: true };
         }
 
@@ -195,7 +208,7 @@ export class SecurityService {
             return { valid: true, isLegacy: false };
         }
 
-        console.warn(`[SecurityService] Tamper detected on leaderboard score for user ${userId}!`);
+        console.warn(`[SecurityService] Tamper detected on leaderboard score for user ${userId}! Expected ${expectedSig}, got ${sig}`);
         return { valid: false, isLegacy: false };
     }
 

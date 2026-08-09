@@ -166,10 +166,15 @@ export class GameEngine {
                         timesPrestiged: this.state.timesPrestiged || 0,
                         masterMultiplier: this.state.masterMultiplier || 1,
                         derivedIncomeBoostPercent: this.state.derivedIncomeBoostPercent || 0,
-                        activeMarbleSkinID: this.state.activeMarbleSkinID || 'default',
+                        permanentIncomeBoostPercent: this.state.permanentIncomeBoostPercent || 0,
+                        activeMarbleSkinID: (this.state.activeMarbleSkinID && this.state.activeMarbleSkinID !== 'default') ? this.state.activeMarbleSkinID : 'marble_white',
                         ownedMarblesCount: this.state.ownedMarbles?.length || 1,
                         kineticShards: this.state.kineticShards || 0,
-                        totalPlayTime: this.state.totalPlayTime || 0
+                        totalPlayTime: this.state.totalPlayTime || 0,
+                        lifetimePegHits: this.state.stats?.lifetimePegHits || 0,
+                        lifetimeBaskets: this.state.stats?.lifetimeBaskets || 0,
+                        lifetimeCriticalHits: this.state.stats?.lifetimeCriticalHits || 0,
+                        lifetimeMicroMarbles: this.state.stats?.lifetimeMicroMarblesDropped || this.state.stats?.lifetimeMicroMarbles || 0
                     })
                 ]);
                 this.state.lastCloudSyncTime = Date.now();

@@ -16,15 +16,18 @@ export const LeaderboardModal = ({ onClose }: { onClose: () => void }) => {
     const [hoveredEntry, setHoveredEntry] = useState<any | null>(null);
     const [hoveredRect, setHoveredRect] = useState<DOMRect | null>(null);
 
+    const fetchLeaderboard = async () => {
+        setLoading(true);
+        const data = await UnderdogService.getLeaderboard('mps', 50);
+        setLeaderboard(data);
+        setLoading(false);
+    };
+
     useEffect(() => {
         const loadUserAndData = async () => {
             const user = await UnderdogService.getCurrentUser();
             setCurrentUser(user);
-            
-            setLoading(true);
-            const data = await UnderdogService.getLeaderboard('mps', 50);
-            setLeaderboard(data);
-            setLoading(false);
+            await fetchLeaderboard();
         };
         loadUserAndData();
         
@@ -62,7 +65,17 @@ export const LeaderboardModal = ({ onClose }: { onClose: () => void }) => {
                             </p>
                         </div>
                     </div>
-                    <button className="close-core" onClick={onClose}>Close</button>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            className="p-2 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-all"
+                            onClick={fetchLeaderboard}
+                            title="Refresh Leaderboard"
+                            disabled={loading}
+                        >
+                            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                        </button>
+                        <button className="close-core" onClick={onClose}>Close</button>
+                    </div>
                 </div>
 
                 <div className="p-4 shrink-0 border-b border-white/5 space-y-3">
