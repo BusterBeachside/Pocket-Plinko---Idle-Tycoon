@@ -164,13 +164,20 @@ export class SecurityService {
     static computeScoreChecksum(userId: string, leaderboardId: string, score: number, metadata?: any): string {
         const numScore = Math.floor(score);
         let metaObj = metadata;
-        if (metaObj && typeof metaObj === 'object') {
-            const encStr = metaObj._encStats || metaObj._enc;
-            if (encStr && typeof encStr === 'string' && userId) {
-                const decrypted = SecurityService.decryptData(encStr, userId);
-                if (decrypted && typeof decrypted === 'object') {
-                    metaObj = { ...metaObj, ...decrypted };
-                }
+        if (typeof metaObj === 'string') {
+            try {
+                metaObj = JSON.parse(metaObj);
+            } catch (e) {
+                metaObj = {};
+            }
+        }
+        metaObj = (metaObj && typeof metaObj === 'object') ? metaObj : {};
+
+        const encStr = metaObj._encStats || metaObj._enc;
+        if (encStr && typeof encStr === 'string' && userId) {
+            const decrypted = SecurityService.decryptData(encStr, userId);
+            if (decrypted && typeof decrypted === 'object') {
+                metaObj = { ...metaObj, ...decrypted };
             }
         }
         const masterMult = Math.max(1, Number(metaObj?.masterMultiplier) || 1);
@@ -188,27 +195,59 @@ export class SecurityService {
     static verifyScoreChecksum(entry: any, leaderboardId: string = 'mps'): { valid: boolean; isLegacy: boolean } {
         if (!entry) return { valid: false, isLegacy: false };
 
-        const userId = entry.user_id || entry.userId || entry.id?.split('-')[0] || '';
-        const score = Math.floor(Number(entry.score) || 0);
-        const meta = entry.metadata || {};
+        let meta = entry.metadata;
+        if (typeof meta === 'string') {
+            try {
+                meta = JSON.parse(meta);
+            } catch (e) {
+                meta = {};
+            }
+        }
+        if (!meta || typeof meta !== 'object') meta = {};
 
-        const sig = entry._sig || meta._sig || entry.checksum;
+        const combinedMeta = { ...entry, ...meta };
+        const sig = entry._sig || meta._sig || entry.checksum || meta.checksum;
+        const score = Math.floor(Number(entry.score) || 0);
 
         if (!sig) {
-            // Reject un-signed scores if score is unnaturally high or unverified
-            if (score > 10000000) {
-                console.warn(`[SecurityService] Rejecting un-signed high score for user ${userId} (${score})`);
+            // Reject un-signed scores only if absurdly high (e.g. > 1e15) or invalid
+            if (score > 1e15 || isNaN(score) || score <= 0) {
+                console.warn(`[SecurityService] Rejecting suspicious un-signed score: ${score}`);
                 return { valid: false, isLegacy: true };
             }
             return { valid: true, isLegacy: true };
         }
 
-        const expectedSig = SecurityService.computeScoreChecksum(userId, leaderboardId, score, meta);
-        if (sig === expectedSig) {
-            return { valid: true, isLegacy: false };
+        const candidateUserIds: string[] = [];
+        const addCandidate = (id: any) => {
+            if (id && typeof id === 'string' && id.trim().length > 0) {
+                const trimmed = id.trim();
+                if (!candidateUserIds.includes(trimmed)) {
+                    candidateUserIds.push(trimmed);
+                }
+            }
+        };
+
+        addCandidate(entry.user_id);
+        addCandidate(entry.userId);
+        addCandidate(entry.user?.id);
+        addCandidate(entry.user?.userId);
+        addCandidate(meta.user_id);
+        addCandidate(meta.userId);
+        if (typeof entry.id === 'string' && entry.id.includes('-')) {
+            addCandidate(entry.id.split('-')[0]);
+        }
+        addCandidate(entry.username);
+        addCandidate(entry.user?.username);
+
+        for (const uid of candidateUserIds) {
+            const expectedSig = SecurityService.computeScoreChecksum(uid, leaderboardId, score, combinedMeta);
+            if (sig === expectedSig) {
+                return { valid: true, isLegacy: false };
+            }
         }
 
-        console.warn(`[SecurityService] Tamper detected on leaderboard score for user ${userId}! Expected ${expectedSig}, got ${sig}`);
+        console.warn(`[SecurityService] Tamper detected on leaderboard score for user ${entry.username || entry.user_id}! Score: ${score}, Sig: ${sig}`);
         return { valid: false, isLegacy: false };
     }
 
