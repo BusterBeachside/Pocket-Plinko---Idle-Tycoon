@@ -198,6 +198,8 @@ export const OptionsPanel = ({
                     </button>
                 )}
 
+                <WebsimAdBanner id="websim-ad-options-panel" type="banner" style={{ my: '6px' }} />
+
                 {/* CATEGORY 1: Navigation & Stats Grid */}
                 {(() => {
                     const hasRewardWaiting = hasClaimableMissions || hasClaimableAchievements || isDailyRewardClaimable;
@@ -586,8 +588,6 @@ export const OptionsPanel = ({
                         </div>
                     )}
                 </div>
-
-                <WebsimAdBanner id="websim-ad-options-panel" type="banner" style={{ marginTop: '12px' }} />
             </div>
         </div>
     );

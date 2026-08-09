@@ -19,7 +19,6 @@ export interface GoldenBonusMarbleState {
     baseY: number;
     t: number;
     spawnTimer: number; // Seconds until next spawn (4-5 mins = 240-300s)
-    activeTimer?: number; // Seconds to linger before despawning and resetting timer
 }
 
 export interface ChallengeState {
@@ -292,7 +291,7 @@ export const INITIAL_STATE: GameState = {
     tutorials: {},
     
     bonusMarble: { active: false, x: 0, y: 0, baseY: 0, t: 0 },
-    goldenBonusMarble: { active: false, x: 200, y: 80, baseY: 80, t: 0, spawnTimer: 240, activeTimer: 45 },
+    goldenBonusMarble: { active: false, x: 200, y: 80, baseY: 80, t: 0, spawnTimer: 240 },
     achievements: {},
     missions: {
         date: '',

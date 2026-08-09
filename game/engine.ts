@@ -643,11 +643,10 @@ export class GameEngine {
         if (!force && !UnderdogService.isWebsim()) return;
         const nextTimer = 240 + Math.random() * 60; // 4 to 5 minutes
         if (!this.state.goldenBonusMarble) {
-            this.state.goldenBonusMarble = { active: false, x: this.width / 2, y: 80, baseY: 80, t: 0, spawnTimer: nextTimer, activeTimer: 45 };
+            this.state.goldenBonusMarble = { active: false, x: this.width / 2, y: 80, baseY: 80, t: 0, spawnTimer: nextTimer };
         }
         this.state.goldenBonusMarble.active = true;
-        this.state.goldenBonusMarble.spawnTimer = nextTimer; // Timer for next spawn after this one disappears
-        this.state.goldenBonusMarble.activeTimer = 45; // Lingers for up to 45s before despawning if unclicked
+        this.state.goldenBonusMarble.spawnTimer = nextTimer; // Timer for next spawn after this one is clicked
         this.state.goldenBonusMarble.baseY = 75 + Math.random() * 20;
         this.state.goldenBonusMarble.y = this.state.goldenBonusMarble.baseY;
         this.state.goldenBonusMarble.x = Math.random() * Math.max(100, this.width - 120) + 60;
@@ -722,10 +721,10 @@ export class GameEngine {
             }
         }
 
-        // Golden Bonus Marble update (spawns randomly every 4-5 minutes, lingers near top of canvas - WEBSIM ONLY)
+        // Golden Bonus Marble update (spawns randomly every 4-5 minutes, lingers near top of canvas until clicked - WEBSIM ONLY)
         if (UnderdogService.isWebsim()) {
             if (!this.state.goldenBonusMarble) {
-                this.state.goldenBonusMarble = { active: false, x: this.width / 2, y: 80, baseY: 80, t: 0, spawnTimer: 240 + Math.random() * 60, activeTimer: 45 };
+                this.state.goldenBonusMarble = { active: false, x: this.width / 2, y: 80, baseY: 80, t: 0, spawnTimer: 240 + Math.random() * 60 };
             }
 
             const gbm = this.state.goldenBonusMarble;
@@ -735,21 +734,11 @@ export class GameEngine {
                     this.spawnGoldenBonusMarble();
                 }
             } else {
-                // Floating motion near top of canvas
+                // Floating motion near top of canvas (lingers indefinitely until player clicks it)
                 gbm.t += dt;
                 const halfW = Math.max(100, (this.width / 2) - 60);
                 gbm.x = (this.width / 2) + Math.sin(gbm.t * 0.7) * halfW;
                 gbm.y = gbm.baseY + Math.sin(gbm.t * 2.2) * 10;
-
-                // Despawn after activeTimer expires if player doesn't click it
-                if (gbm.activeTimer !== undefined) {
-                    gbm.activeTimer -= dt;
-                    if (gbm.activeTimer <= 0) {
-                        gbm.active = false;
-                        gbm.spawnTimer = 240 + Math.random() * 60; // Reset spawn timer so it appears again in 4-5 minutes
-                        this.notify();
-                    }
-                }
             }
         } else if (this.state.goldenBonusMarble?.active) {
             this.state.goldenBonusMarble.active = false;

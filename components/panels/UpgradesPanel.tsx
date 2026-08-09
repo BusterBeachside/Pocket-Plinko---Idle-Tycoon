@@ -193,6 +193,7 @@ export const UpgradesPanel = ({ isOpen, onClose, gameState, onBuy }: UpgradesPan
             )}
  
             <div className="sidebar-content">
+                <WebsimAdBanner id="websim-ad-upgrades-panel" type="banner" style={{ marginBottom: '12px' }} />
                 <div className="upgrade-grid">
                     {inChallenge ? (
                         challengeUpgrades.map(u => {
@@ -243,8 +244,6 @@ export const UpgradesPanel = ({ isOpen, onClose, gameState, onBuy }: UpgradesPan
                             );
                         })
                     )}
-
-                    <WebsimAdBanner id="websim-ad-upgrades-panel" type="banner" style={{ marginTop: '10px' }} />
                 </div>
             </div>
         </div>

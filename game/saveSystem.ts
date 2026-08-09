@@ -90,8 +90,7 @@ export class SaveSystem {
                 y: 80,
                 baseY: 80,
                 t: 0,
-                spawnTimer: (typeof savedTimer === 'number' && savedTimer <= 300) ? savedTimer : (240 + Math.random() * 60),
-                activeTimer: 45
+                spawnTimer: (typeof savedTimer === 'number' && savedTimer <= 300) ? savedTimer : (240 + Math.random() * 60)
             };
             return loaded;
         }
@@ -135,8 +134,7 @@ export class SaveSystem {
             y: 80,
             baseY: 80,
             t: 0,
-            spawnTimer: state.goldenBonusMarble?.spawnTimer ?? (240 + Math.random() * 60),
-            activeTimer: 45
+            spawnTimer: state.goldenBonusMarble?.spawnTimer ?? (240 + Math.random() * 60)
         };
         localStorage.setItem('plinko_react_v1', JSON.stringify(stateToSave));
     }
