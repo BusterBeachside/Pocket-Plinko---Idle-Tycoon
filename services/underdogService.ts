@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { engine } from "../game/engine";
+import { SecurityService } from "./securityService";
 
 const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || '';
 const supabaseKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY || '';
@@ -376,17 +377,27 @@ export class UnderdogService {
                     const existingRecord = existingList ? existingList[0] : null;
                     const bestScore = Math.max(UnderdogService.toScore(existingRecord?.score), numericScore);
                     const stats = UnderdogService.mergeStats(existingRecord, playerStats);
+
+                    // Compute checksum signature and encrypted stats payload
+                    const sig = SecurityService.computeScoreChecksum(user.userId, leaderboardId, bestScore, stats);
+                    const encStats = SecurityService.encryptData(stats, user.userId);
+
                     await room.collection('leaderboard').upsert({
                         id,
                         score: bestScore,
                         mode: leaderboardId,
                         user_id: user.userId,
                         username: user.username,
+                        _sig: sig,
+                        _v: 2,
                         ...stats,
                         metadata: {
                             ...stats,
                             mode: leaderboardId,
-                            peakMps: bestScore
+                            peakMps: bestScore,
+                            _sig: sig,
+                            _v: 2,
+                            _encStats: encStats
                         }
                     });
                     localStorage.setItem(`underdog_last_submitted_score_${leaderboardId}`, bestScore.toString());
@@ -399,10 +410,17 @@ export class UnderdogService {
             const ws = (window as any).websim;
             if (typeof ws?.submitScore === 'function') {
                 try {
+                    const sig = SecurityService.computeScoreChecksum(user.userId, leaderboardId, numericScore, playerStats);
+                    const encStats = SecurityService.encryptData(playerStats, user.userId);
                     await ws.submitScore({
                         score: numericScore,
                         leaderboard: leaderboardId,
-                        metadata: playerStats
+                        metadata: {
+                            ...(playerStats || {}),
+                            _sig: sig,
+                            _v: 2,
+                            _encStats: encStats
+                        }
                     });
                 } catch (e) {}
             }
@@ -479,7 +497,7 @@ export class UnderdogService {
                         entries = await new Promise((resolve) => {
                             let resolved = false;
                             const unsub = room.query(`
-                                SELECT l.id, l.score, l.metadata, l.mode, l.user_id, u.username
+                                SELECT l.*, u.username
                                 FROM public.leaderboard l
                                 JOIN public.user u ON l.user_id = u.id
                                 WHERE l.mode = $1
@@ -518,6 +536,14 @@ export class UnderdogService {
                         for (const entry of entries) {
                             if (!entry) continue;
                             if (entry.mode && entry.mode !== leaderboardId) continue;
+
+                            // Verify signature / checksum to detect manual database tampering
+                            const { valid } = SecurityService.verifyScoreChecksum(entry, leaderboardId);
+                            if (!valid) {
+                                console.warn(`[Leaderboard] Tampered score rejected for user ${entry.username || entry.user_id}`);
+                                continue;
+                            }
+
                             const username = entry.username || entry.user?.username || 'Unknown';
                             const score = UnderdogService.toScore(entry.score);
                             if (!highestScores[username] || highestScores[username].score < score) {
@@ -643,11 +669,22 @@ export class UnderdogService {
         if (this.isWebsim()) {
             const ws = (window as any).websim;
             const userId = user.userId;
+            const numCurrency = Math.floor(currency);
+            const checksum = SecurityService.computeSaveChecksum(userId, numCurrency, stats);
+            const encPayload = SecurityService.encryptData({
+                currency: numCurrency,
+                stats,
+                settings
+            }, userId);
+
             const payload = {
                 user_id: userId,
                 stats,
-                currency: Math.floor(currency),
+                currency: numCurrency,
                 settings,
+                _sig: checksum,
+                _v: 2,
+                _enc: encPayload,
                 updated_at: new Date().toISOString()
             };
 
@@ -658,9 +695,11 @@ export class UnderdogService {
                 try { await ws.database.upsert('user_game_data', payload); } catch (e) {}
             }
 
-            localStorage.setItem(`websim_save_currency_${userId}`, Math.floor(currency).toString());
+            localStorage.setItem(`websim_save_currency_${userId}`, numCurrency.toString());
             localStorage.setItem(`websim_save_stats_${userId}`, JSON.stringify(stats));
             localStorage.setItem(`websim_save_settings_${userId}`, JSON.stringify(settings));
+            localStorage.setItem(`websim_save_enc_${userId}`, encPayload);
+            localStorage.setItem(`websim_save_sig_${userId}`, checksum);
             return;
         }
 
@@ -694,47 +733,77 @@ export class UnderdogService {
             const ws = (window as any).websim;
             const userId = user.userId;
 
+            let loadedData: { currency: number; stats: any; settings: any; _sig?: string; _enc?: string } | null = null;
+
             if (typeof ws?.getKV === 'function') {
                 try {
                     const kvData = await ws.getKV(`save_${userId}`);
-                    if (kvData && kvData.stats) {
-                        return {
-                            currency: kvData.currency || 0,
-                            stats: kvData.stats,
-                            settings: kvData.settings || {}
-                        };
+                    if (kvData && (kvData.stats || kvData._enc)) {
+                        loadedData = kvData;
                     }
                 } catch (e) {}
             }
 
-            if (typeof ws?.database?.from === 'function') {
+            if (!loadedData && typeof ws?.database?.from === 'function') {
                 try {
                     const { data } = await ws.database
                         .from('user_game_data')
                         .select('*')
                         .eq('user_id', userId)
                         .single();
-                    if (data && data.stats) {
-                        return {
-                            currency: data.currency || 0,
-                            stats: data.stats,
-                            settings: data.settings || {}
-                        };
+                    if (data && (data.stats || data._enc)) {
+                        loadedData = data;
                     }
                 } catch (e) {}
             }
 
-            const currencyStr = localStorage.getItem(`websim_save_currency_${userId}`);
-            const statsStr = localStorage.getItem(`websim_save_stats_${userId}`);
-            const settingsStr = localStorage.getItem(`websim_save_settings_${userId}`);
-            if (statsStr) {
-                return {
-                    currency: parseInt(currencyStr || '0', 10),
-                    stats: JSON.parse(statsStr),
-                    settings: settingsStr ? JSON.parse(settingsStr) : {}
-                };
+            if (!loadedData) {
+                const currencyStr = localStorage.getItem(`websim_save_currency_${userId}`);
+                const statsStr = localStorage.getItem(`websim_save_stats_${userId}`);
+                const settingsStr = localStorage.getItem(`websim_save_settings_${userId}`);
+                const encStr = localStorage.getItem(`websim_save_enc_${userId}`);
+                const sigStr = localStorage.getItem(`websim_save_sig_${userId}`);
+
+                if (statsStr || encStr) {
+                    loadedData = {
+                        currency: parseInt(currencyStr || '0', 10),
+                        stats: statsStr ? JSON.parse(statsStr) : null,
+                        settings: settingsStr ? JSON.parse(settingsStr) : {},
+                        _enc: encStr || undefined,
+                        _sig: sigStr || undefined
+                    };
+                }
             }
-            return null;
+
+            if (!loadedData) return null;
+
+            let currency = loadedData.currency || 0;
+            let stats = loadedData.stats;
+            let settings = loadedData.settings || {};
+
+            // If encrypted payload exists, decrypt and verify consistency against DB tampering
+            if (loadedData._enc) {
+                const decrypted = SecurityService.decryptData(loadedData._enc, userId);
+                if (decrypted && decrypted.stats) {
+                    // Authoritative values from encrypted payload
+                    currency = decrypted.currency ?? currency;
+                    stats = decrypted.stats;
+                    settings = decrypted.settings ?? settings;
+                }
+            }
+
+            // Verify checksum signature (returns valid: true if legacy un-checksummed save)
+            const { valid } = SecurityService.verifySaveChecksum(userId, currency, stats, loadedData._sig);
+            if (!valid) {
+                console.warn(`[UnderdogService] Websim cloud save checksum invalid for user ${userId}! Tamper detected.`);
+                return null;
+            }
+
+            return {
+                currency,
+                stats,
+                settings
+            };
         }
 
         if (supabaseUrl) {

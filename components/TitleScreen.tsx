@@ -35,7 +35,7 @@ Thank you for playing Pocket Plinko!`
 - On mobile, the Challenge Dome button now appears directly on the bottom navbar
 - The Kinetic Core (Prestige) button now only animates when you meet both the Marble AND Money requirements to prestige
 - Fixed black letterboxing margins appearing by the plinko board on odd screen resolution (e.g. taller/wider phone screens)
-- Changed the Shard Shop button coloration to match the main upgrade desing language (Green = can buy, red = not enough money, gray = locked/maxed out)
+- Changed the Shard Shop button coloration to match the main upgrade design language (Green = can buy, red = not enough money, gray = locked/maxed out)
 - Re-Added Websim Ads by CoponStackos. You will now see a few image ads appearing throughout the game in non-obtrusive places. You can also watch Rewarded Ads for some generous in-game boosts!
 - Added a Gems section to the Shard Shop. Peg Socket gems may be purchased here, but they are extremely expensive. Intended to give end-game players something to spend their shards on!
 
