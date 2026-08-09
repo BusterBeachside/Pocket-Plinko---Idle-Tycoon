@@ -171,10 +171,10 @@ export class GameEngine {
                         ownedMarblesCount: this.state.ownedMarbles?.length || 1,
                         kineticShards: this.state.kineticShards || 0,
                         totalPlayTime: this.state.totalPlayTime || 0,
-                        lifetimePegHits: this.state.stats?.lifetimePegHits || 0,
-                        lifetimeBaskets: this.state.stats?.lifetimeBaskets || 0,
-                        lifetimeCriticalHits: this.state.stats?.lifetimeCriticalHits || 0,
-                        lifetimeMicroMarbles: this.state.stats?.lifetimeMicroMarblesDropped || this.state.stats?.lifetimeMicroMarbles || 0
+                        lifetimePegHits: this.state.lifetimePegHits || 0,
+                        lifetimeBaskets: this.state.lifetimeBaskets || 0,
+                        lifetimeCriticalHits: this.state.lifetimeCriticalHits || 0,
+                        lifetimeMicroMarbles: this.state.lifetimeMicroMarblesDropped || 0
                     })
                 ]);
                 this.state.lastCloudSyncTime = Date.now();
@@ -630,6 +630,8 @@ export class GameEngine {
             if (dist < 45) {
                 this.audio.play('bonus', 0, 0.4);
                 this.state.goldenBonusMarble.active = false;
+                // Reset spawn timer to randomly 4-5 minutes (240 to 300 seconds)
+                this.state.goldenBonusMarble.spawnTimer = 240 + Math.random() * 60;
                 this.notify();
                 return true;
             }
@@ -639,11 +641,13 @@ export class GameEngine {
 
     spawnGoldenBonusMarble(force: boolean = false) {
         if (!force && !UnderdogService.isWebsim()) return;
+        const nextTimer = 240 + Math.random() * 60; // 4 to 5 minutes
         if (!this.state.goldenBonusMarble) {
-            this.state.goldenBonusMarble = { active: false, x: this.width / 2, y: 80, baseY: 80, t: 0, spawnTimer: 600 };
+            this.state.goldenBonusMarble = { active: false, x: this.width / 2, y: 80, baseY: 80, t: 0, spawnTimer: nextTimer, activeTimer: 45 };
         }
         this.state.goldenBonusMarble.active = true;
-        this.state.goldenBonusMarble.spawnTimer = 600; // Reset 10m timer
+        this.state.goldenBonusMarble.spawnTimer = nextTimer; // Timer for next spawn after this one disappears
+        this.state.goldenBonusMarble.activeTimer = 45; // Lingers for up to 45s before despawning if unclicked
         this.state.goldenBonusMarble.baseY = 75 + Math.random() * 20;
         this.state.goldenBonusMarble.y = this.state.goldenBonusMarble.baseY;
         this.state.goldenBonusMarble.x = Math.random() * Math.max(100, this.width - 120) + 60;
@@ -718,10 +722,10 @@ export class GameEngine {
             }
         }
 
-        // Golden Bonus Marble update (spawns every 10 minutes = 600s, lingers near top of canvas - WEBSIM ONLY)
+        // Golden Bonus Marble update (spawns randomly every 4-5 minutes, lingers near top of canvas - WEBSIM ONLY)
         if (UnderdogService.isWebsim()) {
             if (!this.state.goldenBonusMarble) {
-                this.state.goldenBonusMarble = { active: false, x: this.width / 2, y: 80, baseY: 80, t: 0, spawnTimer: 600 };
+                this.state.goldenBonusMarble = { active: false, x: this.width / 2, y: 80, baseY: 80, t: 0, spawnTimer: 240 + Math.random() * 60, activeTimer: 45 };
             }
 
             const gbm = this.state.goldenBonusMarble;
@@ -736,6 +740,16 @@ export class GameEngine {
                 const halfW = Math.max(100, (this.width / 2) - 60);
                 gbm.x = (this.width / 2) + Math.sin(gbm.t * 0.7) * halfW;
                 gbm.y = gbm.baseY + Math.sin(gbm.t * 2.2) * 10;
+
+                // Despawn after activeTimer expires if player doesn't click it
+                if (gbm.activeTimer !== undefined) {
+                    gbm.activeTimer -= dt;
+                    if (gbm.activeTimer <= 0) {
+                        gbm.active = false;
+                        gbm.spawnTimer = 240 + Math.random() * 60; // Reset spawn timer so it appears again in 4-5 minutes
+                        this.notify();
+                    }
+                }
             }
         } else if (this.state.goldenBonusMarble?.active) {
             this.state.goldenBonusMarble.active = false;

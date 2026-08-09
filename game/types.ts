@@ -18,7 +18,8 @@ export interface GoldenBonusMarbleState {
     y: number;
     baseY: number;
     t: number;
-    spawnTimer: number; // Seconds until next spawn (10 mins = 600s)
+    spawnTimer: number; // Seconds until next spawn (4-5 mins = 240-300s)
+    activeTimer?: number; // Seconds to linger before despawning and resetting timer
 }
 
 export interface ChallengeState {
@@ -137,6 +138,7 @@ export interface GameState {
     lifetimeBonusMarbles: number;
     lifetimeUpgradesBought: number;
     lifetimeCriticalHits: number;
+    lifetimeMicroMarblesDropped?: number;
     lifetimeBronzeMedals: number;
     lifetimeSilverMedals: number;
     lifetimeGoldMedals: number;
@@ -274,6 +276,7 @@ export const INITIAL_STATE: GameState = {
     lifetimeBonusMarbles: 0,
     lifetimeUpgradesBought: 0,
     lifetimeCriticalHits: 0,
+    lifetimeMicroMarblesDropped: 0,
     lifetimeBronzeMedals: 0,
     lifetimeSilverMedals: 0,
     lifetimeGoldMedals: 0,
@@ -289,7 +292,7 @@ export const INITIAL_STATE: GameState = {
     tutorials: {},
     
     bonusMarble: { active: false, x: 0, y: 0, baseY: 0, t: 0 },
-    goldenBonusMarble: { active: false, x: 200, y: 80, baseY: 80, t: 0, spawnTimer: 600 },
+    goldenBonusMarble: { active: false, x: 200, y: 80, baseY: 80, t: 0, spawnTimer: 240, activeTimer: 45 },
     achievements: {},
     missions: {
         date: '',
