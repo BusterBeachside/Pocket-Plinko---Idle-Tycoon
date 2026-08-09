@@ -224,15 +224,15 @@ export const LeaderboardModal = ({ onClose }: { onClose: () => void }) => {
                                 </span>
                             </div>
                             <div className="p-2 bg-black/40 rounded-lg border border-white/5 flex flex-col justify-center">
-                                <span className="text-[8px] text-slate-500 font-mono uppercase">Peg Hits / Baskets</span>
+                                <span className="text-[8px] text-slate-500 font-mono uppercase">Peg Hits</span>
                                 <span className="text-xs font-black text-amber-300 mt-0.5">
-                                    🎯 {formatNumber(hoveredEntry.metadata?.lifetimePegHits || 0)} / {formatNumber(hoveredEntry.metadata?.lifetimeBaskets || 0)}
+                                    🎯 {formatNumber(hoveredEntry.metadata?.lifetimePegHits || 0)}
                                 </span>
                             </div>
                             <div className="p-2 bg-black/40 rounded-lg border border-white/5 flex flex-col justify-center">
-                                <span className="text-[8px] text-slate-500 font-mono uppercase">Crits / Micro Drops</span>
-                                <span className="text-xs font-black text-red-400 mt-0.5">
-                                    ⚡ {formatNumber(hoveredEntry.metadata?.lifetimeCriticalHits || 0)} / {formatNumber(hoveredEntry.metadata?.lifetimeMicroMarbles || 0)}
+                                <span className="text-[8px] text-slate-500 font-mono uppercase">Baskets</span>
+                                <span className="text-xs font-black text-amber-400 mt-0.5">
+                                    🧺 {formatNumber(hoveredEntry.metadata?.lifetimeBaskets || 0)}
                                 </span>
                             </div>
                             <div className="p-2 bg-black/40 rounded-lg border border-white/5 flex flex-col justify-center col-span-2">
