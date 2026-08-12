@@ -364,10 +364,10 @@ body {
     border-radius: 12px;
     box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 0, 0, 0.3);
     background: #0d0e15;
-    /* Responsive Canvas Logic - Fill available vertical space cleanly without horizontal letterboxing */
+    /* Responsive Canvas Logic - Lock board tightly to 2:3 aspect ratio without letterboxing */
     flex: 0 1 auto;
-    height: 100%;
     width: auto;
+    height: auto;
     max-width: 100%;
     max-height: 100%;
     aspect-ratio: 400 / 600; /* Strictly match Plinko board 2:3 aspect ratio */
@@ -707,7 +707,7 @@ body {
         max-height: 100%;
         max-width: 100%;
         width: auto;
-        height: 100%;
+        height: auto;
         aspect-ratio: 400 / 600;
     }
 
