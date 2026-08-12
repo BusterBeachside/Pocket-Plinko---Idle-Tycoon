@@ -1,4 +1,5 @@
 import { ChallengesManager, CHALLENGES } from './challenges';
+import { DAILY_EVENTS } from './dailyEvents';
 
 /**
  * Interface definition for Android Native Bridge objects attached to window
@@ -130,7 +131,7 @@ export function sendLocalNotification(
 }
 
 /**
- * Calculates the exact delay until the stored local date changes (local midnight)
+ * Calculates the exact delay until 6:00 AM local time
  * and schedules the Daily Reward local notification via the bridge.
  * 
  * Title: "Daily reward ready!"
@@ -138,8 +139,11 @@ export function sendLocalNotification(
  */
 export function scheduleDailyRewardNotification(): void {
     const now = new Date();
-    const tomorrowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
-    const delayMs = tomorrowMidnight.getTime() - now.getTime();
+    let target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 6, 0, 0, 0);
+    if (now.getTime() >= target.getTime()) {
+        target.setDate(target.getDate() + 1);
+    }
+    const delayMs = target.getTime() - now.getTime();
 
     sendLocalNotification(
         'daily_reward',
@@ -147,6 +151,36 @@ export function scheduleDailyRewardNotification(): void {
         'Come see your new daily missions, too!',
         delayMs
     );
+}
+
+/**
+ * Calculates the exact delay until 8:00 AM local time for each daily event
+ * and schedules a local notification for each event on its respective day of the week.
+ * 
+ * Title: event.name (e.g. "Critical Frenzy Event")
+ * Body: event.explanation
+ */
+export function scheduleDailyEventNotifications(): void {
+    const now = new Date();
+
+    DAILY_EVENTS.forEach(event => {
+        let target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0, 0, 0);
+        let daysUntil = (event.dayOfWeek - now.getDay() + 7) % 7;
+
+        if (daysUntil === 0 && now.getTime() >= target.getTime()) {
+            daysUntil = 7;
+        }
+
+        target.setDate(target.getDate() + daysUntil);
+        const delayMs = target.getTime() - now.getTime();
+
+        sendLocalNotification(
+            `daily_event_${event.id}`,
+            event.name,
+            event.explanation,
+            delayMs
+        );
+    });
 }
 
 /**
@@ -191,6 +225,7 @@ export function scheduleChallengeNotification(): void {
 export function syncAndroidNotifications(): void {
     try {
         scheduleDailyRewardNotification();
+        scheduleDailyEventNotifications();
         scheduleChallengeNotification();
     } catch (err) {
         console.warn('[AndroidNotifications] Failed to sync notifications:', err);
