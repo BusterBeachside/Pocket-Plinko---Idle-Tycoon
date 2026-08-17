@@ -5,10 +5,64 @@ import { AudioController } from './audio';
 import { ProgressionManager } from './progression';
 import { DailyEventsManager } from './dailyEvents';
 import { ChallengesManager } from './challenges';
+import { AdventureLevelsManager } from './adventureLevels';
+import { Spawner } from './spawner';
 
 export class PhysicsManager {
+    static getActiveAdventureGimmick(state: GameState): string | null {
+        if (state.gameMode !== 'adventure') return null;
+        const config = AdventureLevelsManager.getLevelConfig(state.adventureState?.currentLevel || 1);
+        return config.gimmickId;
+    }
+
     static getEffectiveStats(state: GameState) {
-        if (!state.inChallengeMode) {
+        if (state.gameMode === 'adventure') {
+            const gimmick = PhysicsManager.getActiveAdventureGimmick(state);
+            const u = state.upgrades;
+            let critChance = Math.min(20, u.criticalChance);
+            if (gimmick === 'critical_overload') {
+                critChance = Math.min(100, 20 + (u.criticalChance * 4));
+            }
+            let pegBaseVal = 1 + (u.pegValue * 2);
+            if (gimmick === 'space_zero_g') {
+                pegBaseVal *= 5;
+            } else if (gimmick === 'paper_blueprint') {
+                pegBaseVal *= 1.10;
+            }
+
+            let unc = Math.min(20, u.uncommonChance);
+            let rare = Math.min(20, u.rareChance);
+            let leg = Math.min(20, u.legendaryChance);
+
+            if (gimmick === 'frosted_cafe') {
+                unc *= 2;
+                rare *= 2;
+                leg *= 2;
+            }
+
+            let bSpeed = Math.pow(1.05, u.ballSpeed);
+            if (gimmick === 'paper_blueprint') {
+                bSpeed *= 1.15;
+            }
+
+            return {
+                upgrades: u,
+                criticalChancePercent: critChance,
+                pegValue: pegBaseVal,
+                microValuePercent: u.microValue * 2,
+                uncommonChancePercent: unc,
+                rareChancePercent: rare,
+                legendaryChancePercent: leg,
+                criticalIncomeBoostPercent: 0,
+                permanentIncomeBoostPercent: 0,
+                permanentMicroBoostPercent: 0,
+                derivedIncomeBoostPercent: 0,
+                derivedMasterBonus: 0,
+                masterMultiplier: 0,
+                ballSpeed: bSpeed,
+                basketValueBonus: u.basketValue * 10
+            };
+        } else if (!state.inChallengeMode) {
             return {
                 upgrades: state.upgrades,
                 criticalChancePercent: state.criticalChancePercent,
@@ -112,6 +166,11 @@ export class PhysicsManager {
         let gain = baseValue * multiplier * marbleCountMult * permIncomeMult * (ball.mergeCount || 1);
         if (isPeg) {
             gain *= DailyEventsManager.getPegIncomeMultiplier();
+        } else {
+            // Apply marble_society gimmick (+50% to all bottom bucket payouts)
+            if (state.gameMode === 'adventure' && PhysicsManager.getActiveAdventureGimmick(state) === 'marble_society') {
+                gain *= 1.5;
+            }
         }
         if (ball.micro && gain < 1 && gain > 0.01) gain = 1;
         gain = Math.round(gain);
@@ -127,13 +186,18 @@ export class PhysicsManager {
             if (state.inChallengeMode && state.challengeState.challengeId === 'critical_meltdown') {
                 gain = 0;
             }
+            // critical_overload gimmick: Only Critical Marbles generate earnings
+            if (state.gameMode === 'adventure' && PhysicsManager.getActiveAdventureGimmick(state) === 'critical_overload') {
+                gain = 0;
+            }
         }
 
         // Micro marble failsafe: always give at least $1 no matter what (under all gamemodes),
         // except in Critical Meltdown if it was a non-critical hit.
         if (ball.micro) {
             const isCriticalMeltdownNoCrit = state.inChallengeMode && state.challengeState.challengeId === 'critical_meltdown' && !isCritical;
-            if (!isCriticalMeltdownNoCrit && gain < 1) {
+            const isCriticalOverloadNoCrit = state.gameMode === 'adventure' && PhysicsManager.getActiveAdventureGimmick(state) === 'critical_overload' && !isCritical;
+            if (!isCriticalMeltdownNoCrit && !isCriticalOverloadNoCrit && gain < 1) {
                 gain = 1;
             }
         }
@@ -288,17 +352,28 @@ export class PhysicsManager {
 
         const stats = PhysicsManager.getEffectiveStats(state);
         const timeScale = stats.ballSpeed;
+        const gimmick = PhysicsManager.getActiveAdventureGimmick(state);
         
-        // Gravity adjustments: Anti-gravity cuts gravity by 80%
+        const isAntiGravity = (state.inChallengeMode && state.challengeState?.challengeId === 'anti_gravity') || (gimmick === 'space_zero_g');
+        const isConcreteGravity = gimmick === 'concrete_gravity';
+        const isWoodSpringy = gimmick === 'wood_springy';
+        const isLeafBreeze = gimmick === 'leaf_breeze';
+        const isSkyThermals = gimmick === 'sky_thermals';
+
+        // Gravity adjustments: Anti-gravity / Zero-G cuts gravity by 80%
         let gravity = 600 * timeScale;
-        if (state.inChallengeMode && state.challengeState.challengeId === 'anti_gravity') {
+        if (isAntiGravity) {
             gravity = 600 * timeScale * 0.20; // Cut gravity by 80% (floating feel)
+        } else if (isConcreteGravity) {
+            gravity = 600 * timeScale * 1.35; // +35% Heavy gravity
         }
         
-        // Bounce adjustments: anti_gravity pegs are extremely bouncy!
+        // Bounce adjustments: anti_gravity pegs & wood_springy
         let bounce = 0.55;
-        if (state.inChallengeMode && state.challengeState.challengeId === 'anti_gravity') {
+        if (isAntiGravity) {
             bounce = 1.15; // Elastic bumper restitution
+        } else if (isWoodSpringy) {
+            bounce = 0.74; // Energetic wooden springiness without runaway acceleration
         }
         
         const friction = 0.995; // Air resistance/friction
@@ -307,7 +382,6 @@ export class PhysicsManager {
             if (b._remove) return;
 
             // Age tracking and despawn for all marbles in anti-gravity challenge, or micro marbles
-            const isAntiGravity = state.inChallengeMode && state.challengeState?.challengeId === 'anti_gravity';
             if (b.micro || isAntiGravity) {
                 b.age = (b.age || 0) + dt;
                 b.maxAge = b.maxAge || (25 + Math.random() * 5);
@@ -317,14 +391,36 @@ export class PhysicsManager {
                 }
             }
 
+            // Apply Gimmick forces
+            if (isLeafBreeze) {
+                // Dynamic wind gusting left and right across the forest canopy
+                const windTime = Date.now() / 700;
+                const windForce = Math.sin(windTime) * 75 + Math.sin(windTime * 2.1) * 35;
+                b.vx += windForce * dt;
+            }
+            if (isSkyThermals && b.y > height * 0.35) {
+                // Strong buoyant rising thermal columns that actively lift and loft marbles upward
+                const columnWave = Math.sin((b.x / width) * Math.PI * 4 + Date.now() / 500);
+                const updraft = 580 + columnWave * 260; // 320 to 840 px/s² upward
+                b.vy -= updraft * dt;
+                b.vx += Math.cos(b.y / 40 + Date.now() / 600) * 45 * dt;
+            }
+
             // Apply gravity and friction
             b.vy += gravity * dt;
             b.vx *= friction;
             b.vy *= friction;
 
-            // Velocity cap in anti-gravity
+            // Velocity cap in anti-gravity and wood springy
             if (isAntiGravity) {
                 const maxSpeed = 350; // Gentle floaty velocity clamp
+                const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+                if (speed > maxSpeed) {
+                    b.vx = (b.vx / speed) * maxSpeed;
+                    b.vy = (b.vy / speed) * maxSpeed;
+                }
+            } else if (isWoodSpringy) {
+                const maxSpeed = 580; // Crisp spring velocity clamp to prevent crazy runaway speed
                 const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
                 if (speed > maxSpeed) {
                     b.vx = (b.vx / speed) * maxSpeed;
@@ -335,19 +431,32 @@ export class PhysicsManager {
             b.x += b.vx * dt * timeScale;
             b.y += b.vy * dt * timeScale;
             
-            // Wall Collision
+            // Wall Collision & Wall Clearance Safety Bump
             if (b.x < b.radius) {
                 b.x = b.radius;
-                b.vx = Math.abs(b.vx) * 0.5;
-            }
-            if (b.x > width - b.radius) {
+                b.vx = Math.abs(b.vx) * 0.75 + 15;
+            } else if (b.x > width - b.radius) {
                 b.x = width - b.radius;
-                b.vx = -Math.abs(b.vx) * 0.5;
+                b.vx = -Math.abs(b.vx) * 0.75 - 15;
             }
             // Ceiling Collision
             if (b.y < b.radius) {
                 b.y = b.radius;
                 b.vy = Math.abs(b.vy) * 0.5;
+            }
+
+            // Anti-Stuck Monitor: If marble is almost stationary above bottom buckets, nudge it free!
+            const speedSq = b.vx * b.vx + b.vy * b.vy;
+            if (speedSq < 4.0 && b.y < height - 50) {
+                b.stuckTimer = (b.stuckTimer || 0) + dt;
+                if (b.stuckTimer > 0.3) {
+                    const sidePush = (b.x < width / 2 ? 1 : -1) * (30 + Math.random() * 40);
+                    b.vx = sidePush;
+                    b.vy = 50 + Math.random() * 60;
+                    b.stuckTimer = 0;
+                }
+            } else {
+                b.stuckTimer = 0;
             }
             
             if (b.trail.length > 20) b.trail.shift();
@@ -414,7 +523,7 @@ export class PhysicsManager {
                                     state.lifetimePegHits = (state.lifetimePegHits || 0) + countVal;
                                     ProgressionManager.updateMissionProgress(state, 'pegs_hit', countVal);
 
-                                    const isSandPeg = state.inChallengeMode && state.challengeState.challengeId === 'sand_peg';
+                                    const isSandPeg = (state.inChallengeMode && state.challengeState.challengeId === 'sand_peg') || (PhysicsManager.getActiveAdventureGimmick(state) === 'sand_pegs');
                                     if (isSandPeg) {
                                         if (p.hp === undefined) p.hp = 3;
                                         
@@ -458,17 +567,32 @@ export class PhysicsManager {
                                             else if (b.type === 'rare') basePegs = 3;
                                             else if (b.type === 'legendary') basePegs = 4;
                                             
-                                            const multLevel = state.challengeState.upgrades.sandPegMultiplier || 0;
+                                            let multLevel = 0;
+                                            if (state.inChallengeMode && state.challengeState?.upgrades) {
+                                                multLevel = state.challengeState.upgrades.sandPegMultiplier || 0;
+                                            }
                                             const pegReward = Math.round(basePegs * Math.pow(1.25, multLevel) * (b.mergeCount || 1));
                                             
-                                            state.challengeState.pegsBrokenCurrency = (state.challengeState.pegsBrokenCurrency || 0) + pegReward;
-                                            state.challengeState.lifetimePegsBroken = (state.challengeState.lifetimePegsBroken || 0) + pegReward;
-                                            addMoney(pegReward);
+                                            if (state.inChallengeMode && state.challengeState) {
+                                                state.challengeState.pegsBrokenCurrency = (state.challengeState.pegsBrokenCurrency || 0) + pegReward;
+                                                state.challengeState.lifetimePegsBroken = (state.challengeState.lifetimePegsBroken || 0) + pegReward;
+                                                addMoney(pegReward);
+                                            } else {
+                                                // Adventure mode sand peg cash reward
+                                                const pegBase = stats.pegValue;
+                                                const rarityMult = b.type === 'legendary' ? 4 : (b.type === 'rare' ? 3 : (b.type === 'uncommon' ? 2 : 1));
+                                                const { gain: hitGain } = PhysicsManager.calculateScore(state, b, pegBase, rarityMult, true);
+                                                // Breaking a sand peg awards a massive burst of cash (6x hit gain * pegReward)
+                                                const cashReward = Math.max(hitGain * 6 * pegReward, 25);
+                                                addMoney(cashReward);
+                                            }
                                             
                                             pushPopup({
                                                 x: p.x,
                                                 y: p.y,
-                                                text: `+${pegReward} Peg${pegReward > 1 ? 's' : ''}`,
+                                                text: state.inChallengeMode 
+                                                    ? `+${pegReward} Peg${pegReward > 1 ? 's' : ''}` 
+                                                    : `+$${formatNumber(Math.max(PhysicsManager.calculateScore(state, b, stats.pegValue, b.type === 'legendary' ? 4 : (b.type === 'rare' ? 3 : (b.type === 'uncommon' ? 2 : 1)), true).gain * 6 * pegReward, 25))}`,
                                                 t: performance.now(),
                                                 critical: isCritical,
                                                 master: b.master,
@@ -511,6 +635,30 @@ export class PhysicsManager {
                                             ProgressionManager.updateMissionProgress(state, 'critical_hits', 1);
                                             if (!state.critMuted) {
                                                 audio.play('crit', 0.15, 0.2);
+                                            }
+                                        }
+
+                                        // Adventure Mode Gimmick Collision Logic
+                                        if (state.gameMode === 'adventure') {
+                                            const activeGimmick = PhysicsManager.getActiveAdventureGimmick(state);
+                                            if (activeGimmick === 'micro_frenzy' && !b.micro) {
+                                                if (Math.random() < 0.45) {
+                                                    Spawner.spawnMicroMarble(width, (overrides: any) => {
+                                                        overrides.x = p.x + (Math.random() - 0.5) * 8;
+                                                        overrides.y = p.y + (Math.random() - 0.5) * 8;
+                                                        overrides.vx = (Math.random() - 0.5) * 160;
+                                                        overrides.vy = -Math.random() * 100 - 30;
+                                                        balls.push(Spawner.createBall(state, width, overrides));
+                                                    }, pushEffect);
+                                                }
+                                            } else if (activeGimmick === 'critical_overload') {
+                                                if (isCritical) {
+                                                    p.overheated = false;
+                                                    p.heat = 0;
+                                                } else {
+                                                    p.overheated = true;
+                                                    p.heat = Math.min(1.0, (p.heat || 0) + 0.35);
+                                                }
                                             }
                                         }
 
@@ -638,7 +786,7 @@ export class PhysicsManager {
                                                                 state.lifetimePegHits = (state.lifetimePegHits || 0) + 1;
                                                                 ProgressionManager.updateMissionProgress(state, 'pegs_hit', 1);
                                                                 
-                                                                const opIsSandPeg = state.inChallengeMode && state.challengeState?.challengeId === 'sand_peg';
+                                                                const opIsSandPeg = (state.inChallengeMode && state.challengeState?.challengeId === 'sand_peg') || (PhysicsManager.getActiveAdventureGimmick(state) === 'sand_pegs');
                                                                 if (opIsSandPeg) {
                                                                     if (op.hp === undefined) op.hp = 3;
                                                                     op.hp -= 1;
@@ -647,16 +795,27 @@ export class PhysicsManager {
                                                                         op.respawnTimer = 5;
                                                                         op.reformingStarted = false;
                                                                         
-                                                                        const sandLvl = state.challengeState.upgrades.sandPegMultiplier || 0;
-                                                                        const pegReward = 1 * (1 + sandLvl);
-                                                                        
-                                                                        state.challengeState.pegsBrokenCurrency = (state.challengeState.pegsBrokenCurrency || 0) + pegReward;
-                                                                        state.challengeState.lifetimePegsBroken = (state.challengeState.lifetimePegsBroken || 0) + 1;
-                                                                        
-                                                                        pushPopup({
-                                                                            x: op.x, y: op.y, text: `+${pegReward} Peg`, t: performance.now(),
-                                                                            critical: false, master: false, micro: false
-                                                                        });
+                                                                        if (state.inChallengeMode && state.challengeState) {
+                                                                            const sandLvl = state.challengeState.upgrades.sandPegMultiplier || 0;
+                                                                            const pegReward = 1 * (1 + sandLvl);
+                                                                            
+                                                                            state.challengeState.pegsBrokenCurrency = (state.challengeState.pegsBrokenCurrency || 0) + pegReward;
+                                                                            state.challengeState.lifetimePegsBroken = (state.challengeState.lifetimePegsBroken || 0) + 1;
+                                                                            
+                                                                            pushPopup({
+                                                                                x: op.x, y: op.y, text: `+${pegReward} Peg`, t: performance.now(),
+                                                                                critical: false, master: false, micro: false
+                                                                            });
+                                                                        } else {
+                                                                            const opBase = stats.pegValue;
+                                                                            const { gain: opGain } = PhysicsManager.calculateScore(state, b, opBase, 1, true);
+                                                                            const opCash = Math.max(opGain * 6, 25);
+                                                                            addMoney(opCash);
+                                                                            pushPopup({
+                                                                                x: op.x, y: op.y, text: `+$${formatNumber(opCash)}`, t: performance.now(),
+                                                                                critical: false, master: false, micro: false
+                                                                            });
+                                                                        }
                                                                         if (onPegBreak) onPegBreak(op);
                                                                     }
                                                                 } else {
@@ -769,11 +928,11 @@ export class PhysicsManager {
                         }
                     }
 
-                    if (!state.inChallengeMode || state.challengeState.challengeId !== 'sand_peg') {
+                    if (!state.inChallengeMode || state.challengeState?.challengeId !== 'sand_peg') {
                         addMoney(gain);
                     }
                     
-                    const isSandPeg = state.inChallengeMode && state.challengeState.challengeId === 'sand_peg';
+                    const isSandPeg = state.inChallengeMode && state.challengeState?.challengeId === 'sand_peg';
                     const qModeBasket = state.qualityMode || 'high';
                     let showBasketPopup = !state.disableMoneyPopups && gain > 0 && !isSandPeg;
                     if (showBasketPopup && qModeBasket === 'low') {

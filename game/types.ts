@@ -195,6 +195,36 @@ export interface GameState {
     lastMainPlayTime?: number;
     pendingChallengeSummary?: ChallengeSummary;
     showChallengeSummary?: boolean;
+
+    // Adventure Mode
+    gameMode: 'classic' | 'adventure';
+    adventureState: AdventureState;
+    classicStateBackup?: {
+        money: number;
+        upgrades: GameState['upgrades'];
+        uncommonChancePercent: number;
+        rareChancePercent: number;
+        legendaryChancePercent: number;
+        criticalChancePercent: number;
+        microValuePercent: number;
+        bonusValuePercent: number;
+        basketValueBonus: number;
+        currentRunPeakMps?: number;
+        currentMps?: number;
+        peakMps?: number;
+    };
+}
+
+export interface AdventureState {
+    currentLevel: number;
+    levelEarnings: number;
+    targetGoal: number;
+    adventureMultiplier: number;
+    highestLevelUnlocked: number;
+    completedLevels: Record<number, { completedAt: number; bestTimeSeconds?: number }>;
+    seenInfoPopups?: Record<number, boolean>;
+    currentLevelPeakMps?: number;
+    currentMps?: number;
 }
 
 export interface ActiveMission {
@@ -343,7 +373,18 @@ export const INITIAL_STATE: GameState = {
         emerald: 0,
         diamond: 0
     },
-    socketedPegs: {}
+    socketedPegs: {},
+
+    // Adventure Mode
+    gameMode: 'classic',
+    adventureState: {
+        currentLevel: 1,
+        levelEarnings: 0,
+        targetGoal: 10000,
+        adventureMultiplier: 1.0,
+        highestLevelUnlocked: 1,
+        completedLevels: {}
+    }
 };
 
 export interface UpgradeConfig {
@@ -371,6 +412,7 @@ export interface Ball {
     maxAge?: number;
     isSplit?: boolean;
     mergeCount?: number;
+    stuckTimer?: number;
 }
 
 export interface Peg {
@@ -382,6 +424,8 @@ export interface Peg {
     reformingStarted?: boolean;
     gemType?: 'ruby' | 'emerald' | 'diamond' | null;
     diamondHits?: number;
+    overheated?: boolean;
+    heat?: number;
 }
 
 export interface SandParticle {

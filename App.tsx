@@ -35,6 +35,9 @@ import { GoldenBonusModal } from './components/modals/GoldenBonusModal';
 import { getTodayDateString } from './game/dailyLoginRewards';
 import { ChallengeSummaryModal } from './components/modals/ChallengeSummaryModal';
 import { syncAndroidNotifications } from './game/androidNotifications';
+import { AdventureLevelInfoModal } from './components/modals/AdventureLevelInfoModal';
+import { AdventureLevelModal } from './components/modals/AdventureLevelModal';
+import { AdventureVictoryModal } from './components/modals/AdventureVictoryModal';
 
 const FloatingTextLayer = () => {
     const [items, setItems] = useState<any[]>([]);
@@ -66,6 +69,41 @@ const App = () => {
     const [gameState, setGameState] = useState(engine.state);
     const [uiState, setUiState] = useState({ upgradesOpen: false, optionsOpen: false, statsOpen: false, shardShopOpen: false, coreModalOpen: false, prestigeAnim: false, achievementsOpen: false, missionsOpen: false, leaderboardOpen: false, challengesOpen: false, dailyRewardOpen: false });
     const [goldenBonusModalOpen, setGoldenBonusModalOpen] = useState(false);
+    const [adventureLevelModalOpen, setAdventureLevelModalOpen] = useState(false);
+    const [adventureInfoModalOpen, setAdventureInfoModalOpen] = useState(false);
+    const [adventureInfoLevelId, setAdventureInfoLevelId] = useState<number | null>(null);
+
+    // Fade Transition Helper
+    const runWithFade = (action: () => void) => {
+        setFadeActive(true);
+        setUiState(prev => ({
+            ...prev,
+            challengesOpen: false,
+            optionsOpen: false,
+            upgradesOpen: false
+        }));
+        engine.audio.fadeSfx(0, 400);
+
+        setTimeout(() => {
+            action();
+            setGameState({ ...engine.state });
+            setTimeout(() => {
+                setFadeActive(false);
+                engine.audio.fadeSfx(1, 400);
+            }, 300);
+        }, 450);
+    };
+
+    useEffect(() => {
+        const introHandler = (e: any) => {
+            if (e.detail && e.detail.levelId) {
+                setAdventureInfoLevelId(e.detail.levelId);
+                setAdventureInfoModalOpen(true);
+            }
+        };
+        window.addEventListener('adventure-board-intro', introHandler);
+        return () => window.removeEventListener('adventure-board-intro', introHandler);
+    }, []);
     const [started, setStarted] = useState(false);
     const [authModalOpen, setAuthModalOpen] = useState(true);
     const [isAuthChecking, setIsAuthChecking] = useState(true);
@@ -170,7 +208,9 @@ const App = () => {
                 const syncedState = await UnderdogService.syncData(engine.state);
                 if (syncedState) {
                     engine.state = { ...syncedState };
+                    engine.state.inChallengeMode = false; // Always default to main board on login/open
                     SaveSystem.calculateDerivedState(engine.state);
+                    engine.initPegs();
                     engine.notify();
                 }
                 engine.isSyncing = false;
@@ -199,7 +239,9 @@ const App = () => {
                 const syncedState = await UnderdogService.syncData(engine.state);
                 if (syncedState) {
                     engine.state = { ...syncedState };
+                    engine.state.inChallengeMode = false; // Always default to main board when opening game while logged in
                     SaveSystem.calculateDerivedState(engine.state);
+                    engine.initPegs();
                     engine.notify();
                 }
                 engine.isSyncing = false;
@@ -304,6 +346,7 @@ const App = () => {
     // Challenge real-time progress notification listeners
     useEffect(() => {
         const handleChallengeNotif = (e: any) => {
+            if (!started) return;
             const { msg } = e.detail;
             setToast({ msg, visible: true });
             engine.audio.play('goal_complete');
@@ -314,7 +357,7 @@ const App = () => {
         };
         window.addEventListener('challenge-notif', handleChallengeNotif);
         return () => window.removeEventListener('challenge-notif', handleChallengeNotif);
-    }, []);
+    }, [started]);
 
     // Underdog gameplay start/stop menu flow tracker
     useEffect(() => {
@@ -379,11 +422,12 @@ const App = () => {
 
     // Check for Kinetic Core Tutorial (>= 50 Marbles)
     useEffect(() => {
+        if (!started) return;
         const balls = gameState.upgrades.extraBall; // Fixed: Do not add +1, level is the count
         if (balls >= 50 && !gameState.tutorials['plinko_seen_kinetic_tutorial_v1'] && !localStorage.getItem('plinko_seen_kinetic_tutorial_v1')) {
              setSpecificTutorial('tut_kinetic');
         }
-    }, [gameState.upgrades.extraBall]);
+    }, [started, gameState.upgrades.extraBall]);
 
     const togglePanel = (panel: 'upgrades' | 'options' | 'challenges') => {
         setUiState(prev => ({
@@ -424,12 +468,17 @@ const App = () => {
             const syncedState = await UnderdogService.syncData(engine.state);
             if (syncedState) {
                 engine.state = { ...syncedState };
+                engine.state.inChallengeMode = false; // Always default to main board
                 SaveSystem.calculateDerivedState(engine.state);
-                engine.notify();
+                SaveSystem.saveState(engine.state);
+            } else {
+                engine.state.inChallengeMode = false;
+                SaveSystem.saveState(engine.state);
             }
             engine.isSyncing = false;
             engine.state.isOffline = false;
-            engine.notify();
+            // Full reload of the game so that things like peg sockets can be properly setup
+            window.location.reload();
         } else {
             engine.state.isOffline = true;
             engine.notify();
@@ -577,7 +626,7 @@ const App = () => {
 
             {!started && <TitleScreen onStart={handleStart} loading={!assetsLoaded} progress={loadProgress} />}
             
-            {!isAuthChecking && authModalOpen && (
+            {started && !isAuthChecking && authModalOpen && (
                 <UnderdogAuth 
                     onAuthComplete={handleAuthComplete} 
                     onClose={() => setAuthModalOpen(false)}
@@ -585,7 +634,7 @@ const App = () => {
                 />
             )}
 
-            {uiState.prestigeAnim && <PrestigeOverlay onComplete={completePrestige} />}
+            {started && uiState.prestigeAnim && <PrestigeOverlay onComplete={completePrestige} />}
             
             {/* Standard First-run Tutorial */}
             {started && showTutorial && !specificTutorial && <TutorialOverlay onClose={() => { 
@@ -598,19 +647,19 @@ const App = () => {
             {/* Specific Tutorial from Menu or Logic Trigger */}
             {started && specificTutorial && <TutorialOverlay imageKey={specificTutorial} onClose={handleTutorialClose} />}
             
-            {toast && <Toast msg={toast.msg} visible={toast.visible} />}
+            {started && toast && <Toast msg={toast.msg} visible={toast.visible} />}
             
-            {dailyEventModalOpen && !gameState.showChallengeSummary && <DailyEventModal currentEvent={DailyEventsManager.getCurrentEvent()} onClose={() => setDailyEventModalOpen(false)} />}
-            {uiState.statsOpen && <StatsModal onClose={() => setUiState(s => ({...s, statsOpen: false}))} />}
-            {uiState.shardShopOpen && <ShardShopModal onClose={() => setUiState(s => ({...s, shardShopOpen: false}))} />}
-            {uiState.coreModalOpen && <CoreModal onClose={() => setUiState(s => ({...s, coreModalOpen: false}))} onOpenShop={() => setUiState(s => ({...s, coreModalOpen: false, shardShopOpen: true}))} onActivate={handleActivatePrestige} />}
-            {uiState.achievementsOpen && <AchievementsModal gameState={gameState} onClose={() => setUiState(s => ({...s, achievementsOpen: false}))} />}
-            {uiState.missionsOpen && <MissionsModal onClose={() => setUiState(s => ({...s, missionsOpen: false}))} />}
-            {uiState.leaderboardOpen && <LeaderboardModal onClose={() => setUiState(s => ({...s, leaderboardOpen: false}))} />}
-            {uiState.dailyRewardOpen && <DailyLoginModal gameState={gameState} onClose={() => setUiState(s => ({...s, dailyRewardOpen: false}))} onUpdate={() => setGameState({...engine.state})} />}
-            {goldenBonusModalOpen && <GoldenBonusModal onClose={() => setGoldenBonusModalOpen(false)} />}
+            {started && dailyEventModalOpen && !gameState.showChallengeSummary && <DailyEventModal currentEvent={DailyEventsManager.getCurrentEvent()} onClose={() => setDailyEventModalOpen(false)} />}
+            {started && uiState.statsOpen && <StatsModal onClose={() => setUiState(s => ({...s, statsOpen: false}))} />}
+            {started && uiState.shardShopOpen && <ShardShopModal onClose={() => setUiState(s => ({...s, shardShopOpen: false}))} />}
+            {started && uiState.coreModalOpen && <CoreModal onClose={() => setUiState(s => ({...s, coreModalOpen: false}))} onOpenShop={() => setUiState(s => ({...s, coreModalOpen: false, shardShopOpen: true}))} onActivate={handleActivatePrestige} />}
+            {started && uiState.achievementsOpen && <AchievementsModal gameState={gameState} onClose={() => setUiState(s => ({...s, achievementsOpen: false}))} />}
+            {started && uiState.missionsOpen && <MissionsModal onClose={() => setUiState(s => ({...s, missionsOpen: false}))} />}
+            {started && uiState.leaderboardOpen && <LeaderboardModal onClose={() => setUiState(s => ({...s, leaderboardOpen: false}))} />}
+            {started && uiState.dailyRewardOpen && <DailyLoginModal gameState={gameState} onClose={() => setUiState(s => ({...s, dailyRewardOpen: false}))} onUpdate={() => setGameState({...engine.state})} />}
+            {started && goldenBonusModalOpen && <GoldenBonusModal onClose={() => setGoldenBonusModalOpen(false)} />}
             
-            {gameState.showChallengeSummary && gameState.pendingChallengeSummary && (
+            {started && gameState.showChallengeSummary && gameState.pendingChallengeSummary && (
                 <ChallengeSummaryModal 
                     summary={gameState.pendingChallengeSummary} 
                     onClose={() => {
@@ -629,95 +678,97 @@ const App = () => {
                 />
             )}
             
-            {tutorialMenuOpen && <TutorialMenu onClose={() => setTutorialMenuOpen(false)} onSelect={(key) => { setTutorialMenuOpen(false); setSpecificTutorial(key); }} />}
+            {started && tutorialMenuOpen && <TutorialMenu onClose={() => setTutorialMenuOpen(false)} onSelect={(key) => { setTutorialMenuOpen(false); setSpecificTutorial(key); }} />}
             
-            {resetStep > 0 && <ResetModal step={resetStep as 1|2} onCancel={() => setResetStep(0)} onConfirm={() => {
+            {started && resetStep > 0 && <ResetModal step={resetStep as 1|2} onCancel={() => setResetStep(0)} onConfirm={() => {
                 if (resetStep === 1) setResetStep(2);
                 else {
                     engine.hardReset();
                 }
             }} />}
 
-            <div className="notification-layer">
-                <AnimatePresence mode="popLayout">
-                    {notifications.map(n => (
-                        <motion.div 
-                            key={n.id} 
-                            drag="x"
-                            dragConstraints={{ left: 0, right: 350 }}
-                            dragElastic={0.6}
-                            onDragStart={() => {
-                                draggingRef.current[n.id] = true;
-                            }}
-                            onDragEnd={(e, info) => {
-                                if (info.offset.x > 80) {
-                                    dismissNotification(n.id);
-                                } else {
-                                    setTimeout(() => {
-                                        draggingRef.current[n.id] = false;
-                                    }, 80);
-                                }
-                            }}
-                            initial={{ opacity: 0, y: -20, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, x: 250, scale: 0.95, transition: { duration: 0.25 } }}
-                            className={`notification-item ${n.type === 'multiple_achievements' ? 'achievement cursor-pointer' : n.type} ${n.fading ? 'fading' : ''}`}
-                            onClick={() => {
-                                if (draggingRef.current[n.id]) return;
-                                if (n.type === 'multiple_achievements') {
-                                    n.expanded = !n.expanded;
-                                    setNotifications([...engine.notifications]);
-                                    engine.notify();
-                                    return;
-                                }
-                                if (n.type === 'mission') setUiState(s => ({ ...s, missionsOpen: true }));
-                                if (n.type === 'achievement') setUiState(s => ({ ...s, achievementsOpen: true }));
-                            }}
-                            style={{ x: 0 }}
-                        >
-                            {n.type === 'multiple_achievements' ? (
-                                <div className="flex flex-col gap-2 w-full text-left">
-                                    <div className="flex items-center justify-between font-extrabold text-amber-300">
-                                        <span className="flex items-center gap-1">🏆 Multiple Achievements Unlocked!</span>
-                                        <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-md">
-                                            {n.expanded ? 'Hide ▴' : `Show (${n.achievements?.length}) ▾`}
-                                        </span>
-                                    </div>
-                                    {n.expanded && (
-                                        <motion.div 
-                                            initial={{ opacity: 0, height: 0 }}
-                                            animate={{ opacity: 1, height: 'auto' }}
-                                            className="flex flex-col gap-1 text-[11px] font-medium text-slate-200 pl-2 border-l border-amber-500/30 mt-1"
-                                            onClick={(e) => {
-                                                // Prevent outer toggle on list click
-                                                e.stopPropagation();
-                                            }}
-                                        >
-                                            {n.achievements?.map((ach, idx) => (
-                                                <div key={idx} className="flex items-center gap-1.5 py-0.5">
-                                                    <span className="text-amber-400">✦</span> {ach}
-                                                </div>
-                                            ))}
-                                            <button 
-                                                className="mt-2 text-xs font-black text-black bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 px-3 py-1.5 rounded-lg active:scale-95 transition-all text-center uppercase tracking-wider"
+            {started && (
+                <div className="notification-layer">
+                    <AnimatePresence mode="popLayout">
+                        {notifications.map(n => (
+                            <motion.div 
+                                key={n.id} 
+                                drag="x"
+                                dragConstraints={{ left: 0, right: 350 }}
+                                dragElastic={0.6}
+                                onDragStart={() => {
+                                    draggingRef.current[n.id] = true;
+                                }}
+                                onDragEnd={(e, info) => {
+                                    if (info.offset.x > 80) {
+                                        dismissNotification(n.id);
+                                    } else {
+                                        setTimeout(() => {
+                                            draggingRef.current[n.id] = false;
+                                        }, 80);
+                                    }
+                                }}
+                                initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, x: 250, scale: 0.95, transition: { duration: 0.25 } }}
+                                className={`notification-item ${n.type === 'multiple_achievements' ? 'achievement cursor-pointer' : n.type} ${n.fading ? 'fading' : ''}`}
+                                onClick={() => {
+                                    if (draggingRef.current[n.id]) return;
+                                    if (n.type === 'multiple_achievements') {
+                                        n.expanded = !n.expanded;
+                                        setNotifications([...engine.notifications]);
+                                        engine.notify();
+                                        return;
+                                    }
+                                    if (n.type === 'mission') setUiState(s => ({ ...s, missionsOpen: true }));
+                                    if (n.type === 'achievement') setUiState(s => ({ ...s, achievementsOpen: true }));
+                                }}
+                                style={{ x: 0 }}
+                            >
+                                {n.type === 'multiple_achievements' ? (
+                                    <div className="flex flex-col gap-2 w-full text-left">
+                                        <div className="flex items-center justify-between font-extrabold text-amber-300">
+                                            <span className="flex items-center gap-1">🏆 Multiple Achievements Unlocked!</span>
+                                            <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-md">
+                                                {n.expanded ? 'Hide ▴' : `Show (${n.achievements?.length}) ▾`}
+                                            </span>
+                                        </div>
+                                        {n.expanded && (
+                                            <motion.div 
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: 'auto' }}
+                                                className="flex flex-col gap-1 text-[11px] font-medium text-slate-200 pl-2 border-l border-amber-500/30 mt-1"
                                                 onClick={(e) => {
-                                                    e.stopPropagation(); // Prevent toggling expand
-                                                    setUiState(s => ({ ...s, achievementsOpen: true }));
-                                                    dismissNotification(n.id);
+                                                    // Prevent outer toggle on list click
+                                                    e.stopPropagation();
                                                 }}
                                             >
-                                                Claim All Rewards
-                                            </button>
-                                        </motion.div>
-                                    )}
-                                </div>
-                            ) : (
-                                n.message
-                            )}
-                        </motion.div>
-                    ))}
-                </AnimatePresence>
-            </div>
+                                                {n.achievements?.map((ach, idx) => (
+                                                    <div key={idx} className="flex items-center gap-1.5 py-0.5">
+                                                        <span className="text-amber-400">✦</span> {ach}
+                                                    </div>
+                                                ))}
+                                                <button 
+                                                    className="mt-2 text-xs font-black text-black bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 px-3 py-1.5 rounded-lg active:scale-95 transition-all text-center uppercase tracking-wider"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation(); // Prevent toggling expand
+                                                        setUiState(s => ({ ...s, achievementsOpen: true }));
+                                                        dismissNotification(n.id);
+                                                    }}
+                                                >
+                                                    Claim All Rewards
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    n.message
+                                )}
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
+                </div>
+            )}
 
             <Header 
                 onCoreClick={handleCoreClick} 
@@ -725,8 +776,47 @@ const App = () => {
                 profile={profile}
                 onEventClick={() => setDailyEventModalOpen(true)}
                 onChallengeClick={() => togglePanel('challenges')}
+                onAdventureDetailsClick={() => {
+                    const curLvl = gameState.adventureState?.currentLevel || 1;
+                    setAdventureInfoLevelId(curLvl);
+                    setAdventureInfoModalOpen(true);
+                }}
                 onDebugClick={() => setDebugModalOpen(true)}
             />
+
+            {/* Game Mode Selector Bar */}
+            <div className="flex justify-center items-center gap-2 py-1.5 bg-slate-950/90 border-b border-slate-800/80 shadow-md z-20">
+                <button
+                    onClick={() => {
+                        if (gameState.gameMode === 'classic') return;
+                        runWithFade(() => {
+                            engine.setGameMode('classic');
+                        });
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider transition-all border cursor-pointer ${
+                        gameState.gameMode === 'classic' || !gameState.gameMode
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20'
+                            : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-800'
+                    }`}
+                >
+                    🎲 Classic Mode
+                </button>
+                <button
+                    onClick={() => {
+                        if (gameState.gameMode === 'adventure') return;
+                        runWithFade(() => {
+                            engine.setGameMode('adventure');
+                        });
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider transition-all border cursor-pointer ${
+                        gameState.gameMode === 'adventure'
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/30 font-black'
+                            : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-800'
+                    }`}
+                >
+                    🗺️ Adventure Mode
+                </button>
+            </div>
             
             <div className="main-content">
                 <UpgradesPanel 
@@ -763,7 +853,9 @@ const App = () => {
                     <StatsBar />
                     <FloatingTextLayer />
                     <GameCanvas inChallengeMode={gameState.inChallengeMode} />
-                    <GemSocketHud onUpdate={() => setGameState({ ...engine.state })} />
+                    {gameState.gameMode !== 'adventure' && (
+                        <GemSocketHud onUpdate={() => setGameState({ ...engine.state })} />
+                    )}
                     <div className="mobile-controls">
                         <button className="mobile-btn" onClick={() => togglePanel('upgrades')}>⚡ Upgrades</button>
                         {gameState.inChallengeMode ? (() => {
@@ -792,7 +884,7 @@ const App = () => {
                                     </div>
                                 </button>
                             );
-                        })() : (() => {
+                        })() : gameState.gameMode !== 'adventure' ? (() => {
                             const activeRot = ChallengesManager.getRotationInfo();
                             const activeId = activeRot.activeChallengeId;
                             const cState = gameState.challengeState;
@@ -826,7 +918,7 @@ const App = () => {
                                     )}
                                 </button>
                             );
-                        })()}
+                        })() : null}
                         <button className={`mobile-btn ${(hasClaimableMissions || hasClaimableAchievements || claimableToday) ? 'glow-breathing' : ''}`} onClick={() => togglePanel('options')}>⚙ Options</button>
                     </div>
                 </div>
@@ -854,6 +946,29 @@ const App = () => {
                         onTestPrestige={() => handleActivatePrestige(10, 1.5)}
                     />
                 )}
+
+                <AdventureLevelModal
+                    state={gameState}
+                    isOpen={adventureLevelModalOpen}
+                    onClose={() => setAdventureLevelModalOpen(false)}
+                    onSelectLevel={(lvl) => {
+                        runWithFade(() => {
+                            engine.startAdventureLevel(lvl);
+                        });
+                    }}
+                />
+                <AdventureVictoryModal 
+                    onAdvanceLevel={() => {
+                        runWithFade(() => {
+                            engine.completeAdventureLevel();
+                        });
+                    }}
+                />
+                <AdventureLevelInfoModal 
+                    levelId={adventureInfoLevelId}
+                    isOpen={adventureInfoModalOpen}
+                    onClose={() => setAdventureInfoModalOpen(false)}
+                />
             </div>
         </div>
     );

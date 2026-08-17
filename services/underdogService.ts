@@ -380,11 +380,53 @@ export class UnderdogService {
 
     static async submitScore(score: number, leaderboardId: string = 'mps', playerStats?: any): Promise<void> {
         if ((window as any).__DEBUG_MODE__ || engine?.state?.debugMode) return;
+
+        // --- ANTI-CHEAT SUBMISSION ROADBLOCKS ---
+        const numericScore = UnderdogService.toScore(score);
+        if (!Number.isFinite(numericScore) || isNaN(numericScore) || numericScore <= 0) {
+            console.warn("[AntiCheat] Blocked non-finite or invalid score submission:", score);
+            return;
+        }
+
+        // 1. Verify engine memory integrity token (detects direct console state mutation)
+        const globalEngine = (window as any).engine;
+        if (globalEngine && typeof globalEngine.verifyIntegrityToken === 'function') {
+            if (!globalEngine.verifyIntegrityToken()) {
+                console.warn("[AntiCheat] Blocked score submission: Game engine state integrity check failed.");
+                return;
+            }
+        }
+
+        // 2. Cross-check against actual engine state
+        const currentEngineState = globalEngine?.state;
+        if (currentEngineState) {
+            const actualPeak = Math.floor(currentEngineState.peakMps || currentEngineState.currentRunPeakMps || 0);
+            if (actualPeak > 0 && numericScore > Math.max(actualPeak * 1.05, 100)) {
+                console.warn(`[AntiCheat] Blocked score submission: Score ${numericScore} exceeds actual engine peak ${actualPeak}`);
+                return;
+            }
+
+            // 3. Cross-check against total lifetime earnings
+            const lifetimeEarned = Math.floor(currentEngineState.allTimeEarnings || currentEngineState.lifetimeEarnings || 0);
+            if (lifetimeEarned > 0 && numericScore > Math.max(lifetimeEarned * 2.5, 1000)) {
+                console.warn(`[AntiCheat] Blocked score submission: Score ${numericScore} exceeds lifetime earnings ${lifetimeEarned}`);
+                return;
+            }
+
+            // 4. Prestige level mathematical ceiling check
+            const prestiged = Math.max(0, Number(playerStats?.timesPrestiged ?? currentEngineState.timesPrestiged ?? 0));
+            const maxPlausible = SecurityService.getMaxPlausibleMps(prestiged);
+            if (numericScore > maxPlausible) {
+                console.warn(`[AntiCheat] Blocked score submission: Score ${numericScore} exceeds max plausible ${maxPlausible} for prestige level ${prestiged}`);
+                return;
+            }
+        }
+
         const user = await this.getCurrentUser();
         if (!user || user.userId === 'local') {
             const currentMockScore = parseFloat(localStorage.getItem(`underdog_mock_highscore_${leaderboardId}`) || '-1');
-            if (score > currentMockScore) {
-                localStorage.setItem(`underdog_mock_highscore_${leaderboardId}`, score.toString());
+            if (numericScore > currentMockScore) {
+                localStorage.setItem(`underdog_mock_highscore_${leaderboardId}`, numericScore.toString());
             }
             return;
         }
@@ -640,10 +682,10 @@ export class UnderdogService {
                         ownedMarblesCount: engine?.state?.ownedMarbles?.length || 1,
                         kineticShards: engine?.state?.kineticShards || 0,
                         totalPlayTime: engine?.state?.totalPlayTime || 0,
-                        lifetimePegHits: engine?.state?.stats?.lifetimePegHits || 0,
-                        lifetimeBaskets: engine?.state?.stats?.lifetimeBaskets || 0,
-                        lifetimeCriticalHits: engine?.state?.stats?.lifetimeCriticalHits || 0,
-                        lifetimeMicroMarbles: engine?.state?.stats?.lifetimeMicroMarblesDropped || engine?.state?.stats?.lifetimeMicroMarbles || 0
+                        lifetimePegHits: (engine?.state as any)?.stats?.lifetimePegHits || 0,
+                        lifetimeBaskets: (engine?.state as any)?.stats?.lifetimeBaskets || 0,
+                        lifetimeCriticalHits: (engine?.state as any)?.stats?.lifetimeCriticalHits || 0,
+                        lifetimeMicroMarbles: (engine?.state as any)?.stats?.lifetimeMicroMarblesDropped || (engine?.state as any)?.stats?.lifetimeMicroMarbles || 0
                     }
                 }];
             }
@@ -706,62 +748,79 @@ export class UnderdogService {
         alert("Leaderboard UI opens here.");
     }
 
+    static notifyCloudSave(status: 'saving' | 'saved' | 'error') {
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('cloud-save-status', { detail: { status, timestamp: Date.now() } }));
+        }
+    }
+
     static async saveProgress(stats: any, currency: number = 0, settings: any = {}): Promise<void> {
         if ((window as any).__DEBUG_MODE__ || engine?.state?.debugMode) return;
-        const user = await this.getCurrentUser();
-        if (!user) {
-            localStorage.setItem('underdog_save_currency', Math.floor(currency).toString());
-            localStorage.setItem('underdog_save_stats', JSON.stringify(stats));
-            localStorage.setItem('underdog_save_settings', JSON.stringify(settings));
-            return;
-        }
-
-        if (this.isWebsim()) {
-            const ws = (window as any).websim;
-            const userId = user.userId;
-            const numCurrency = Math.floor(currency);
-            const checksum = SecurityService.computeSaveChecksum(userId, numCurrency, stats);
-            const encPayload = SecurityService.encryptData({
-                currency: numCurrency,
-                stats,
-                settings
-            }, userId);
-
-            const payload = {
-                user_id: userId,
-                stats,
-                currency: numCurrency,
-                settings,
-                _sig: checksum,
-                _v: 2,
-                _enc: encPayload,
-                updated_at: new Date().toISOString()
-            };
-
-            if (typeof ws?.setKV === 'function') {
-                try { await ws.setKV(`save_${userId}`, payload); } catch (e) {}
-            }
-            if (typeof ws?.database?.upsert === 'function') {
-                try { await ws.database.upsert('user_game_data', payload); } catch (e) {}
+        this.notifyCloudSave('saving');
+        try {
+            const user = await this.getCurrentUser();
+            if (!user) {
+                localStorage.setItem('underdog_save_currency', Math.floor(currency).toString());
+                localStorage.setItem('underdog_save_stats', JSON.stringify(stats));
+                localStorage.setItem('underdog_save_settings', JSON.stringify(settings));
+                this.notifyCloudSave('saved');
+                return;
             }
 
-            localStorage.setItem(`websim_save_currency_${userId}`, numCurrency.toString());
-            localStorage.setItem(`websim_save_stats_${userId}`, JSON.stringify(stats));
-            localStorage.setItem(`websim_save_settings_${userId}`, JSON.stringify(settings));
-            localStorage.setItem(`websim_save_enc_${userId}`, encPayload);
-            localStorage.setItem(`websim_save_sig_${userId}`, checksum);
-            return;
-        }
+            if (this.isWebsim()) {
+                const ws = (window as any).websim;
+                const userId = user.userId;
+                const numCurrency = Math.floor(currency);
+                const checksum = SecurityService.computeSaveChecksum(userId, numCurrency, stats);
+                const encPayload = SecurityService.encryptData({
+                    currency: numCurrency,
+                    stats,
+                    settings
+                }, userId);
 
-        if (supabaseUrl) {
-            await supabase.from('user_game_data').upsert({
-                game_id: '7bb15041-7cb9-44cd-aed0-c7549ae19803',
-                user_id: user.userId,
-                stats,
-                currency,
-                settings,
-                updated_at: new Date().toISOString()
-            });
+                const payload = {
+                    user_id: userId,
+                    stats,
+                    currency: numCurrency,
+                    settings,
+                    _sig: checksum,
+                    _v: 2,
+                    _enc: encPayload,
+                    updated_at: new Date().toISOString()
+                };
+
+                if (typeof ws?.setKV === 'function') {
+                    try { await ws.setKV(`save_${userId}`, payload); } catch (e) {}
+                }
+                if (typeof ws?.database?.upsert === 'function') {
+                    try { await ws.database.upsert('user_game_data', payload); } catch (e) {}
+                }
+
+                localStorage.setItem(`websim_save_currency_${userId}`, numCurrency.toString());
+                localStorage.setItem(`websim_save_stats_${userId}`, JSON.stringify(stats));
+                localStorage.setItem(`websim_save_settings_${userId}`, JSON.stringify(settings));
+                localStorage.setItem(`websim_save_enc_${userId}`, encPayload);
+                localStorage.setItem(`websim_save_sig_${userId}`, checksum);
+                this.notifyCloudSave('saved');
+                return;
+            }
+
+            if (supabaseUrl) {
+                await supabase.from('user_game_data').upsert({
+                    game_id: '7bb15041-7cb9-44cd-aed0-c7549ae19803',
+                    user_id: user.userId,
+                    stats,
+                    currency,
+                    settings,
+                    updated_at: new Date().toISOString()
+                });
+                this.notifyCloudSave('saved');
+            } else {
+                this.notifyCloudSave('saved');
+            }
+        } catch (e) {
+            this.notifyCloudSave('error');
+            throw e;
         }
     }
 

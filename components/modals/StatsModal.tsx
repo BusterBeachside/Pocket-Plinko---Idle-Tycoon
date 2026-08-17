@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { engine } from '../../game/engine';
 import { formatNumber } from '../../game/utils';
 import { CHALLENGES } from '../../game/challenges';
+import { AdventureLevelsManager } from '../../game/adventureLevels';
 
 export const StatsModal = ({ onClose }: { onClose: () => void }) => {
     const [tick, setTick] = useState(0);
@@ -144,6 +145,124 @@ export const StatsModal = ({ onClose }: { onClose: () => void }) => {
                         {Object.values(activeUpgrades).every(lvl => lvl === 0) && (
                             <div className="col-span-2 text-center text-xs text-neutral-500 py-3 italic">
                                 No upgrades purchased in this challenge yet!
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (s.gameMode === 'adventure' && s.adventureState) {
+        const currentLevel = s.adventureState.currentLevel || 1;
+        const config = AdventureLevelsManager.getLevelConfig(currentLevel);
+        const completedCount = Object.keys(s.adventureState.completedLevels || {}).length;
+        const globalMult = s.adventureState.adventureMultiplier || 1.0;
+        const levelEarnings = s.adventureState.levelEarnings || 0;
+        const targetGoal = config.targetGoal || s.adventureState.targetGoal || 1000;
+        const progressPercent = Math.min(100, Math.floor((levelEarnings / targetGoal) * 100));
+        const activeUpgrades = s.upgrades || {};
+
+        const UPGRADE_LABELS: { [key: string]: string } = {
+            extraBall: 'Extra Marbles',
+            pegValue: 'Peg Value',
+            ballSpeed: 'Marble Speed',
+            basketValue: 'Basket Multiplier',
+            uncommonChance: 'Uncommon Chance',
+            rareChance: 'Rare Chance',
+            legendaryChance: 'Legendary Chance',
+            criticalChance: 'Critical Chance',
+            microValue: 'Micro Value',
+            bonusValue: 'Bonus Splash Value'
+        };
+
+        const timeSecs = Math.floor(s.totalPlayTime || 0);
+        const hh = Math.floor(timeSecs / 3600);
+        const mm = Math.floor((timeSecs % 3600) / 60);
+        const ss = timeSecs % 60;
+        const timeStr = `${hh}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+
+        return (
+            <div className="confirm-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+                <div className="confirm-modal stats-modal max-w-xl">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'space-between', marginBottom: '15px' }}>
+                        <div>
+                            <h3 className="text-cyan-400 font-extrabold uppercase tracking-wide text-xs flex items-center gap-1">
+                                🗺️ Adventure Mode Stats
+                            </h3>
+                            <h2 className="text-xl font-bold leading-tight">Board {currentLevel}: {config.bgName}</h2>
+                            <p className="text-xs text-neutral-400 mt-0.5">{config.gimmickName} &bull; {config.gimmickDesc}</p>
+                        </div>
+                        <button className="close-core" onClick={onClose}>Close</button>
+                    </div>
+
+                    {/* Global Income Multiplier Banner */}
+                    <div className="mb-4 p-3.5 bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-indigo-500/10 border border-emerald-500/30 rounded-xl">
+                        <div className="flex justify-between items-center mb-1">
+                            <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-400">
+                                Global Income Multiplier
+                            </span>
+                            <span className="text-lg font-mono font-extrabold text-emerald-400">
+                                x{globalMult.toFixed(2)}
+                            </span>
+                        </div>
+                        <p className="text-[11px] text-neutral-300 mb-2 leading-relaxed">
+                            Completing boards permanently multiplies income across all modes! Current boost: <strong className="text-emerald-300">+{Math.round((globalMult - 1) * 100)}%</strong>.
+                        </p>
+                        <div className="flex justify-between items-center text-xs font-mono bg-black/40 p-2 rounded-lg border border-white/5">
+                            <span className="text-neutral-400">Highest Board Unlocked:</span>
+                            <span className="text-cyan-400 font-bold">Board {s.adventureState.highestLevelUnlocked || 1}</span>
+                        </div>
+                    </div>
+
+                    {/* Current Board Metrics */}
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 mb-2">Current Board Metrics</h4>
+                    <div className="stats-grid mb-4">
+                        <div className="stat-tile">
+                            <div className="stat-label">Level Goal Progress</div>
+                            <div className="stat-value text-emerald-400">${format(levelEarnings)} / ${format(targetGoal)}</div>
+                            <div className="w-full bg-neutral-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                                <div className="bg-emerald-500 h-full rounded-full transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+                            </div>
+                        </div>
+                        <div className="stat-tile">
+                            <div className="stat-label">Board Cash Wallet</div>
+                            <div className="stat-value text-amber-400">${format(s.money)}</div>
+                        </div>
+                        <div className="stat-tile">
+                            <div className="stat-label">Peak $/s (This Board)</div>
+                            <div className="stat-value">${format(s.adventureState.currentLevelPeakMps || 0)}/s</div>
+                        </div>
+                        <div className="stat-tile">
+                            <div className="stat-label">Current $/s</div>
+                            <div className="stat-value">${format(s.adventureState.currentMps || 0)}/s</div>
+                        </div>
+                        <div className="stat-tile">
+                            <div className="stat-label">Micro Marbles Dropped</div>
+                            <div className="stat-value">{format(s.lifetimeMicroMarblesDropped || 0)}</div>
+                        </div>
+                        <div className="stat-tile">
+                            <div className="stat-label">Total Play Time</div>
+                            <div className="stat-value">{timeStr}</div>
+                        </div>
+                    </div>
+
+                    {/* Board Upgrades Purchased */}
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 mb-2">Board Upgrades Purchased</h4>
+                    <div className="grid grid-cols-2 gap-2 max-h-[140px] overflow-y-auto pr-1">
+                        {Object.entries(activeUpgrades).map(([key, level]) => {
+                            if (typeof level !== 'number' || (key === 'extraBall' ? level <= 1 : level <= 0)) return null;
+                            const label = UPGRADE_LABELS[key] || key;
+                            return (
+                                <div key={key} className="flex justify-between items-center p-2 rounded-lg bg-neutral-900/40 border border-white/5 text-xs">
+                                    <span className="text-neutral-300 font-medium">{label}</span>
+                                    <span className="font-mono bg-cyan-500/10 text-cyan-400 px-1.5 py-0.5 rounded font-bold">Lvl {level}</span>
+                                </div>
+                            );
+                        })}
+                        {Object.entries(activeUpgrades).every(([k, v]) => k === 'extraBall' ? v <= 1 : v <= 0) && (
+                            <div className="col-span-2 text-center text-xs text-neutral-500 py-3 italic">
+                                No upgrades purchased on this board yet!
                             </div>
                         )}
                     </div>

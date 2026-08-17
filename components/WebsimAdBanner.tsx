@@ -38,16 +38,21 @@ export const WebsimAdBanner: React.FC<WebsimAdBannerProps> = ({
 
     return (
         <div 
-            className={`ad-container p-1.5 rounded-lg bg-black/40 border border-white/10 shadow-[inset_0_2px_6px_rgba(0,0,0,0.6)] flex flex-col items-center justify-center my-1.5 mx-auto w-full max-w-full overflow-hidden ${className}`}
-            style={style}
+            className={`ad-container type-${type} p-1.5 rounded-lg bg-black/40 border border-white/10 shadow-[inset_0_2px_6px_rgba(0,0,0,0.6)] flex flex-col items-center justify-center my-1.5 mx-auto w-full max-w-full overflow-hidden shrink-0 ${className}`}
+            style={{
+                maxHeight: type === 'square' ? '180px' : '95px',
+                flexShrink: 0,
+                ...style
+            }}
         >
             <div 
                 id={id} 
                 ref={containerRef}
-                className="websim-ad-block w-full flex items-center justify-center rounded-md overflow-hidden bg-black/30"
+                className="websim-ad-block w-full flex items-center justify-center rounded-md overflow-hidden bg-black/30 shrink-0"
                 style={{
                     width: '100%',
-                    minHeight: type === 'square' ? '200px' : '55px',
+                    minHeight: type === 'square' ? '120px' : '45px',
+                    maxHeight: type === 'square' ? '140px' : '65px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'

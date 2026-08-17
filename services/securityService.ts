@@ -159,7 +159,20 @@ export class SecurityService {
     }
 
     /**
-     * Computes a cryptographic checksum for a leaderboard score
+     * Calculates the maximum plausible MPS for a given prestige tier.
+     * Prevents mathematically impossible score submissions from DevTools / console edits.
+     */
+    static getMaxPlausibleMps(timesPrestiged: number = 0): number {
+        const prestige = Math.max(0, Number(timesPrestiged) || 0);
+        if (prestige === 0) return 1e14; // $100 Trillion max ceiling for 0 prestiges
+        if (prestige === 1) return 1e20; // $100 Quintillion max ceiling for 1 prestige
+        if (prestige === 2) return 1e25;
+        if (prestige <= 5) return 1e30;
+        return 1e32; // Absolute mathematical precision cap
+    }
+
+    /**
+     * Computes a multi-factor cryptographic checksum for a leaderboard score
      */
     static computeScoreChecksum(userId: string, leaderboardId: string, score: number, metadata?: any): string {
         const numScore = Math.floor(score);
@@ -182,15 +195,17 @@ export class SecurityService {
         }
         const masterMult = Math.max(1, Number(metaObj?.masterMultiplier) || 1);
         const prestiged = Math.max(0, Number(metaObj?.timesPrestiged) || 0);
-        const payloadToHash = `${userId}:${leaderboardId}:${numScore}:${masterMult}:${prestiged}:${WEBSIM_SALT_2}`;
+        const lifetimeHits = Math.max(0, Number(metaObj?.lifetimePegHits) || 0);
+        const allTime = Math.max(0, Number(metaObj?.allTimeEarnings || metaObj?.lifetimeEarnings) || 0);
+        
+        // Multi-factor payload with salt protection
+        const payloadToHash = `${userId}:${leaderboardId}:${numScore}:${allTime}:${masterMult}:${prestiged}:${lifetimeHits}:${WEBSIM_SALT_2}:v3_guard`;
         return sha256(utf8ToAscii(payloadToHash));
     }
 
     /**
-     * Validates a leaderboard entry's score checksum.
+     * Validates a leaderboard entry's score checksum and statistical plausibility.
      * Returns { valid: boolean, isLegacy: boolean }.
-     * - Returns valid: true, isLegacy: true for older saves without signature (for backwards compatibility).
-     * - Returns valid: false if a signature is present BUT does not match score (tamper detected).
      */
     static verifyScoreChecksum(entry: any, leaderboardId: string = 'mps'): { valid: boolean; isLegacy: boolean } {
         if (!entry) return { valid: false, isLegacy: false };
@@ -209,10 +224,31 @@ export class SecurityService {
         const sig = entry._sig || meta._sig || entry.checksum || meta.checksum;
         const score = Math.floor(Number(entry.score) || 0);
 
+        // Deterrent A: Numerical sanity check
+        if (!Number.isFinite(score) || isNaN(score) || score <= 0) {
+            console.warn(`[SecurityService] Rejecting non-finite score: ${entry.score}`);
+            return { valid: false, isLegacy: false };
+        }
+
+        // Deterrent B: Prestige tier maximum plausible ceiling check
+        const prestiged = Math.max(0, Number(combinedMeta.timesPrestiged) || 0);
+        const maxPlausible = SecurityService.getMaxPlausibleMps(prestiged);
+        if (score > maxPlausible) {
+            console.warn(`[SecurityService] Rejecting implausible score ${score} for prestige tier ${prestiged} (max allowed ${maxPlausible})`);
+            return { valid: false, isLegacy: false };
+        }
+
+        // Deterrent C: Lifetime earnings ratio check
+        const allTime = Math.max(0, Number(combinedMeta.allTimeEarnings || combinedMeta.lifetimeEarnings) || 0);
+        if (allTime > 0 && score > Math.max(allTime * 2.5, 1000)) {
+            console.warn(`[SecurityService] Rejecting score ${score} exceeding lifetime earnings ${allTime}`);
+            return { valid: false, isLegacy: false };
+        }
+
+        // Deterrent D: Strict unsigned score rejection
         if (!sig) {
-            // Reject un-signed scores only if absurdly high (e.g. > 1e15) or invalid
-            if (score > 1e15 || isNaN(score) || score <= 0) {
-                console.warn(`[SecurityService] Rejecting suspicious un-signed score: ${score}`);
+            if (score > 10000) {
+                console.warn(`[SecurityService] Rejecting un-signed score over 10k threshold: ${score}`);
                 return { valid: false, isLegacy: true };
             }
             return { valid: true, isLegacy: true };
@@ -241,9 +277,18 @@ export class SecurityService {
         addCandidate(entry.user?.username);
 
         for (const uid of candidateUserIds) {
-            const expectedSig = SecurityService.computeScoreChecksum(uid, leaderboardId, score, combinedMeta);
-            if (sig === expectedSig) {
+            // Check v3 multi-factor signature
+            const expectedSigV3 = SecurityService.computeScoreChecksum(uid, leaderboardId, score, combinedMeta);
+            if (sig === expectedSigV3) {
                 return { valid: true, isLegacy: false };
+            }
+
+            // Fallback: Check v2 legacy signature for backwards compatibility with valid pre-v3 records
+            const masterMult = Math.max(1, Number(combinedMeta?.masterMultiplier) || 1);
+            const legacyPayload = `${uid}:${leaderboardId}:${score}:${masterMult}:${prestiged}:${WEBSIM_SALT_2}`;
+            const legacySig = sha256(utf8ToAscii(legacyPayload));
+            if (sig === legacySig) {
+                return { valid: true, isLegacy: true };
             }
         }
 

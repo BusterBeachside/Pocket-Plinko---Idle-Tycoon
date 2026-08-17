@@ -11,12 +11,14 @@ import { Spawner } from './spawner';
 import { UnderdogService } from '../services/underdogService';
 import { DailyEventsManager } from './dailyEvents';
 import { ChallengesManager } from './challenges';
+import { AdventureLevelsManager } from './adventureLevels';
 
 export class GameEngine {
     state: GameState;
     listeners: Set<() => void> = new Set();
     audio: AudioController;
     renderer: GameRenderer;
+    levelVictoryPending: boolean = false;
     
     // Peg Socket Mode State
     socketingActive: boolean = false;
@@ -77,9 +79,44 @@ export class GameEngine {
     lastCloudSave: number = 0;
     lastLeaderboardSync: number = 0;
 
+    // Memory State Integrity Guard
+    private _sessionKey: string = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    private _integrityHash: string = '';
+
+    private computeIntegrityHash(): string {
+        if (!this.state) return '';
+        const peak = Math.floor(this.state.peakMps || 0);
+        const curPeak = Math.floor(this.state.currentRunPeakMps || 0);
+        const lifetime = Math.floor(this.state.allTimeEarnings || this.state.lifetimeEarnings || 0);
+        const prestiged = Number(this.state.timesPrestiged || 0);
+        const masterMult = Number(this.state.masterMultiplier || 1);
+        const payload = `s_${this._sessionKey}:${peak}:${curPeak}:${lifetime}:${prestiged}:${masterMult}`;
+        let hash = 0;
+        for (let i = 0; i < payload.length; i++) {
+            const char = payload.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash |= 0;
+        }
+        return hash.toString(16);
+    }
+
+    updateIntegrityToken() {
+        this._integrityHash = this.computeIntegrityHash();
+    }
+
+    verifyIntegrityToken(): boolean {
+        if (!this._integrityHash) {
+            this.updateIntegrityToken();
+            return true;
+        }
+        const expected = this.computeIntegrityHash();
+        return this._integrityHash === expected;
+    }
+
     constructor() {
         this.state = SaveSystem.loadState();
         SaveSystem.calculateDerivedState(this.state); // Ensure stats are correct on load
+        this.updateIntegrityToken();
         this.audio = new AudioController();
         this.renderer = new GameRenderer();
         this.initPegs();
@@ -141,6 +178,9 @@ export class GameEngine {
     async saveState(force: boolean = false) {
         if (this.isResetting || this.isSyncing) return;
         
+        // Refresh memory state integrity token for anti-cheat verification
+        this.updateIntegrityToken();
+
         // Always save to local storage as backup/offline mode
         SaveSystem.saveState(this.state);
 
@@ -157,26 +197,34 @@ export class GameEngine {
                 const { money, ...stats } = this.state;
                 // Clean temporary visual state
                 stats.bonusMarble = { active: false, x: 0, y: 0, baseY: 0, t: 0 };
-                console.log("[Engine Save] Syncing to Underdog data and leaderboards:", stats);
+                console.log("[Engine Save] Syncing to Underdog data:", stats);
                 
-                // Sync both progress and leaderboard on the same cycle for guest and authenticated sessions alike
-                await Promise.all([
-                    UnderdogService.saveProgress(stats, money, {}),
-                    UnderdogService.submitScore(this.state.peakMps, 'mps', {
-                        timesPrestiged: this.state.timesPrestiged || 0,
-                        masterMultiplier: this.state.masterMultiplier || 1,
-                        derivedIncomeBoostPercent: this.state.derivedIncomeBoostPercent || 0,
-                        permanentIncomeBoostPercent: this.state.permanentIncomeBoostPercent || 0,
-                        activeMarbleSkinID: (this.state.activeMarbleSkinID && this.state.activeMarbleSkinID !== 'default') ? this.state.activeMarbleSkinID : 'marble_white',
-                        ownedMarblesCount: this.state.ownedMarbles?.length || 1,
-                        kineticShards: this.state.kineticShards || 0,
-                        totalPlayTime: this.state.totalPlayTime || 0,
-                        lifetimePegHits: this.state.lifetimePegHits || 0,
-                        lifetimeBaskets: this.state.lifetimeBaskets || 0,
-                        lifetimeCriticalHits: this.state.lifetimeCriticalHits || 0,
-                        lifetimeMicroMarbles: this.state.lifetimeMicroMarblesDropped || 0
-                    })
-                ]);
+                const syncPromises: Promise<any>[] = [
+                    UnderdogService.saveProgress(stats, money, {})
+                ];
+
+                // Leaderboard tracking is strictly for Classic Mode
+                if (this.state.gameMode === 'classic' && !this.state.inChallengeMode) {
+                    syncPromises.push(
+                        UnderdogService.submitScore(this.state.peakMps, 'mps', {
+                            timesPrestiged: this.state.timesPrestiged || 0,
+                            masterMultiplier: this.state.masterMultiplier || 1,
+                            allTimeEarnings: this.state.allTimeEarnings || this.state.lifetimeEarnings || 0,
+                            derivedIncomeBoostPercent: this.state.derivedIncomeBoostPercent || 0,
+                            permanentIncomeBoostPercent: this.state.permanentIncomeBoostPercent || 0,
+                            activeMarbleSkinID: (this.state.activeMarbleSkinID && this.state.activeMarbleSkinID !== 'default') ? this.state.activeMarbleSkinID : 'marble_white',
+                            ownedMarblesCount: this.state.ownedMarbles?.length || 1,
+                            kineticShards: this.state.kineticShards || 0,
+                            totalPlayTime: this.state.totalPlayTime || 0,
+                            lifetimePegHits: this.state.lifetimePegHits || 0,
+                            lifetimeBaskets: this.state.lifetimeBaskets || 0,
+                            lifetimeCriticalHits: this.state.lifetimeCriticalHits || 0,
+                            lifetimeMicroMarbles: this.state.lifetimeMicroMarblesDropped || 0
+                        })
+                    );
+                }
+
+                await Promise.all(syncPromises);
                 this.state.lastCloudSyncTime = Date.now();
                 this.lastLeaderboardSync = Date.now();
             } catch (err) {
@@ -351,11 +399,15 @@ export class GameEngine {
             if (diffSeconds > threshold && this.state.currentRunPeakMps > 0) {
                 const earnings = Math.floor(this.state.currentRunPeakMps * 0.25 * diffSeconds);
                 if (earnings > 0) {
-                    this.state.money += earnings;
+                    if (this.state.gameMode === 'adventure' && this.state.classicStateBackup) {
+                        this.state.classicStateBackup.money += earnings;
+                    } else {
+                        this.state.money += earnings;
+                    }
                     this.state.lifetimeEarnings += earnings;
                     this.state.allTimeEarnings = (this.state.allTimeEarnings || 0) + earnings;
                     this.pushNotification(`Welcome back! Offline: +$${formatNumber(earnings)} Career Cash.`, 'mission');
-                    if (!this.state.inChallengeMode) {
+                    if (this.state.gameMode !== 'adventure' && !this.state.inChallengeMode) {
                         this.offlineEarnings = earnings;
                     }
                 }
@@ -413,7 +465,7 @@ export class GameEngine {
     }
 
     initPegs() {
-        const { pegs, grid, gridCols, gridRows } = Spawner.initPegs(this.width, this.height, this.gridSize);
+        const { pegs, grid, gridCols, gridRows } = Spawner.initPegs(this.width, this.height, this.gridSize, this.state);
         this.pegs = pegs;
         this.grid = grid;
         this.gridCols = gridCols;
@@ -424,7 +476,7 @@ export class GameEngine {
     syncSocketedPegs() {
         if (!this.pegs || !this.state.socketedPegs) return;
         this.pegs.forEach((p, idx) => {
-            if (this.state.inChallengeMode) {
+            if (this.state.inChallengeMode || this.state.gameMode === 'adventure') {
                 p.gemType = undefined;
                 p.diamondHits = 0;
             } else {
@@ -515,6 +567,23 @@ export class GameEngine {
                 if (mps > (this.state.challengeState.currentRunPeakMps || 0)) {
                     this.state.challengeState.currentRunPeakMps = mps;
                 }
+            } else if (this.state.gameMode === 'adventure') {
+                if (!this.state.adventureState) {
+                    this.state.adventureState = {
+                        currentLevel: 1,
+                        levelEarnings: 0,
+                        targetGoal: 1000,
+                        adventureMultiplier: 1.0,
+                        highestLevelUnlocked: 1,
+                        completedLevels: {}
+                    };
+                }
+                this.state.adventureState.currentMps = mps;
+                if (mps > (this.state.adventureState.currentLevelPeakMps || 0)) {
+                    this.state.adventureState.currentLevelPeakMps = mps;
+                }
+                this.state.currentMps = mps;
+                this.state.currentRunPeakMps = this.state.adventureState.currentLevelPeakMps || 0;
             } else {
                 this.state.currentMps = mps;
                 
@@ -537,7 +606,10 @@ export class GameEngine {
             this.saveState();
             
             // Allow bonus marble spawns in challenge mode but ignore the windfall_wednesday daily event if active
-            const bSpawnMult = this.state.inChallengeMode ? 1.0 : DailyEventsManager.getBonusSpawnMultiplier();
+            let bSpawnMult = this.state.inChallengeMode ? 1.0 : DailyEventsManager.getBonusSpawnMultiplier();
+            if (this.state.gameMode === 'adventure' && PhysicsManager.getActiveAdventureGimmick(this.state) === 'frosted_cafe') {
+                bSpawnMult *= 2.0; // 2x Bonus Marble frequency for Cozy Ambiance!
+            }
             const spawnTimerLimit = 60000 / bSpawnMult;
             if (Date.now() - this.lastBonusSpawn > spawnTimerLimit && this.isGameStarted) {
                 if (!this.state.bonusMarble?.active) {
@@ -600,6 +672,12 @@ export class GameEngine {
                         this.state.challengeState.money = (this.state.challengeState.money || 0) + amount;
                         this.state.challengeState.lifetimeEarnings = (this.state.challengeState.lifetimeEarnings || 0) + amount;
                     }
+                } else if (this.state.gameMode === 'adventure') {
+                    // Adventure mode: strictly use the active adventure board's peak MPS or level income baseline
+                    const advPeak = this.state.adventureState?.currentLevelPeakMps || this.state.adventureState?.currentMps || this.state.currentRunPeakMps || 0;
+                    const baseline = Math.max(25, Math.round((this.state.adventureState?.levelEarnings || 0) * 0.05));
+                    amount = Math.max(baseline, Math.round(advPeak * bonusRate));
+                    this.addMoney(amount, false);
                 } else {
                     const peakToUse = this.state.currentRunPeakMps || this.state.currentMps || 0;
                     amount = Math.max(100, Math.round(peakToUse * bonusRate));
@@ -655,7 +733,34 @@ export class GameEngine {
     }
 
     addMoney(amount: number, countTowardsIncome: boolean = true) {
-        if (this.state.inChallengeMode && countTowardsIncome) {
+        if (this.state.gameMode === 'adventure' && countTowardsIncome) {
+            const advMult = this.state.adventureState?.adventureMultiplier || 1.0;
+            const finalAmount = amount * advMult;
+            this.state.money += finalAmount;
+            if (!this.state.adventureState) {
+                this.state.adventureState = {
+                    currentLevel: 1,
+                    levelEarnings: 0,
+                    targetGoal: 10000,
+                    adventureMultiplier: 1.0,
+                    highestLevelUnlocked: 1,
+                    completedLevels: {}
+                };
+            }
+            this.state.adventureState.levelEarnings = (this.state.adventureState.levelEarnings || 0) + finalAmount;
+            if (countTowardsIncome) {
+                this.incomeBuffer += finalAmount;
+            }
+
+            // Check Level Victory Goal
+            if (this.state.adventureState.levelEarnings >= this.state.adventureState.targetGoal && !this.levelVictoryPending) {
+                this.levelVictoryPending = true;
+                this.audio.play('goal_complete', 0, 0.6);
+                window.dispatchEvent(new CustomEvent('adventure-level-complete', {
+                    detail: { levelId: this.state.adventureState.currentLevel }
+                }));
+            }
+        } else if (this.state.inChallengeMode && countTowardsIncome) {
             ChallengesManager.checkAndSyncChallengeState(this.state);
             if (this.state.challengeState.challengeId === 'sand_peg') {
                 this.incomeBuffer += amount;
@@ -665,13 +770,162 @@ export class GameEngine {
                 this.incomeBuffer += amount;
             }
         } else {
-            this.state.money += amount;
+            if (this.state.gameMode === 'adventure' && this.state.classicStateBackup) {
+                this.state.classicStateBackup.money += amount;
+            } else {
+                this.state.money += amount;
+            }
             this.state.lifetimeEarnings += amount;
             this.state.allTimeEarnings = (this.state.allTimeEarnings || 0) + amount;
             if (countTowardsIncome) {
                 this.incomeBuffer += amount;
             }
         }
+    }
+
+    setGameMode(mode: 'classic' | 'adventure') {
+        if (this.state.gameMode === mode) return;
+        
+        if (mode === 'adventure') {
+            // Backup classic state before switching to adventure
+            if (this.state.gameMode === 'classic') {
+                this.state.classicStateBackup = {
+                    money: this.state.money,
+                    upgrades: JSON.parse(JSON.stringify(this.state.upgrades)),
+                    uncommonChancePercent: this.state.uncommonChancePercent,
+                    rareChancePercent: this.state.rareChancePercent,
+                    legendaryChancePercent: this.state.legendaryChancePercent,
+                    criticalChancePercent: this.state.criticalChancePercent,
+                    microValuePercent: this.state.microValuePercent,
+                    bonusValuePercent: this.state.bonusValuePercent,
+                    basketValueBonus: this.state.basketValueBonus,
+                    currentRunPeakMps: this.state.currentRunPeakMps,
+                    currentMps: this.state.currentMps,
+                    peakMps: this.state.peakMps
+                };
+            }
+            this.state.gameMode = mode;
+            this.state.inChallengeMode = false;
+            const lvl = this.state.adventureState?.currentLevel || 1;
+            this.startAdventureLevel(lvl);
+        } else {
+            this.state.gameMode = mode;
+            this.state.inChallengeMode = false;
+            // Restore classic board
+            if (this.state.classicStateBackup) {
+                this.state.money = this.state.classicStateBackup.money;
+                this.state.upgrades = JSON.parse(JSON.stringify(this.state.classicStateBackup.upgrades));
+                this.state.uncommonChancePercent = this.state.classicStateBackup.uncommonChancePercent;
+                this.state.rareChancePercent = this.state.classicStateBackup.rareChancePercent;
+                this.state.legendaryChancePercent = this.state.classicStateBackup.legendaryChancePercent;
+                this.state.criticalChancePercent = this.state.classicStateBackup.criticalChancePercent;
+                this.state.microValuePercent = this.state.classicStateBackup.microValuePercent;
+                this.state.bonusValuePercent = this.state.classicStateBackup.bonusValuePercent;
+                this.state.basketValueBonus = this.state.classicStateBackup.basketValueBonus;
+                this.state.currentRunPeakMps = this.state.classicStateBackup.currentRunPeakMps || 0;
+                this.state.currentMps = this.state.classicStateBackup.currentMps || 0;
+                if (this.state.classicStateBackup.peakMps) {
+                    this.state.peakMps = this.state.classicStateBackup.peakMps;
+                }
+            }
+            
+            this.levelVictoryPending = false;
+            this.balls = [];
+            this.initPegs();
+            SaveSystem.calculateDerivedState(this.state);
+            SaveSystem.saveState(this.state);
+            this.notify();
+        }
+    }
+
+    startAdventureLevel(levelId: number) {
+        this.state.gameMode = 'adventure';
+        this.state.inChallengeMode = false;
+        this.levelVictoryPending = false;
+        
+        const config = AdventureLevelsManager.getLevelConfig(levelId);
+        
+        if (!this.state.adventureState) {
+            this.state.adventureState = {
+                currentLevel: levelId,
+                levelEarnings: 0,
+                targetGoal: config.targetGoal,
+                adventureMultiplier: 1.0,
+                highestLevelUnlocked: Math.max(1, levelId),
+                completedLevels: {},
+                currentLevelPeakMps: 0,
+                currentMps: 0
+            };
+        } else {
+            this.state.adventureState.currentLevel = levelId;
+            this.state.adventureState.levelEarnings = 0;
+            this.state.adventureState.targetGoal = config.targetGoal;
+            this.state.adventureState.highestLevelUnlocked = Math.max(this.state.adventureState.highestLevelUnlocked || 1, levelId);
+            this.state.adventureState.currentLevelPeakMps = 0;
+            this.state.adventureState.currentMps = 0;
+        }
+
+        // Reset level-specific cash, MPS tracking, & local upgrades for new board run
+        this.state.currentRunPeakMps = 0;
+        this.state.currentMps = 0;
+        this.incomeBuffer = 0;
+        this.state.money = 0;
+        this.state.upgrades = {
+            extraBall: 1,
+            pegValue: 0,
+            ballSpeed: 0,
+            basketValue: 0,
+            uncommonChance: 0,
+            rareChance: 0,
+            legendaryChance: 0,
+            criticalChance: 0,
+            microValue: 0,
+            bonusValue: 0
+        };
+
+        this.balls = [];
+        this.initPegs();
+        SaveSystem.calculateDerivedState(this.state);
+        SaveSystem.saveState(this.state);
+        this.notify();
+
+        // Dispatch first-time intro pop-up event
+        if (typeof window !== 'undefined') {
+            if (!this.state.adventureState.seenInfoPopups) {
+                this.state.adventureState.seenInfoPopups = {};
+            }
+            if (!this.state.adventureState.seenInfoPopups[levelId]) {
+                this.state.adventureState.seenInfoPopups[levelId] = true;
+                setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('adventure-board-intro', { detail: { levelId } }));
+                }, 100);
+            }
+        }
+    }
+
+    completeAdventureLevel() {
+        if (!this.state.adventureState) return;
+        const currentLvl = this.state.adventureState.currentLevel;
+        const config = AdventureLevelsManager.getLevelConfig(currentLvl);
+
+        // Apply compounding multiplier reward
+        const currentMult = this.state.adventureState.adventureMultiplier || 1.0;
+        this.state.adventureState.adventureMultiplier = currentMult * config.multiplierReward;
+
+        // Record level completion
+        if (!this.state.adventureState.completedLevels) {
+            this.state.adventureState.completedLevels = {};
+        }
+        this.state.adventureState.completedLevels[currentLvl] = { completedAt: Date.now() };
+
+        const nextLevel = currentLvl + 1;
+        this.state.adventureState.highestLevelUnlocked = Math.max(
+            this.state.adventureState.highestLevelUnlocked || 1,
+            nextLevel
+        );
+
+        // Advance to next level
+        this.startAdventureLevel(nextLevel);
     }
 
     calculateScore(ball: Ball, baseValue: number, rarityMultiplier: number) {
@@ -688,9 +942,12 @@ export class GameEngine {
         this.state.totalPlayTime = (this.state.totalPlayTime || 0) + dt;
 
         // Micro Autoclicker Logic
-        let autoLevel = this.state.inChallengeMode ? 0 : (this.state.permUpgradesLevels['perm_micro_autoclicker'] || 0);
+        let autoLevel = (this.state.inChallengeMode || this.state.gameMode === 'adventure') ? 0 : (this.state.permUpgradesLevels['perm_micro_autoclicker'] || 0);
         if (this.state.inChallengeMode && this.state.challengeState?.challengeId === 'micro_mania') {
             autoLevel = this.state.challengeState.upgrades.microAutoclicker || 0;
+        }
+        if (this.state.gameMode === 'adventure' && PhysicsManager.getActiveAdventureGimmick(this.state) === 'micro_frenzy') {
+            autoLevel = 5;
         }
         if (autoLevel > 0) {
             const marblesPerSecond = autoLevel * 0.1;
@@ -764,8 +1021,9 @@ export class GameEngine {
             (peg) => this.spawnSandExplosion(peg)
         );
         
-        // Challenge-specific physics updates (e.g. sand peg respawning)
-        if (this.state.inChallengeMode && this.state.challengeState?.challengeId === 'sand_peg') {
+        // Challenge & Adventure specific physics updates (e.g. sand peg respawning)
+        const isSandPegBoard = (this.state.inChallengeMode && this.state.challengeState?.challengeId === 'sand_peg') || (PhysicsManager.getActiveAdventureGimmick(this.state) === 'sand_pegs');
+        if (isSandPegBoard) {
             this.pegs.forEach(p => {
                 if (p.broken) {
                     p.respawnTimer = (p.respawnTimer || 5) - dt;

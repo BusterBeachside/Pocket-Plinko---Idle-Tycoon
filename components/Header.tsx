@@ -1,12 +1,13 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { engine } from '../game/engine';
 import { assets } from '../game/assets';
 import { DailyEventsManager } from '../game/dailyEvents';
 import { CHALLENGES, ChallengesManager } from '../game/challenges';
+import { AdventureLevelsManager } from '../game/adventureLevels';
 import { UnderdogService } from '../services/underdogService';
 
-import { User, Bug } from 'lucide-react';
+import { User, Bug, Cloud, CloudUpload, Check } from 'lucide-react';
 import { AvatarDisplay } from './AvatarDisplay';
 
 export function isAIStudioPreview(): boolean {
@@ -45,6 +46,7 @@ export const Header = ({
     profile, 
     onEventClick,
     onChallengeClick,
+    onAdventureDetailsClick,
     onDebugClick
 }: { 
     onCoreClick: () => void, 
@@ -52,6 +54,7 @@ export const Header = ({
     profile?: any, 
     onEventClick: () => void,
     onChallengeClick?: () => void,
+    onAdventureDetailsClick?: () => void,
     onDebugClick?: () => void
 }) => {
     const [glow, setGlow] = useState(false);
@@ -59,8 +62,52 @@ export const Header = ({
 
     const [timeLeft, setTimeLeft] = useState('');
 
-    // Challenge Mode state tracking for header banner replacement
+    // Cloud Save status tracking
+    const [cloudStatus, setCloudStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+    const savedTimeoutRef = useRef<any>(null);
+
+    useEffect(() => {
+        const handleCloudSaveStatus = (e: any) => {
+            const { status } = e.detail || {};
+            if (status === 'saving') {
+                if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+                setCloudStatus('saving');
+            } else if (status === 'saved') {
+                setCloudStatus('saved');
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                setLastSavedTime(timeStr);
+                if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+                savedTimeoutRef.current = setTimeout(() => {
+                    setCloudStatus('idle');
+                }, 3000);
+            } else if (status === 'error') {
+                setCloudStatus('error');
+                if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+                savedTimeoutRef.current = setTimeout(() => {
+                    setCloudStatus('idle');
+                }, 3000);
+            }
+        };
+
+        window.addEventListener('cloud-save-status', handleCloudSaveStatus);
+        return () => {
+            window.removeEventListener('cloud-save-status', handleCloudSaveStatus);
+            if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+        };
+    }, []);
+
+    // Challenge & Adventure Mode state tracking for header banner replacement
     const [inChallenge, setInChallenge] = useState(engine.state.inChallengeMode);
+    const [inAdventure, setInAdventure] = useState(engine.state.gameMode === 'adventure');
+    const [adventureInfo, setAdventureInfo] = useState({
+        level: 1,
+        name: '',
+        earnings: 0,
+        goal: 10000,
+        isBoss: false
+    });
     const [challengeInfo, setChallengeInfo] = useState({
         nextTier: 'bronze' as 'bronze' | 'silver' | 'gold',
         currentMetricVal: 0,
@@ -94,9 +141,24 @@ export const Header = ({
             const secs = Math.floor((diff % 60000) / 1000);
             setTimeLeft(`${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
 
-            // Sync challenge info
+            // Sync challenge & adventure info
             const inChal = engine.state.inChallengeMode;
+            const inAdv = engine.state.gameMode === 'adventure';
             setInChallenge(inChal);
+            setInAdventure(inAdv);
+
+            if (inAdv && engine.state.adventureState) {
+                const curLvl = engine.state.adventureState.currentLevel || 1;
+                const cfg = AdventureLevelsManager.getLevelConfig(curLvl);
+                setAdventureInfo({
+                    level: curLvl,
+                    name: cfg.name,
+                    earnings: engine.state.adventureState.levelEarnings || 0,
+                    goal: cfg.targetGoal,
+                    isBoss: cfg.isBoss
+                });
+            }
+
             if (inChal) {
                 const activeId = ChallengesManager.getActiveChallengeId();
                 const challenge = CHALLENGES[activeId];
@@ -168,6 +230,57 @@ export const Header = ({
                     </span>
                 </div>
 
+                {/* Cloud Save Indicator Pill */}
+                <div 
+                    className={`flex items-center gap-1 sm:gap-1.5 px-2 py-1 rounded-full border text-[9.5px] font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer select-none shrink-0 ${
+                        cloudStatus === 'saving'
+                            ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.3)] animate-pulse'
+                            : cloudStatus === 'saved'
+                            ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.25)]'
+                            : cloudStatus === 'error'
+                            ? 'bg-rose-500/20 border-rose-400/50 text-rose-300'
+                            : 'bg-white/5 hover:bg-white/10 border-white/10 text-white/50 hover:text-white/80'
+                    }`}
+                    onClick={() => {
+                        if (cloudStatus !== 'saving') {
+                            engine.saveState(true);
+                        }
+                    }}
+                    title={
+                        cloudStatus === 'saving'
+                            ? 'Actively saving progress to cloud...'
+                            : cloudStatus === 'saved'
+                            ? `Cloud save complete! ${lastSavedTime ? `(Last save at ${lastSavedTime})` : ''}`
+                            : cloudStatus === 'error'
+                            ? 'Cloud save failed. Click to retry.'
+                            : `Cloud Save Active ${lastSavedTime ? `(Last save at ${lastSavedTime})` : ''} - Click to save now!`
+                    }
+                >
+                    {cloudStatus === 'saving' ? (
+                        <>
+                            <CloudUpload className="w-3.5 h-3.5 text-cyan-400 animate-bounce shrink-0" />
+                            <span className="hidden sm:inline text-[9px] font-black text-cyan-300">Saving...</span>
+                        </>
+                    ) : cloudStatus === 'saved' ? (
+                        <>
+                            <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[3] shrink-0" />
+                            <span className="hidden sm:inline text-[9px] font-black text-emerald-300">Saved</span>
+                        </>
+                    ) : cloudStatus === 'error' ? (
+                        <>
+                            <Cloud className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                            <span className="hidden sm:inline text-[9px] font-black text-rose-300">Retry</span>
+                        </>
+                    ) : (
+                        <>
+                            <Cloud className="w-3.5 h-3.5 text-emerald-400/80 shrink-0" />
+                            <span className="hidden lg:inline text-[9px] font-extrabold text-white/50 group-hover:text-white/80">
+                                {lastSavedTime ? `Saved ${lastSavedTime}` : 'Cloud Save'}
+                            </span>
+                        </>
+                    )}
+                </div>
+
                 {isAIStudioPreview() && onDebugClick && (
                     <button
                         onClick={onDebugClick}
@@ -180,7 +293,7 @@ export const Header = ({
                 )}
             </div>
             
-            <div className="flex flex-col items-center select-none w-full px-12 sm:px-32 overflow-hidden my-auto" style={{ alignSelf: 'center' }}>
+            <div className="flex flex-col items-center select-none w-full px-20 xs:px-28 sm:px-44 overflow-hidden my-auto" style={{ alignSelf: 'center' }}>
                 <h1 className="header-title text-center" style={{ fontSize: '1.4rem', lineHeight: '1.1' }}>Pocket Plinko</h1>
                 {inChallenge ? (
                     <div 
@@ -207,6 +320,31 @@ export const Header = ({
                             />
                         </div>
                     </div>
+                ) : inAdventure ? (
+                    <div 
+                        onClick={onAdventureDetailsClick}
+                        className="flex flex-col gap-0.5 mt-0.5 px-2.5 py-0.5 bg-black/70 border border-amber-500/40 cursor-pointer hover:bg-black/90 hover:border-amber-400/60 transition-all w-44 xs:w-52 sm:w-64 select-none shadow-md rounded-lg max-w-full overflow-hidden"
+                        title="Click to view details and gimmick for this board!"
+                    >
+                        <div className="flex items-center justify-between text-[8px] sm:text-[9px] font-extrabold tracking-wider uppercase leading-none">
+                            <span className="text-amber-400 font-black truncate max-w-[110px] xs:max-w-[140px]">
+                                Board {adventureInfo.level}: {adventureInfo.name} {adventureInfo.isBoss ? '👑' : ''}
+                            </span>
+                            <span className="font-mono text-emerald-400 font-bold">
+                                ${formatVal(adventureInfo.earnings)} / ${formatVal(adventureInfo.goal)}
+                            </span>
+                        </div>
+                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden border border-slate-700/60">
+                            <div 
+                                className={`h-full rounded-full transition-all duration-300 ${
+                                    adventureInfo.isBoss 
+                                        ? 'bg-gradient-to-r from-red-500 via-amber-500 to-orange-400' 
+                                        : 'bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400'
+                                }`}
+                                style={{ width: `${Math.min(100, (adventureInfo.earnings / adventureInfo.goal) * 100)}%` }}
+                            />
+                        </div>
+                    </div>
                 ) : (
                     <div 
                         onClick={onEventClick}
@@ -229,14 +367,14 @@ export const Header = ({
             </div>
             
             <div 
-                className={`kinetic-icon absolute right-2.5 sm:right-4 top-1/2 -translate-y-1/2 z-10 ${glow && !inChallenge ? 'glow' : ''}`} 
-                onClick={inChallenge ? undefined : onCoreClick} 
+                className={`kinetic-icon absolute right-2.5 sm:right-4 top-1/2 -translate-y-1/2 z-10 ${glow && !inChallenge && !inAdventure ? 'glow' : ''}`} 
+                onClick={(inChallenge || inAdventure) ? undefined : onCoreClick} 
                 style={{
-                    cursor: inChallenge ? 'not-allowed' : 'pointer',
-                    opacity: inChallenge ? 0.35 : 1,
-                    pointerEvents: inChallenge ? 'none' : 'auto'
+                    cursor: (inChallenge || inAdventure) ? 'not-allowed' : 'pointer',
+                    opacity: (inChallenge || inAdventure) ? 0.35 : 1,
+                    pointerEvents: (inChallenge || inAdventure) ? 'none' : 'auto'
                 }}
-                title={inChallenge ? "Kinetic Core is disabled while on a Challenge board!" : "Access Kinetic Core"}
+                title={inChallenge ? "Kinetic Core is disabled while on a Challenge board!" : inAdventure ? "Kinetic Core is disabled in Adventure Mode!" : "Access Kinetic Core"}
             >
                 {/* Use preloaded asset source if available, else raw path */}
                 <img src={assets.getSrc('core')} alt="Core" />

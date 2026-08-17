@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { 
     X, Bug, Zap, Plus, RefreshCw, Trash2, Sparkles, 
-    Calendar, Trophy, Gift, Gauge, Flame, ShieldAlert, Globe, RotateCcw
+    Calendar, Trophy, Gift, Gauge, Flame, ShieldAlert, Globe, RotateCcw,
+    Compass, Play, MapPin
 } from 'lucide-react';
 import { engine } from '../../game/engine';
 import { SaveSystem } from '../../game/saveSystem';
 import { DailyEventsManager } from '../../game/dailyEvents';
 import { ChallengesManager } from '../../game/challenges';
 import { ProgressionManager } from '../../game/progression';
+import { AdventureLevelsManager } from '../../game/adventureLevels';
 import { UnderdogService } from '../../services/underdogService';
 import { formatNumber } from '../../game/utils';
 
@@ -27,10 +29,20 @@ export const DebugModal: React.FC<DebugModalProps> = ({ onClose, onUpdate, onTes
     const [masterInput, setMasterInput] = useState('5');
     const [isWebsimMode, setIsWebsimMode] = useState(() => UnderdogService.isWebsim());
     const [isDoubleSpeed, setIsDoubleSpeed] = useState(() => engine.debugDoubleSpeed);
+    const [selectedLevelId, setSelectedLevelId] = useState<number>(() => state.adventureState?.currentLevel || 1);
+    const [customLevelInput, setCustomLevelInput] = useState<string>('1');
 
     const refreshApp = () => {
         onUpdate();
         engine.notify();
+    };
+
+    const handleStartAdventureLevel = (lvl: number) => {
+        const validLevel = Math.max(1, lvl);
+        engine.startAdventureLevel(validLevel);
+        setSelectedLevelId(validLevel);
+        setCustomLevelInput(String(validLevel));
+        refreshApp();
     };
 
     const enableDebugMode = () => {
@@ -393,6 +405,104 @@ export const DebugModal: React.FC<DebugModalProps> = ({ onClose, onUpdate, onTes
                                     >
                                         Set
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Adventure Mode Level Select */}
+                        <div className="bg-slate-800/60 border border-amber-500/40 p-3 rounded-xl space-y-2.5">
+                            <div className="flex items-center justify-between">
+                                <div className="text-[10.5px] font-extrabold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                                    <Compass className="w-3.5 h-3.5 text-amber-400" />
+                                    Adventure Mode Level Select
+                                </div>
+                                {state.gameMode === 'adventure' && (
+                                    <span className="text-[9.5px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                                        Active: Level {state.adventureState?.currentLevel || 1}
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Dropdown level selection */}
+                            <div className="flex gap-1.5 items-center">
+                                <select 
+                                    value={selectedLevelId}
+                                    onChange={(e) => setSelectedLevelId(Number(e.target.value))}
+                                    className="bg-slate-900 border border-slate-700 text-amber-200 text-xs rounded-lg px-2.5 py-1.5 w-full font-mono focus:outline-none focus:border-amber-500 cursor-pointer"
+                                >
+                                    {Array.from({ length: 20 }, (_, i) => i + 1).map((lvl) => {
+                                        const cfg = AdventureLevelsManager.getLevelConfig(lvl);
+                                        return (
+                                            <option key={lvl} value={lvl} className="bg-slate-900 text-white">
+                                                Lvl {lvl}: {cfg.name} {cfg.isBoss ? '👑 (BOSS)' : ''} — {cfg.gimmickName}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                                <button 
+                                    onClick={() => handleStartAdventureLevel(selectedLevelId)}
+                                    className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-3.5 py-1.5 rounded-lg text-xs shrink-0 transition-all active:scale-95 flex items-center gap-1 shadow-md cursor-pointer"
+                                >
+                                    <Play className="w-3 h-3 fill-current" /> Launch
+                                </button>
+                            </div>
+
+                            {/* Custom Level Input */}
+                            <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-700/40">
+                                <span className="text-[10px] text-slate-400 uppercase font-bold shrink-0">Custom Level ID:</span>
+                                <div className="flex items-center gap-1.5">
+                                    <input 
+                                        type="number"
+                                        min="1"
+                                        max="999"
+                                        value={customLevelInput}
+                                        onChange={(e) => setCustomLevelInput(e.target.value)}
+                                        className="bg-slate-900 border border-slate-700 text-white text-xs rounded-lg px-2 py-1 w-16 font-mono focus:outline-none focus:border-amber-500 text-center"
+                                    />
+                                    <button 
+                                        onClick={() => {
+                                            const num = parseInt(customLevelInput, 10);
+                                            if (!isNaN(num) && num >= 1) {
+                                                handleStartAdventureLevel(num);
+                                            }
+                                        }}
+                                        className="bg-slate-700 hover:bg-slate-600 text-amber-300 border border-amber-500/30 font-bold px-2.5 py-1 rounded-lg text-[10.5px] transition-all active:scale-95 cursor-pointer"
+                                    >
+                                        Jump to Level
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Quick Preset Effect Buttons */}
+                            <div className="space-y-1 pt-1.5 border-t border-slate-700/40">
+                                <div className="text-[9.5px] font-extrabold uppercase tracking-wider text-slate-400">
+                                    Quick Gimmick & Atmosphere Test:
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                                    {[
+                                        { lvl: 1, label: 'Lvl 1: Blueprint', icon: '📐' },
+                                        { lvl: 2, label: 'Lvl 2: Oak Bounce', icon: '🪵' },
+                                        { lvl: 3, label: 'Lvl 3: Gale Breeze', icon: '🍃' },
+                                        { lvl: 4, label: 'Lvl 4: Heavy Gravity', icon: '🪨' },
+                                        { lvl: 5, label: 'Lvl 5: Sand Pegs 👑', icon: '⏳' },
+                                        { lvl: 6, label: 'Lvl 6: Fortress Grid', icon: '🧱' },
+                                        { lvl: 7, label: 'Lvl 7: Sky Thermals', icon: '☁️' },
+                                        { lvl: 8, label: 'Lvl 8: Frosted Cafe', icon: '☕' },
+                                        { lvl: 9, label: 'Lvl 9: High Society', icon: '🏛️' },
+                                        { lvl: 10, label: 'Lvl 10: Zero-G 👑', icon: '🪐' },
+                                        { lvl: 15, label: 'Lvl 15: Micro Frenzy 👑', icon: '⚡' },
+                                        { lvl: 20, label: 'Lvl 20: Meltdown 👑', icon: '🔥' },
+                                    ].map((item) => (
+                                        <button
+                                            key={item.lvl}
+                                            onClick={() => handleStartAdventureLevel(item.lvl)}
+                                            className="bg-slate-900/90 hover:bg-amber-950/60 hover:border-amber-500/50 text-slate-200 hover:text-amber-300 border border-slate-700/60 font-bold px-2 py-1.5 rounded-lg text-[10px] text-left transition-all truncate flex items-center gap-1 active:scale-95 cursor-pointer"
+                                            title={`Test level ${item.lvl}`}
+                                        >
+                                            <span className="text-xs">{item.icon}</span>
+                                            <span className="truncate">{item.label}</span>
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                         </div>

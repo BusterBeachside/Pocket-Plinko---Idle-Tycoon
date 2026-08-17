@@ -3,6 +3,7 @@ import { GameState, Ball, Peg, Popup, VisualEffect, SandParticle } from './types
 import { assets } from './assets';
 import { formatNumber } from './utils';
 import { PhysicsManager } from './physics';
+import { BoardBackgrounds } from './boardBackgrounds';
 
 export class GameRenderer {
     private textureCache: Map<string, HTMLImageElement> = new Map();
@@ -36,9 +37,11 @@ export class GameRenderer {
         const allowHeavyShadows = isHighQuality || (isMediumQuality && totalBalls < 15);
         const allowLightShadows = isHighQuality || (isMediumQuality && totalBalls < 30);
         
-        // Faint Tech Grid Background
+        // Background Rendering
         ctx.save();
-        if (state.inChallengeMode) {
+        if (state.gameMode === 'adventure') {
+            BoardBackgrounds.drawBackground(ctx, width, height, state.adventureState?.currentLevel || 1);
+        } else if (state.inChallengeMode) {
             // Animated scrolling tech grid for Challenges!
             const t = (Date.now() / 1500) % 1; // 0 to 1
             const offset = t * 40;
@@ -91,7 +94,9 @@ export class GameRenderer {
         
         // Draw Pegs with 3D spherical look + neon hit glow
         pegs.forEach(p => {
-            const isSandPeg = state.inChallengeMode && state.challengeState?.challengeId === 'sand_peg';
+            const isSandPeg = (state.inChallengeMode && state.challengeState?.challengeId === 'sand_peg') || (PhysicsManager.getActiveAdventureGimmick(state) === 'sand_pegs');
+            const isOverheated = p.overheated || (p.heat && p.heat > 0);
+            const isBrickWide = state.gameMode === 'adventure' && PhysicsManager.getActiveAdventureGimmick(state) === 'brick_wide';
 
             if (p.broken) {
                 // Faint dashed outline showing former peg placement
@@ -110,7 +115,16 @@ export class GameRenderer {
             // Spherical gradient
             const grad = ctx.createRadialGradient(p.x - 2, p.y - 2, 1, p.x, p.y, this.pegRadius);
             
-            if (isSandPeg) {
+            if (isOverheated) {
+                // Fiery overheated red/orange thermal glow
+                if (allowLightShadows) {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = '#ef4444';
+                }
+                grad.addColorStop(0, '#ffffff');
+                grad.addColorStop(0.3, '#f97316');
+                grad.addColorStop(1, '#dc2626');
+            } else if (isSandPeg) {
                 // 7. Color pegs differently in this mode to show their current HP. Green for 3, yellow for 2, and red for 1.
                 const hp = p.hp !== undefined ? p.hp : 3;
                 let hpColor = '#39ff14'; // green
@@ -146,10 +160,10 @@ export class GameRenderer {
                 }
             } else if (p.glow > 0) {
                 // Active Glow based on hit type
-                let glowColor = '#ffd700'; // Default gold
+                let glowColor = isBrickWide ? '#f97316' : '#ffd700'; // Amber spark on BrickWall
                 let startCol = '#fff';
-                let midCol = '#fff7cc';
-                let endCol = '#ffab00';
+                let midCol = isBrickWide ? '#fed7aa' : '#fff7cc';
+                let endCol = isBrickWide ? '#ea580c' : '#ffab00';
                 
                 if (p.hitType === 'master') {
                     const hue = (performance.now() / 5) % 360;
@@ -186,6 +200,12 @@ export class GameRenderer {
                 grad.addColorStop(0, startCol);
                 grad.addColorStop(0.2, midCol);
                 grad.addColorStop(1, endCol);
+            } else if (isBrickWide) {
+                // Fortress stone rivet styling
+                grad.addColorStop(0, '#f8fafc');
+                grad.addColorStop(0.3, '#cbd5e1');
+                grad.addColorStop(1, '#475569');
+                ctx.shadowBlur = 0;
             } else {
                 // Idle Metallic/Glass look
                 grad.addColorStop(0, '#e6e6e6');
@@ -549,14 +569,19 @@ export class GameRenderer {
         const marbleCountMult = Math.max(1, stats.upgrades.extraBall * 0.75);
         const totalIncomePercent = (stats.permanentIncomeBoostPercent || 0) + (stats.derivedIncomeBoostPercent || 0);
         const permIncomeMult = 1 + (totalIncomePercent / 100);
-        const displayMult = marbleCountMult * permIncomeMult;
+        let displayMult = marbleCountMult * permIncomeMult;
+
+        const isMarbleSociety = state.gameMode === 'adventure' && PhysicsManager.getActiveAdventureGimmick(state) === 'marble_society';
+        if (isMarbleSociety) {
+            displayMult *= 1.5; // +50% extra gimmick on Board 9 High Society
+        }
 
         const isAntiGravity = state.inChallengeMode && state.challengeState?.challengeId === 'anti_gravity';
 
         for(let i=0; i<5; i++) {
             const bx = i * basketW;
             const by = height - basketH;
-            const col = isAntiGravity ? '#fd79a8' : basketColors[i];
+            const col = isAntiGravity ? '#fd79a8' : (isMarbleSociety ? '#eab308' : basketColors[i]);
             
             ctx.save();
             
@@ -610,17 +635,17 @@ export class GameRenderer {
             } else {
                 // Strong Neon Glow
                 if (!isLowQuality) {
-                    ctx.shadowBlur = 30; // Increased blur
+                    ctx.shadowBlur = isMarbleSociety ? 35 : 30; // Increased blur
                     ctx.shadowColor = col;
                 }
                 
                 // Background with Gradient
                 const bgGrad = ctx.createLinearGradient(bx, by, bx, height);
                 bgGrad.addColorStop(0, col); // Solid at top
-                bgGrad.addColorStop(1, 'rgba(0,0,0,0.2)'); // Fade to dark
+                bgGrad.addColorStop(1, isMarbleSociety ? 'rgba(234, 179, 8, 0.2)' : 'rgba(0,0,0,0.2)'); // Fade to dark
                 
                 ctx.fillStyle = bgGrad;
-                ctx.globalAlpha = 0.3;
+                ctx.globalAlpha = isMarbleSociety ? 0.45 : 0.3;
                 // Draw shape with rounded top
                 ctx.beginPath();
                 ctx.moveTo(bx + 4, by);
@@ -634,7 +659,7 @@ export class GameRenderer {
                 
                 // Bright Top Line (The "Lip")
                 ctx.strokeStyle = col;
-                ctx.lineWidth = 3;
+                ctx.lineWidth = isMarbleSociety ? 4 : 3;
                 ctx.beginPath();
                 ctx.moveTo(bx + 4, by);
                 ctx.lineTo(bx + basketW - 4, by);
@@ -644,13 +669,13 @@ export class GameRenderer {
                 if (!isSandPegMode) {
                     // Text
                     const val = (baseValues[i] + stats.basketValueBonus) * displayMult;
-                    ctx.fillStyle = '#fff';
-                    ctx.font = '800 13px "Segoe UI", Roboto, sans-serif';
+                    ctx.fillStyle = isMarbleSociety ? '#fef08a' : '#fff';
+                    ctx.font = isMarbleSociety ? '900 13px "Segoe UI", Roboto, sans-serif' : '800 13px "Segoe UI", Roboto, sans-serif';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     if (!isLowQuality) {
-                        ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                        ctx.shadowBlur = 4;
+                        ctx.shadowColor = isMarbleSociety ? 'rgba(234, 179, 8, 0.6)' : 'rgba(0,0,0,0.8)';
+                        ctx.shadowBlur = isMarbleSociety ? 6 : 4;
                     }
                     
                     let txt = formatNumber(val);

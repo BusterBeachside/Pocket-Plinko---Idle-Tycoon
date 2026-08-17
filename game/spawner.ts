@@ -3,24 +3,56 @@ import { Ball, GameState, Peg, VisualEffect } from './types';
 import { PhysicsManager } from './physics';
 
 export class Spawner {
-    static initPegs(width: number, height: number, gridSize: number): { pegs: Peg[], grid: Peg[][][], gridCols: number, gridRows: number } {
+    static initPegs(width: number, height: number, gridSize: number, state?: GameState): { pegs: Peg[], grid: Peg[][][], gridCols: number, gridRows: number } {
         const pegs: Peg[] = [];
-        const spacingX = 40; 
-        const spacingY = 40; 
-        const rows = 12; 
         
-        for(let r=0; r<rows; r++) {
-            const cols = (r % 2 === 0) ? 11 : 10;
-            const rowWidth = (cols - 1) * spacingX;
-            const startX = (width - rowWidth) / 2;
+        let isBrickWide = false;
+        if (state && state.gameMode === 'adventure') {
+            const gimmick = PhysicsManager.getActiveAdventureGimmick(state);
+            if (gimmick === 'brick_wide') {
+                isBrickWide = true;
+            }
+        }
+
+        // Side margin safety so marbles NEVER get wedged/stuck on outer walls
+        const minMarginX = 32;
+        const startY = 75;
+        const spacingY = isBrickWide ? 34 : 38;
+        const maxRows = isBrickWide ? 15 : 12;
+        
+        // Target columns for standard vs fortress brick wall grid
+        const baseColsEven = isBrickWide ? 13 : 11;
+        const baseColsOdd = isBrickWide ? 12 : 10;
+
+        // Calculate horizontal spacing across available width with 32px wall margins
+        const availWidth = Math.max(200, width - (minMarginX * 2));
+        const spacingXEven = availWidth / (baseColsEven - 1);
+
+        // Buckets top is at height - 40. Lowest peg row stops at least 62px above bottom
+        const maxPegY = height - 62;
+
+        for (let r = 0; r < maxRows; r++) {
+            const pegY = startY + (r * spacingY);
+            if (pegY > maxPegY) break; // Strict safety check: Never overlap bottom buckets
+
+            const isEven = (r % 2 === 0);
+            const cols = isEven ? baseColsEven : baseColsOdd;
             
-            for(let c=0; c<cols; c++) {
-                pegs.push({
-                    x: startX + (c * spacingX),
-                    y: 80 + (r * spacingY),
-                    glow: 0,
-                    cooldown: 0
-                });
+            // Center odd rows relative to even rows
+            const rowWidth = (cols - 1) * spacingXEven;
+            const startX = isEven ? minMarginX : (width - rowWidth) / 2;
+
+            for (let c = 0; c < cols; c++) {
+                const pegX = startX + (c * spacingXEven);
+                // Sanity check: keep peg center well within side boundaries
+                if (pegX >= 24 && pegX <= width - 24) {
+                    pegs.push({
+                        x: pegX,
+                        y: pegY,
+                        glow: 0,
+                        cooldown: 0
+                    });
+                }
             }
         }
 
@@ -31,7 +63,7 @@ export class Spawner {
         pegs.forEach(p => {
             const gx = Math.floor(p.x / gridSize);
             const gy = Math.floor(p.y / gridSize);
-            if(gx >= 0 && gx < gridCols && gy >= 0 && gy < gridRows) {
+            if (gx >= 0 && gx < gridCols && gy >= 0 && gy < gridRows) {
                 grid[gy][gx].push(p);
             }
         });
@@ -57,6 +89,15 @@ export class Spawner {
             
             // Other challenges
             const targetCount = state.challengeState.upgrades.extraBall;
+            const currentNormalBalls = balls.filter(b => !b.micro && !b.isSplit).reduce((sum, b) => sum + (b.mergeCount || 1), 0);
+            if (currentNormalBalls < targetCount) {
+                spawnBall();
+            }
+            return;
+        }
+
+        if (state.gameMode === 'adventure') {
+            const targetCount = state.upgrades.extraBall || 1;
             const currentNormalBalls = balls.filter(b => !b.micro && !b.isSplit).reduce((sum, b) => sum + (b.mergeCount || 1), 0);
             if (currentNormalBalls < targetCount) {
                 spawnBall();

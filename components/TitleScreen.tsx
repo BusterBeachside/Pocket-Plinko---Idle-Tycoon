@@ -2,10 +2,25 @@ import React, { useState } from 'react';
 import { UnderdogService } from '../services/underdogService';
 
 export const TitleScreen = ({ onStart, loading, progress }: { onStart: () => void, loading: boolean, progress: number }) => {
-    const [expanded, setExpanded] = useState<string | null>('v3.2 - The Performance Update');
+    const [expanded, setExpanded] = useState<string | null>('v3.3 - The Adventure Update');
     const isWebsim = UnderdogService.isWebsim();
 
     const updates = [
+        {
+            version: 'v3.3 - The Adventure Update',
+            blurb: `Greetings, Tycoons! Update 3.3 has arrived, and it brings with it a brand new game mode!
+
+- Added Adventure Mode. In this mode, you will make progress on new and unique boards, separate from your main progression. Each board type has its own unique gimmick! Meet the earnings goal to clear it and move on to the next board. See how far you can get!
+- Fixed particularly large Websim Ad banner sometimes taking up way too much space in menus
+- Another attempted fix for leaderboard cheats (Note: Websim databases are impossible to make 100% secure as of now, but I've done about as much as I can to put some roadblocks in place. A determined cheater could still get around these with enough dedication, but in case it wasn't clear, I'll say it here: PLEASE DO NOT ATTEMPT TO SUBMIT CHEATED SCORES. Players submitting cheated scores will be banned upon detection. Thank you!)
+- The game now always loads into the main board when a Challenge was the last-played mode.
+- Pop-ups for things like Challenges ending or daily events should no longer appear on the title screen.
+- Updated the mobile layout to make slightly better use of space on some screen sizes
+
+Please remember to leave feature suggestions, bug reports, and, ahem, Credit tips, in the comments! :)
+
+Thank you for playing Pocket Plinko!`
+        },
         {
             version: 'v3.2 - The Performance Update',
             blurb: `Greetings Tycoons! Today brings an update for bug fixes and new performance features.

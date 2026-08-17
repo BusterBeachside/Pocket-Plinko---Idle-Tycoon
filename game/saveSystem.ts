@@ -20,6 +20,9 @@ export class SaveSystem {
             const loaded = { 
                 ...INITIAL_STATE, 
                 ...parsed,
+                gameMode: parsed.gameMode || 'classic',
+                adventureState: { ...INITIAL_STATE.adventureState, ...(parsed.adventureState || {}) },
+                inChallengeMode: false, // Always default to main board on initial game load
                 debugMode: false, // Never restore debugMode from local storage
                 permUpgradesLevels: { ...INITIAL_STATE.permUpgradesLevels, ...parsed.permUpgradesLevels },
                 permUpgradeCosts: { ...INITIAL_STATE.permUpgradeCosts, ...parsed.permUpgradeCosts },
@@ -164,7 +167,7 @@ export class SaveSystem {
 
         // Calculate permanent upgrades
         const p = state.permUpgradesLevels || {};
-        if (state.inChallengeMode) {
+        if (state.inChallengeMode || state.gameMode === 'adventure') {
             state.permanentIncomeBoostPercent = 0;
             state.shardMultiplierPercent = 0;
             state.permanentMicroBoostPercent = 0;

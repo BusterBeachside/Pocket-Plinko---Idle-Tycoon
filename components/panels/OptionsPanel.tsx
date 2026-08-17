@@ -140,50 +140,52 @@ export const OptionsPanel = ({
             <div className="sidebar-content space-y-3 pb-8">
                 
                 {/* 1. Main Action Button: Challenge Dome / Return to Main Board */}
-                <button 
-                    className={`btn-toggle w-full flex flex-col items-center justify-center p-3 transition-all cursor-pointer ${(!gameState.inChallengeMode && !hasChallengeStarted) ? 'glow-breathing' : ''}`} 
-                    style={{ 
-                        background: gameState.inChallengeMode 
-                            ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
-                            : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', 
-                        border: gameState.inChallengeMode ? '1px solid #f87171' : '1px solid #fbbf24', 
-                        color: gameState.inChallengeMode ? 'white' : 'black',
-                        textTransform: 'uppercase',
-                        fontWeight: '900',
-                        fontSize: gameState.inChallengeMode ? '0.75rem' : '0.8rem',
-                        letterSpacing: '0.05em',
-                        boxShadow: gameState.inChallengeMode 
-                            ? '0 4px 15px rgba(239, 68, 68, 0.4)' 
-                            : '0 4px 15px rgba(245, 158, 11, 0.4)',
-                    }} 
-                    onClick={() => {
-                        if (gameState.inChallengeMode && onToggleChallenge) {
-                            onClose();
-                            onToggleChallenge();
-                        } else {
-                            onOpenChallenges();
-                        }
-                    }}
-                >
-                    <span className="font-extrabold flex items-center justify-center gap-1.5 whitespace-nowrap flex-nowrap w-full">
-                        {gameState.inChallengeMode ? '🔙 Return to Main Board' : '🏆 Challenge Dome'}
-                    </span>
-                    {!gameState.inChallengeMode && hasChallengeStarted && (
-                        <div className="flex items-center gap-1.5 mt-1.5 bg-black/40 border border-black/30 px-2.5 py-0.5 rounded-full text-[10px] font-bold text-black/90">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                            <span>IN PROGRESS</span>
-                            <span className="opacity-60">•</span>
-                            <span className="font-mono">{timeLeftStr}</span>
+                {gameState.gameMode !== 'adventure' && (
+                    <button 
+                        className={`btn-toggle w-full flex flex-col items-center justify-center p-3 transition-all cursor-pointer ${(!gameState.inChallengeMode && !hasChallengeStarted) ? 'glow-breathing' : ''}`} 
+                        style={{ 
+                            background: gameState.inChallengeMode 
+                                ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
+                                : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', 
+                            border: gameState.inChallengeMode ? '1px solid #f87171' : '1px solid #fbbf24', 
+                            color: gameState.inChallengeMode ? 'white' : 'black',
+                            textTransform: 'uppercase',
+                            fontWeight: '900',
+                            fontSize: gameState.inChallengeMode ? '0.75rem' : '0.8rem',
+                            letterSpacing: '0.05em',
+                            boxShadow: gameState.inChallengeMode 
+                                ? '0 4px 15px rgba(239, 68, 68, 0.4)' 
+                                : '0 4px 15px rgba(245, 158, 11, 0.4)',
+                        }} 
+                        onClick={() => {
+                            if (gameState.inChallengeMode && onToggleChallenge) {
+                                onClose();
+                                onToggleChallenge();
+                            } else {
+                                onOpenChallenges();
+                            }
+                        }}
+                    >
+                        <span className="font-extrabold flex items-center justify-center gap-1.5 whitespace-nowrap flex-nowrap w-full">
+                            {gameState.inChallengeMode ? '🔙 Return to Main Board' : '🏆 Challenge Dome'}
+                        </span>
+                        {!gameState.inChallengeMode && hasChallengeStarted && (
+                            <div className="flex items-center gap-1.5 mt-1.5 bg-black/40 border border-black/30 px-2.5 py-0.5 rounded-full text-[10px] font-bold text-black/90">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                                <span>IN PROGRESS</span>
+                                <span className="opacity-60">•</span>
+                                <span className="font-mono">{timeLeftStr}</span>
+                            </div>
+                        )}
+                        <div className="flex gap-2 mt-2 justify-center">
+                            <div className={`w-3.5 h-3.5 rounded-full border border-black/30 transition-all ${isBronzeAchieved ? 'bg-[#b45309]' : 'bg-transparent'}`} title={isBronzeAchieved ? "Bronze Complete" : "Bronze Incomplete"} />
+                            <div className={`w-3.5 h-3.5 rounded-full border border-black/30 transition-all ${isSilverAchieved ? 'bg-[#94a3b8]' : 'bg-transparent'}`} title={isSilverAchieved ? "Silver Complete" : "Silver Incomplete"} />
+                            <div className={`w-3.5 h-3.5 rounded-full border border-black/30 transition-all ${isGoldAchieved ? 'bg-[#fbbf24]' : 'bg-transparent'}`} title={isGoldAchieved ? "Gold Complete" : "Gold Incomplete"} />
                         </div>
-                    )}
-                    <div className="flex gap-2 mt-2 justify-center">
-                        <div className={`w-3.5 h-3.5 rounded-full border border-black/30 transition-all ${isBronzeAchieved ? 'bg-[#b45309]' : 'bg-transparent'}`} title={isBronzeAchieved ? "Bronze Complete" : "Bronze Incomplete"} />
-                        <div className={`w-3.5 h-3.5 rounded-full border border-black/30 transition-all ${isSilverAchieved ? 'bg-[#94a3b8]' : 'bg-transparent'}`} title={isSilverAchieved ? "Silver Complete" : "Silver Incomplete"} />
-                        <div className={`w-3.5 h-3.5 rounded-full border border-black/30 transition-all ${isGoldAchieved ? 'bg-[#fbbf24]' : 'bg-transparent'}`} title={isGoldAchieved ? "Gold Complete" : "Gold Incomplete"} />
-                    </div>
-                </button>
+                    </button>
+                )}
 
-                {!gameState.inChallengeMode && (
+                {!gameState.inChallengeMode && gameState.gameMode !== 'adventure' && (
                     <button 
                         className={`btn-toggle w-full flex items-center justify-center gap-2 ${engine.socketingActive ? 'glow-breathing !bg-[#0f2a3a] !border-cyan-400/60 !text-cyan-300' : ''}`} 
                         onClick={() => {
@@ -198,11 +200,12 @@ export const OptionsPanel = ({
                     </button>
                 )}
 
-                <WebsimAdBanner id="websim-ad-options-panel" type="banner" style={{ my: '6px' }} />
+                <WebsimAdBanner id="websim-ad-options-panel" type="banner" style={{ marginTop: '6px', marginBottom: '6px' }} />
 
                 {/* CATEGORY 1: Navigation & Stats Grid */}
                 {(() => {
-                    const hasRewardWaiting = hasClaimableMissions || hasClaimableAchievements || isDailyRewardClaimable;
+                    const isAdventure = gameState.gameMode === 'adventure';
+                    const hasRewardWaiting = !isAdventure && (hasClaimableMissions || hasClaimableAchievements || isDailyRewardClaimable);
                     return (
                         <div className={`border rounded-xl bg-black/30 overflow-hidden transition-all ${!openSections.navigation && hasRewardWaiting ? 'border-amber-400/80 shadow-[0_0_12px_rgba(251,191,36,0.25)]' : 'border-white/10'}`}>
                             <button 
@@ -213,7 +216,7 @@ export const OptionsPanel = ({
                             >
                                 <span className="flex items-center gap-2">
                                     <Gamepad2 className="w-4 h-4 text-amber-400" />
-                                    Game Views & Rewards
+                                    {isAdventure ? "Game Views" : "Game Views & Rewards"}
                                     {!openSections.navigation && hasRewardWaiting && (
                                         <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse inline-block ml-1 shadow-[0_0_8px_#fbbf24]" />
                                     )}
@@ -227,32 +230,36 @@ export const OptionsPanel = ({
                                         <BarChart2 className="w-3.5 h-3.5 text-cyan-400" /> Stats
                                     </button>
 
-                                    <button 
-                                        className={`btn-toggle !py-2 text-xs flex items-center justify-center gap-1.5 ${isDailyRewardClaimable ? 'glow-breathing !bg-[#0f1124] !border-amber-500/40 !text-amber-400' : ''}`} 
-                                        onClick={() => setUiState((s: any) => ({...s, dailyRewardOpen: true}))}
-                                    >
-                                        <Gift className="w-3.5 h-3.5 text-amber-400" /> {isDailyRewardClaimable ? "Daily Reward!" : "Daily Reward"}
-                                    </button>
-
                                     <button className="btn-toggle !py-2 text-xs flex items-center justify-center gap-1.5" onClick={onOpenTutorials}>
                                         <BookOpen className="w-3.5 h-3.5 text-blue-400" /> Tutorials
                                     </button>
 
-                                    <button 
-                                        className="btn-toggle !py-2 text-xs flex items-center justify-center gap-1.5" 
-                                        style={{ background: '#f39c12', boxShadow: '0 3px 0 #d35400' }} 
-                                        onClick={() => setUiState((s: any) => ({...s, leaderboardOpen: true, optionsOpen: false}))}
-                                    >
-                                        <Trophy className="w-3.5 h-3.5 text-amber-100" /> Leaderboard
-                                    </button>
+                                    {!isAdventure && (
+                                        <>
+                                            <button 
+                                                className={`btn-toggle !py-2 text-xs flex items-center justify-center gap-1.5 ${isDailyRewardClaimable ? 'glow-breathing !bg-[#0f1124] !border-amber-500/40 !text-amber-400' : ''}`} 
+                                                onClick={() => setUiState((s: any) => ({...s, dailyRewardOpen: true}))}
+                                            >
+                                                <Gift className="w-3.5 h-3.5 text-amber-400" /> {isDailyRewardClaimable ? "Daily Reward!" : "Daily Reward"}
+                                            </button>
 
-                                    <button className={`btn-toggle !py-2 text-xs flex items-center justify-center gap-1.5 ${hasClaimableAchievements ? 'glow-breathing' : ''}`} onClick={() => setUiState((s: any) => ({...s, achievementsOpen: true}))}>
-                                        <Award className="w-3.5 h-3.5 text-emerald-400" /> Achievements
-                                    </button>
+                                            <button 
+                                                className="btn-toggle !py-2 text-xs flex items-center justify-center gap-1.5" 
+                                                style={{ background: '#f39c12', boxShadow: '0 3px 0 #d35400' }} 
+                                                onClick={() => setUiState((s: any) => ({...s, leaderboardOpen: true, optionsOpen: false}))}
+                                            >
+                                                <Trophy className="w-3.5 h-3.5 text-amber-100" /> Leaderboard
+                                            </button>
 
-                                    <button className={`btn-toggle !py-2 text-xs flex items-center justify-center gap-1.5 ${hasClaimableMissions ? 'glow-breathing' : ''}`} onClick={() => setUiState((s: any) => ({...s, missionsOpen: true}))}>
-                                        <Target className="w-3.5 h-3.5 text-rose-400" /> Missions
-                                    </button>
+                                            <button className={`btn-toggle !py-2 text-xs flex items-center justify-center gap-1.5 ${hasClaimableAchievements ? 'glow-breathing' : ''}`} onClick={() => setUiState((s: any) => ({...s, achievementsOpen: true}))}>
+                                                <Award className="w-3.5 h-3.5 text-emerald-400" /> Achievements
+                                            </button>
+
+                                            <button className={`btn-toggle !py-2 text-xs flex items-center justify-center gap-1.5 ${hasClaimableMissions ? 'glow-breathing' : ''}`} onClick={() => setUiState((s: any) => ({...s, missionsOpen: true}))}>
+                                                <Target className="w-3.5 h-3.5 text-rose-400" /> Missions
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>

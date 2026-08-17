@@ -46,8 +46,10 @@ const getCurrentValueText = (id: string, level: number, stats: any, state: GameS
             return `Current: ${stats.uncommonChancePercent}% spawn chance`;
         case 'bonusValue':
             return `Current: ${Math.round((0.10 + (stats.upgrades.bonusValue || 0) * 0.10) * 100)}% of peak income per second`;
-        case 'criticalChance':
-            return `Current: ${stats.criticalChancePercent}% critical hit chance`;
+        case 'criticalChance': {
+            const activeGimmick = state.gameMode === 'adventure' ? PhysicsManager.getActiveAdventureGimmick(state) : null;
+            return `Current: ${stats.criticalChancePercent}% critical hit chance${activeGimmick === 'critical_overload' ? ' (Crucial for Thermal Meltdown!)' : ''}`;
+        }
         case 'basketValue': {
             const baseVal = stats.basketValueBonus;
             const marbleMult = Math.max(1, purchased * 0.75);

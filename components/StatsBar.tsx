@@ -39,6 +39,16 @@ export const StatsBar = () => {
                     const marbleMult = Math.max(1, (engine.state.challengeState.upgrades.extraBall || 1) * 0.75);
                     setPegVal(Math.round(base * marbleMult));
                 }
+            } else if (engine.state.gameMode === 'adventure') {
+                setMoney(engine.state.money);
+                setMps(engine.state.currentMps || 0);
+                const purchased = engine.state.upgrades.extraBall;
+                setBalls(purchased);
+                
+                const base = engine.state.pegValue;
+                const marbleMult = Math.max(1, purchased * 0.75);
+                const advMult = engine.state.adventureState?.adventureMultiplier || 1.0;
+                setPegVal(Math.round(base * marbleMult * advMult));
             } else {
                 setMoney(engine.state.money);
                 setMps(engine.state.currentMps || 0);

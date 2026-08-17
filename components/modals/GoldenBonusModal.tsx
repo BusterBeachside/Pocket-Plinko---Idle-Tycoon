@@ -25,15 +25,19 @@ export const GoldenBonusModal: React.FC<GoldenBonusModalProps> = ({ onClose }) =
 
     // Calculate base bonus marble value up front
     const isChallenge = engine.state.inChallengeMode;
+    const isAdventure = engine.state.gameMode === 'adventure';
     const bonusLevel = isChallenge 
         ? (engine.state.challengeState?.upgrades?.bonusValue || 0)
         : (engine.state.upgrades?.bonusValue || 0);
     const bonusRate = 0.10 + (bonusLevel * 0.10);
     const peakToUse = isChallenge
         ? (engine.state.challengeState?.currentRunPeakMps || engine.state.challengeState?.currentMps || 0)
+        : isAdventure
+        ? (engine.state.adventureState?.currentLevelPeakMps || engine.state.adventureState?.currentMps || engine.state.currentRunPeakMps || 0)
         : (engine.state.currentRunPeakMps || engine.state.currentMps || 0);
 
-    const baseValue = Math.max(100, Math.round(peakToUse * bonusRate));
+    const baseline = isAdventure ? Math.max(25, Math.round((engine.state.adventureState?.levelEarnings || 0) * 0.05)) : 100;
+    const baseValue = Math.max(baseline, Math.round(peakToUse * bonusRate));
     const commonCashValue = baseValue * 10;
     const rareSuperCashValue = baseValue * 50;
     const isSandPeg = isChallenge && engine.state.challengeState?.challengeId === 'sand_peg';
