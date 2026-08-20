@@ -807,8 +807,23 @@ export class GameEngine {
             this.state.gameMode = mode;
             this.state.inChallengeMode = false;
             const lvl = this.state.adventureState?.currentLevel || 1;
-            this.startAdventureLevel(lvl);
+            this.startAdventureLevel(lvl, false);
         } else {
+            // Save current adventure state before switching to classic
+            if (this.state.gameMode === 'adventure' && this.state.adventureState) {
+                this.state.adventureState.money = this.state.money;
+                this.state.adventureState.upgrades = JSON.parse(JSON.stringify(this.state.upgrades));
+                this.state.adventureState.uncommonChancePercent = this.state.uncommonChancePercent;
+                this.state.adventureState.rareChancePercent = this.state.rareChancePercent;
+                this.state.adventureState.legendaryChancePercent = this.state.legendaryChancePercent;
+                this.state.adventureState.criticalChancePercent = this.state.criticalChancePercent;
+                this.state.adventureState.microValuePercent = this.state.microValuePercent;
+                this.state.adventureState.bonusValuePercent = this.state.bonusValuePercent;
+                this.state.adventureState.basketValueBonus = this.state.basketValueBonus;
+                this.state.adventureState.currentRunPeakMps = this.state.currentRunPeakMps;
+                this.state.adventureState.currentMps = this.state.currentMps;
+            }
+
             this.state.gameMode = mode;
             this.state.inChallengeMode = false;
             // Restore classic board
@@ -838,7 +853,7 @@ export class GameEngine {
         }
     }
 
-    startAdventureLevel(levelId: number) {
+    startAdventureLevel(levelId: number, resetProgress: boolean = true) {
         this.state.gameMode = 'adventure';
         this.state.inChallengeMode = false;
         this.levelVictoryPending = false;
@@ -856,32 +871,73 @@ export class GameEngine {
                 currentLevelPeakMps: 0,
                 currentMps: 0
             };
-        } else {
+            resetProgress = true;
+        } else if (this.state.adventureState.currentLevel !== levelId) {
+            resetProgress = true;
+        }
+
+        if (resetProgress) {
             this.state.adventureState.currentLevel = levelId;
             this.state.adventureState.levelEarnings = 0;
             this.state.adventureState.targetGoal = config.targetGoal;
             this.state.adventureState.highestLevelUnlocked = Math.max(this.state.adventureState.highestLevelUnlocked || 1, levelId);
             this.state.adventureState.currentLevelPeakMps = 0;
             this.state.adventureState.currentMps = 0;
-        }
+            this.state.adventureState.money = 0;
+            this.state.adventureState.upgrades = {
+                extraBall: 1,
+                pegValue: 0,
+                ballSpeed: 0,
+                basketValue: 0,
+                uncommonChance: 0,
+                rareChance: 0,
+                legendaryChance: 0,
+                criticalChance: 0,
+                microValue: 0,
+                bonusValue: 0
+            };
 
-        // Reset level-specific cash, MPS tracking, & local upgrades for new board run
-        this.state.currentRunPeakMps = 0;
-        this.state.currentMps = 0;
-        this.incomeBuffer = 0;
-        this.state.money = 0;
-        this.state.upgrades = {
-            extraBall: 1,
-            pegValue: 0,
-            ballSpeed: 0,
-            basketValue: 0,
-            uncommonChance: 0,
-            rareChance: 0,
-            legendaryChance: 0,
-            criticalChance: 0,
-            microValue: 0,
-            bonusValue: 0
-        };
+            this.state.currentRunPeakMps = 0;
+            this.state.currentMps = 0;
+            this.incomeBuffer = 0;
+            this.state.money = 0;
+            this.state.upgrades = JSON.parse(JSON.stringify(this.state.adventureState.upgrades));
+        } else {
+            this.state.adventureState.currentLevel = levelId;
+            this.state.adventureState.targetGoal = config.targetGoal;
+            this.state.adventureState.highestLevelUnlocked = Math.max(this.state.adventureState.highestLevelUnlocked || 1, levelId);
+
+            if (this.state.adventureState.money !== undefined) {
+                this.state.money = this.state.adventureState.money;
+            } else {
+                this.state.money = 0;
+            }
+            if (this.state.adventureState.upgrades) {
+                this.state.upgrades = JSON.parse(JSON.stringify(this.state.adventureState.upgrades));
+            } else {
+                this.state.upgrades = {
+                    extraBall: 1,
+                    pegValue: 0,
+                    ballSpeed: 0,
+                    basketValue: 0,
+                    uncommonChance: 0,
+                    rareChance: 0,
+                    legendaryChance: 0,
+                    criticalChance: 0,
+                    microValue: 0,
+                    bonusValue: 0
+                };
+            }
+            if (this.state.adventureState.uncommonChancePercent !== undefined) this.state.uncommonChancePercent = this.state.adventureState.uncommonChancePercent;
+            if (this.state.adventureState.rareChancePercent !== undefined) this.state.rareChancePercent = this.state.adventureState.rareChancePercent;
+            if (this.state.adventureState.legendaryChancePercent !== undefined) this.state.legendaryChancePercent = this.state.adventureState.legendaryChancePercent;
+            if (this.state.adventureState.criticalChancePercent !== undefined) this.state.criticalChancePercent = this.state.adventureState.criticalChancePercent;
+            if (this.state.adventureState.microValuePercent !== undefined) this.state.microValuePercent = this.state.adventureState.microValuePercent;
+            if (this.state.adventureState.bonusValuePercent !== undefined) this.state.bonusValuePercent = this.state.adventureState.bonusValuePercent;
+            if (this.state.adventureState.basketValueBonus !== undefined) this.state.basketValueBonus = this.state.adventureState.basketValueBonus;
+            if (this.state.adventureState.currentRunPeakMps !== undefined) this.state.currentRunPeakMps = this.state.adventureState.currentRunPeakMps;
+            if (this.state.adventureState.currentMps !== undefined) this.state.currentMps = this.state.adventureState.currentMps;
+        }
 
         this.balls = [];
         this.initPegs();
@@ -890,7 +946,7 @@ export class GameEngine {
         this.notify();
 
         // Dispatch first-time intro pop-up event
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && resetProgress) {
             if (!this.state.adventureState.seenInfoPopups) {
                 this.state.adventureState.seenInfoPopups = {};
             }

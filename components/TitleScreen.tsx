@@ -2,10 +2,18 @@ import React, { useState } from 'react';
 import { UnderdogService } from '../services/underdogService';
 
 export const TitleScreen = ({ onStart, loading, progress }: { onStart: () => void, loading: boolean, progress: number }) => {
-    const [expanded, setExpanded] = useState<string | null>('v3.3 - The Adventure Update');
+    const [expanded, setExpanded] = useState<string | null>('v3.3.1');
     const isWebsim = UnderdogService.isWebsim();
 
     const updates = [
+        {
+            version: 'v3.3.1',
+            blurb: `HOTFIX:
+            
+- Fixed current Adventure Mode board progress being lost when navigating to Classic Mode and back to Adventure.
+
+Please continue reporting any bugs or issues in the comments and thank you for playing Pocket Plinko!`
+        },
         {
             version: 'v3.3 - The Adventure Update',
             blurb: `Greetings, Tycoons! Update 3.3 has arrived, and it brings with it a brand new game mode!

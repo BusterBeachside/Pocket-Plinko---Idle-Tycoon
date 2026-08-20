@@ -225,6 +225,16 @@ export interface AdventureState {
     seenInfoPopups?: Record<number, boolean>;
     currentLevelPeakMps?: number;
     currentMps?: number;
+    money?: number;
+    upgrades?: GameState['upgrades'];
+    uncommonChancePercent?: number;
+    rareChancePercent?: number;
+    legendaryChancePercent?: number;
+    criticalChancePercent?: number;
+    microValuePercent?: number;
+    bonusValuePercent?: number;
+    basketValueBonus?: number;
+    currentRunPeakMps?: number;
 }
 
 export interface ActiveMission {
